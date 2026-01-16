@@ -10,7 +10,7 @@ In **Shape Stack**, the player's goal is to stack geometric shapes on top of eac
 
 - **Automatic Growth**: The active shape grows at a variable speed (MIN: 25, MAX: 90 units/sec).
 - **Rotation**: Shapes rotate, with speed increasing as the player's score rises.
-- **Levels**: Every 10 successful stacks, the game levels up.
+- **Levels**: Every 5 successful stacks, the game levels up.
 - **Shape Unlocks**: New levels unlock more complex shapes (Circle, Square, Pentagon → Hexagon → Octagon → Triangle → Rectangle).
 - **Containment Check**: Precise collision detection ensures the active shape's vertices are all within the previous shape.
 - **Audio**: Dynamic sound effects for stacking, level-ups, and failure.
@@ -50,6 +50,7 @@ When working on this project, adhere to these principles:
 5.  **Audio Integration**: Always consider how new features interact with the `audioManager`.
 6.  **Progressive Difficulty**: When adding mechanics, ensure they scale with `score` or `level` to maintain challenge.
 7.  **Asset Management**: Use `src/assets` for images/sounds. If new assets are needed, use the `generate_image` tool for visual assets.
+8.  **Documentation**: Keep `GAMEPLAY.md` updated with any changes to game mechanics, levels, or shape unlocks.
 
 ## 🎨 Design System
 
