@@ -2,7 +2,7 @@ import type { ShapeType } from "../utils/geometry";
 
 export const MIN_GROWTH_SPEED = 25;
 export const MAX_GROWTH_SPEED = 90;
-export const STACKS_PER_LEVEL = 10;
+export const STACKS_PER_LEVEL = 5;
 
 export const SHAPE_UNLOCKS: Record<number, ShapeType[]> = {
   1: ["circle", "square"],
