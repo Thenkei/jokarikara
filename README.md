@@ -7,6 +7,7 @@ A minimalist, high-intensity rhythm timing game developed with React, TypeScript
 **Shape Stack** is a game of precision and rhythm. The goal is to stack as many geometric shapes as possible by tapping the screen at the exact right moment.
 
 ### Mechanics
+
 - **Concentric Stacking**: Every successful tap creates a new shape that grows from the center, nested inside the previous ones.
 - **Precise Collision Detection**: The game uses a custom geometric containment system. A tap is only successful if the new shape is strictly contained within the boundaries of the previous shape.
 - **Difficulty Scaling**: As your stack grows, shapes scale up faster and rotate more aggressively, increasing the cognitive load and requiring faster reflexes.
@@ -22,22 +23,26 @@ A minimalist, high-intensity rhythm timing game developed with React, TypeScript
 ## Development
 
 ### Setup
+
 ```bash
 npm install
 ```
 
 ### Run Locally
+
 ```bash
 npm run dev
 ```
 
 ### Build for Production
+
 ```bash
 npm run build
 ```
 
 ## Technologies Used
-- **React 18**
+
+- **React 19**
 - **TypeScript**
 - **Vite**
 - **HTML5 Canvas API**
