@@ -51,6 +51,9 @@ export const GameCanvas = ({
   const lastTimeRef = useRef(0);
   const isGameOverRef = useRef(false);
   const currentSpeedRef = useRef(MIN_GROWTH_SPEED); // Store speed for the current active shape
+  const zoomRef = useRef(1);
+  const targetZoomRef = useRef(1);
+  const initialSizeRef = useRef(0);
 
   const createNewActiveShape = useCallback(() => {
     const unlockedShapes = getUnlockedShapes(levelRef.current);
@@ -86,6 +89,7 @@ export const GameCanvas = ({
   // Initialize first shape
   useEffect(() => {
     const startSize = Math.min(window.innerWidth, window.innerHeight) * 0.45;
+    initialSizeRef.current = startSize;
     const firstShape: Shape = {
       type: "circle",
       size: startSize,
@@ -127,6 +131,14 @@ export const GameCanvas = ({
       levelRef.current = newLevel;
       onLevelUp(newLevel);
       audioManager.playStackSound(scoreRef.current * 2); // Double pitch for level up
+
+      // Trigger zoom in
+      // Calculate how much to zoom to keep shapes at a playable size
+      // We target the current last shape to become roughly 80% of initial size
+      const lastShapeSize = activeShape.size;
+      const newTargetZoom =
+        targetZoomRef.current * (initialSizeRef.current / lastShapeSize) * 0.8;
+      targetZoomRef.current = newTargetZoom;
     }
 
     // Create next active shape
@@ -225,9 +237,24 @@ export const GameCanvas = ({
         }
       }
 
+      // Smoothly interpolate zoom
+      const zoomLerpSpeed = 2; // Adjust for faster/slower zoom
+      if (Math.abs(zoomRef.current - targetZoomRef.current) > 0.001) {
+        zoomRef.current +=
+          (targetZoomRef.current - zoomRef.current) * zoomLerpSpeed * dt;
+      } else {
+        zoomRef.current = targetZoomRef.current;
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
+
+      ctx.save();
+      // Apply zoom centered on the stack
+      ctx.translate(centerX, centerY);
+      ctx.scale(zoomRef.current, zoomRef.current);
+      ctx.translate(-centerX, -centerY);
 
       ctx.beginPath();
       const grad = ctx.createRadialGradient(
@@ -257,6 +284,8 @@ export const GameCanvas = ({
       if (activeShapeRef.current) {
         drawShape(ctx, activeShapeRef.current, centerX, centerY);
       }
+
+      ctx.restore();
 
       requestAnimationFrame(loop);
     };
