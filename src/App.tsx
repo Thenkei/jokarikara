@@ -35,7 +35,7 @@ function App() {
   };
 
   return (
-    <div className="game-container">
+    <div className={`game-container ${level >= 5 ? "world-2" : ""}`}>
       {gameState === "START" && (
         <div className="screen start-screen">
           <h1 className="title">SHAPE STACK</h1>

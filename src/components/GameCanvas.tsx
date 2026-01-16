@@ -55,6 +55,7 @@ export const GameCanvas = ({
   const zoomRef = useRef(1);
   const targetZoomRef = useRef(1);
   const initialSizeRef = useRef(0);
+  const transitionProgressRef = useRef<number | null>(null); // null means no transition, otherwise 0 to 1
 
   const createNewActiveShape = useCallback(() => {
     const unlockedShapes = getUnlockedShapes(levelRef.current);
@@ -140,6 +141,11 @@ export const GameCanvas = ({
         activeShape.size,
         initialSizeRef.current
       );
+
+      // Trigger world transition effect for Level 5 to 10
+      if (newLevel >= 5 && newLevel <= 10) {
+        transitionProgressRef.current = 0;
+      }
     }
 
     // Create next active shape
@@ -216,8 +222,6 @@ export const GameCanvas = ({
       const dt = (time - lastTimeRef.current) / 1000;
       lastTimeRef.current = time;
 
-      const pulse = (Math.sin(time / 500) + 1) / 2;
-
       if (activeShapeRef.current) {
         // Use the fixed random speed assigned to this shape
         activeShapeRef.current.size += currentSpeedRef.current * dt;
@@ -243,6 +247,39 @@ export const GameCanvas = ({
         zoomRef.current = targetZoomRef.current;
       }
 
+      // Handle transition animation
+      let transitionScale = 1;
+      let chromaticAberrationIntensity = 0;
+
+      if (transitionProgressRef.current !== null) {
+        const TRANSITION_DURATION = 1.2; // seconds
+        transitionProgressRef.current += dt / TRANSITION_DURATION;
+
+        if (transitionProgressRef.current >= 1) {
+          transitionProgressRef.current = null;
+        } else {
+          const p = transitionProgressRef.current;
+          // Shrink then expand curve (bell-like for intensity)
+          // 0 -> 0.5 (shrink) -> 1.0 (expand back)
+          if (p < 0.3) {
+            // Rapid shrink
+            const shrinkP = p / 0.3;
+            transitionScale = 1 - 0.7 * shrinkP;
+          } else if (p < 0.7) {
+            // Massive expand
+            const expandP = (p - 0.3) / 0.4;
+            transitionScale = 0.3 + 1.5 * expandP; // Go up to 1.8x
+            chromaticAberrationIntensity = Math.sin(
+              ((p - 0.3) / 0.4) * Math.PI
+            );
+          } else {
+            // Settle
+            const settleP = (p - 0.7) / 0.3;
+            transitionScale = 1.8 - 0.8 * settleP;
+          }
+        }
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
@@ -250,36 +287,62 @@ export const GameCanvas = ({
       ctx.save();
       // Apply zoom centered on the stack
       ctx.translate(centerX, centerY);
-      ctx.scale(zoomRef.current, zoomRef.current);
+      ctx.scale(
+        zoomRef.current * transitionScale,
+        zoomRef.current * transitionScale
+      );
       ctx.translate(-centerX, -centerY);
 
-      ctx.beginPath();
-      const grad = ctx.createRadialGradient(
-        centerX,
-        centerY,
-        0,
-        centerX,
-        centerY,
-        canvas.width * 0.8
-      );
-      grad.addColorStop(0, `rgba(255, 255, 255, ${0.03 + pulse * 0.02})`);
-      grad.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Chromatic Aberration effect during intense expansion
+      const drawStack = (
+        offset: { x: number; y: number } = { x: 0, y: 0 },
+        colorFilter?: "r" | "g" | "b"
+      ) => {
+        ctx.save();
+        ctx.translate(offset.x, offset.y);
+        shapesRef.current.forEach((shape, index) => {
+          const originalColor = shape.color;
+          if (colorFilter) {
+            // Simple color override for aberration
+            if (colorFilter === "r") ctx.fillStyle = "#ff5555";
+            if (colorFilter === "g") ctx.fillStyle = "#55ff55";
+            if (colorFilter === "b") ctx.fillStyle = "#5555ff";
+          }
 
-      shapesRef.current.forEach((shape, index) => {
-        const age = shapesRef.current.length - 1 - index;
-        if (age > 10) {
-          shape.opacity = Math.max(0, shape.opacity - 0.005);
+          const age = shapesRef.current.length - 1 - index;
+          if (age > 10) {
+            shape.opacity = Math.max(0, shape.opacity - 0.005);
+          }
+
+          // Slow rotation for background shapes
+          shape.rotation += 0.005 * (index % 2 === 0 ? 1 : -1);
+
+          drawShape(ctx, shape, centerX, centerY);
+          if (colorFilter) shape.color = originalColor; // Restore
+        });
+
+        if (activeShapeRef.current) {
+          const originalColor = activeShapeRef.current.color;
+          if (colorFilter) {
+            if (colorFilter === "r") ctx.fillStyle = "#ff5555";
+            if (colorFilter === "g") ctx.fillStyle = "#55ff55";
+            if (colorFilter === "b") ctx.fillStyle = "#5555ff";
+          }
+          drawShape(ctx, activeShapeRef.current, centerX, centerY);
+          if (colorFilter) activeShapeRef.current.color = originalColor;
         }
+        ctx.restore();
+      };
 
-        shape.rotation += 0.005 * (index % 2 === 0 ? 1 : -1);
-
-        drawShape(ctx, shape, centerX, centerY);
-      });
-
-      if (activeShapeRef.current) {
-        drawShape(ctx, activeShapeRef.current, centerX, centerY);
+      if (chromaticAberrationIntensity > 0.1) {
+        const dist = chromaticAberrationIntensity * 15;
+        ctx.globalCompositeOperation = "screen";
+        drawStack({ x: -dist, y: 0 }, "r");
+        drawStack({ x: dist, y: 0 }, "b");
+        ctx.globalCompositeOperation = "source-over";
+        drawStack();
+      } else {
+        drawStack();
       }
 
       ctx.restore();
