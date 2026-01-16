@@ -38,12 +38,32 @@
 
 .hud {
   position: absolute;
-  top: 4rem;
+  top: 3rem;
   width: 100%;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
   pointer-events: none;
   z-index: 5;
   user-select: none;
+}
+
+.hud-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.level-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
 .score {
@@ -51,6 +71,74 @@
   font-weight: 900;
   opacity: 0.2;
   font-variant-numeric: tabular-nums;
+}
+
+/* Level up overlay */
+.level-up-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  pointer-events: none;
+  animation: levelUpPop 1.5s ease-out forwards;
+}
+
+.level-up-text {
+  font-size: clamp(3rem, 20vw, 6rem);
+  font-weight: 900;
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 50%, #ff4500 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+  letter-spacing: 0.05em;
+}
+
+@keyframes levelUpPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  40% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+}
+
+/* Final stats on game over */
+.final-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.final-level {
+  font-size: 1.4rem;
+  color: #888;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.score-display {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(to bottom, #fff 0%, #888 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 button {
@@ -62,7 +150,8 @@ button {
   font-weight: 800;
   border-radius: 99px;
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    background 0.2s;
   letter-spacing: 0.05em;
 }
 
@@ -80,6 +169,12 @@ button:active {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

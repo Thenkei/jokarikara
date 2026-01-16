@@ -1,8 +1,17 @@
-import { useRef, useEffect, useCallback } from 'react';
-import { audioManager } from '../utils/audioManager';
+import { useRef, useEffect, useCallback } from "react";
+import { audioManager } from "../utils/audioManager";
+
+type ShapeType =
+  | "circle"
+  | "square"
+  | "triangle"
+  | "rectangle"
+  | "pentagon"
+  | "hexagon"
+  | "octagon";
 
 interface Shape {
-  type: 'circle' | 'square' | 'triangle';
+  type: ShapeType;
   size: number;
   rotation: number;
   color: string;
@@ -12,6 +21,7 @@ interface Shape {
 interface GameCanvasProps {
   onScore: (score: number) => void;
   onGameOver: (finalScore: number) => void;
+  onLevelUp: (level: number) => void;
 }
 
 interface Point {
@@ -19,24 +29,67 @@ interface Point {
   y: number;
 }
 
+// Game constants
+const MIN_GROWTH_SPEED = 25;
+const MAX_GROWTH_SPEED = 90;
+const STACKS_PER_LEVEL = 10;
+
+// Shape unlocks by level
+const SHAPE_UNLOCKS: Record<number, ShapeType[]> = {
+  1: ["circle", "square", "triangle"],
+  2: ["rectangle"],
+  3: ["pentagon"],
+  4: ["hexagon"],
+  5: ["octagon"],
+};
+
 const COLORS = [
-  '#3b82f6', // blue
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // violet
-  '#ec4899', // pink
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#8b5cf6", // violet
+  "#ec4899", // pink
 ];
+
+// Get unlocked shapes for a given level
+const getUnlockedShapes = (level: number): ShapeType[] => {
+  const unlocked: ShapeType[] = [];
+  for (let i = 1; i <= level; i++) {
+    if (SHAPE_UNLOCKS[i]) {
+      unlocked.push(...SHAPE_UNLOCKS[i]);
+    }
+  }
+  return unlocked;
+};
+
+// Helper to get vertices of regular polygons
+const getRegularPolygonVertices = (
+  sides: number,
+  size: number,
+  rotation: number
+): Point[] => {
+  const vertices: Point[] = [];
+  const radius = size / 2;
+  for (let i = 0; i < sides; i++) {
+    const angle = (i / sides) * Math.PI * 2 - Math.PI / 2 + rotation;
+    vertices.push({
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    });
+  }
+  return vertices;
+};
 
 // Helper to get vertices of a shape (for collision)
 const getVertices = (shape: Shape): Point[] => {
   const size = shape.size;
   const rot = shape.rotation;
-  const vertices: Point[] = [];
 
-  if (shape.type === 'circle') {
+  if (shape.type === "circle") {
     // For circles, we sample the perimeter to simulate vertices
     const samples = 12;
+    const vertices: Point[] = [];
     for (let i = 0; i < samples; i++) {
       const angle = (i / samples) * Math.PI * 2 + rot;
       vertices.push({
@@ -44,7 +97,8 @@ const getVertices = (shape: Shape): Point[] => {
         y: Math.sin(angle) * (size / 2),
       });
     }
-  } else if (shape.type === 'square') {
+    return vertices;
+  } else if (shape.type === "square") {
     const half = size / 2;
     const corners = [
       { x: -half, y: -half },
@@ -52,27 +106,42 @@ const getVertices = (shape: Shape): Point[] => {
       { x: half, y: half },
       { x: -half, y: half },
     ];
-    corners.forEach(p => {
-      vertices.push({
-        x: p.x * Math.cos(rot) - p.y * Math.sin(rot),
-        y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
-      });
-    });
-  } else if (shape.type === 'triangle') {
+    return corners.map((p) => ({
+      x: p.x * Math.cos(rot) - p.y * Math.sin(rot),
+      y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
+    }));
+  } else if (shape.type === "triangle") {
     const h = size * 0.866;
     const points = [
       { x: 0, y: -h / 2 },
       { x: size / 2, y: h / 2 },
       { x: -size / 2, y: h / 2 },
     ];
-    points.forEach(p => {
-      vertices.push({
-        x: p.x * Math.cos(rot) - p.y * Math.sin(rot),
-        y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
-      });
-    });
+    return points.map((p) => ({
+      x: p.x * Math.cos(rot) - p.y * Math.sin(rot),
+      y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
+    }));
+  } else if (shape.type === "rectangle") {
+    const halfW = size / 2;
+    const halfH = (size * 0.6) / 2;
+    const corners = [
+      { x: -halfW, y: -halfH },
+      { x: halfW, y: -halfH },
+      { x: halfW, y: halfH },
+      { x: -halfW, y: halfH },
+    ];
+    return corners.map((p) => ({
+      x: p.x * Math.cos(rot) - p.y * Math.sin(rot),
+      y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
+    }));
+  } else if (shape.type === "pentagon") {
+    return getRegularPolygonVertices(5, size, rot);
+  } else if (shape.type === "hexagon") {
+    return getRegularPolygonVertices(6, size, rot);
+  } else if (shape.type === "octagon") {
+    return getRegularPolygonVertices(8, size, rot);
   }
-  return vertices;
+  return [];
 };
 
 // Check if a point is inside a shape
@@ -84,28 +153,59 @@ const isPointInShape = (point: Point, shape: Shape): boolean => {
   const localX = point.x * Math.cos(-rot) - point.y * Math.sin(-rot);
   const localY = point.x * Math.sin(-rot) + point.y * Math.cos(-rot);
 
-  if (shape.type === 'circle') {
+  if (shape.type === "circle") {
     const dist = Math.sqrt(localX * localX + localY * localY);
     return dist <= size / 2 + 0.5; // Small buffer
-  } else if (shape.type === 'square') {
+  } else if (shape.type === "square") {
     const half = size / 2;
     return Math.abs(localX) <= half + 0.5 && Math.abs(localY) <= half + 0.5;
-  } else if (shape.type === 'triangle') {
+  } else if (shape.type === "triangle") {
     const h = size * 0.866;
     const halfW = size / 2;
-    
-    // Triangle bounds in local space:
-    // Top: (0, -h/2), Bottom Right: (halfW, h/2), Bottom Left: (-halfW, h/2)
-    // barycentric coordinates or simple edge tests
+
     if (localY < -h / 2 || localY > h / 2) return false;
-    
-    // Edges are:
-    // Bottom: y = h/2
-    // Left: (y - h/2) / ((-h/2) - h/2) = (x - (-halfW)) / (0 - (-halfW))
-    // (y - h/2) / (-h) = (x + halfW) / halfW
-    // (y - h/2) * halfW / (-h) - halfW = x
+
     const xLimit = (h / 2 - localY) * (halfW / h);
     return Math.abs(localX) <= xLimit + 0.5;
+  } else if (shape.type === "rectangle") {
+    const halfW = size / 2;
+    const halfH = (size * 0.6) / 2;
+    return Math.abs(localX) <= halfW + 0.5 && Math.abs(localY) <= halfH + 0.5;
+  } else if (
+    shape.type === "pentagon" ||
+    shape.type === "hexagon" ||
+    shape.type === "octagon"
+  ) {
+    // For regular polygons, use inscribed circle approximation for quick check
+    const sides =
+      shape.type === "pentagon" ? 5 : shape.type === "hexagon" ? 6 : 8;
+    const radius = size / 2;
+    // Inscribed circle radius for regular polygon
+    const inRadius = radius * Math.cos(Math.PI / sides);
+    const dist = Math.sqrt(localX * localX + localY * localY);
+
+    // Quick rejection
+    if (dist > radius + 0.5) return false;
+    // Quick accept
+    if (dist <= inRadius) return true;
+
+    // Detailed check: use ray casting algorithm
+    const vertices = getRegularPolygonVertices(sides, size, 0);
+    let inside = false;
+    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+      const xi = vertices[i].x,
+        yi = vertices[i].y;
+      const xj = vertices[j].x,
+        yj = vertices[j].y;
+
+      if (
+        yi > localY !== yj > localY &&
+        localX < ((xj - xi) * (localY - yi)) / (yj - yi) + xi
+      ) {
+        inside = !inside;
+      }
+    }
+    return inside;
   }
   return false;
 };
@@ -113,38 +213,54 @@ const isPointInShape = (point: Point, shape: Shape): boolean => {
 // Check if child is fully contained in parent
 const isContained = (child: Shape, parent: Shape): boolean => {
   const childVertices = getVertices(child);
-  return childVertices.every(v => isPointInShape(v, parent));
+  return childVertices.every((v) => isPointInShape(v, parent));
 };
 
-export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
+// Draw a regular polygon
+const drawRegularPolygon = (
+  ctx: CanvasRenderingContext2D,
+  sides: number,
+  size: number
+) => {
+  const radius = size / 2;
+  ctx.beginPath();
+  for (let i = 0; i < sides; i++) {
+    const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.closePath();
+};
+
+export const GameCanvas = ({
+  onScore,
+  onGameOver,
+  onLevelUp,
+}: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
   const activeShapeRef = useRef<Shape | null>(null);
   const scoreRef = useRef(0);
+  const levelRef = useRef(1);
   const lastTimeRef = useRef(0);
   const isGameOverRef = useRef(false);
+  const currentSpeedRef = useRef(MIN_GROWTH_SPEED); // Store speed for the current active shape
 
-  // Initialize first shape
-  useEffect(() => {
-    const startSize = Math.min(window.innerWidth, window.innerHeight) * 0.45;
-    const firstShape: Shape = {
-      type: 'circle',
-      size: startSize,
-      rotation: 0,
-      color: COLORS[0],
-      opacity: 1,
-    };
-    shapesRef.current = [firstShape];
-    createNewActiveShape();
-  }, []);
+  const createNewActiveShape = useCallback(() => {
+    const unlockedShapes = getUnlockedShapes(levelRef.current);
+    const nextType =
+      unlockedShapes[Math.floor(Math.random() * unlockedShapes.length)];
 
-  const createNewActiveShape = () => {
-    const nextType = (['circle', 'square', 'triangle'] as const)[Math.floor(Math.random() * 3)];
-    
     // Get last color to avoid repetition
-    const lastColor = shapesRef.current.length > 0 
-      ? shapesRef.current[shapesRef.current.length - 1].color 
-      : null;
+    const lastColor =
+      shapesRef.current.length > 0
+        ? shapesRef.current[shapesRef.current.length - 1].color
+        : null;
 
     let nextColor = COLORS[Math.floor(Math.random() * COLORS.length)];
     // If choice is same as last, pick the next index as fallback
@@ -152,7 +268,11 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
       const idx = COLORS.indexOf(nextColor);
       nextColor = COLORS[(idx + 1) % COLORS.length];
     }
-    
+
+    // Set a random speed for this specific shape instance (between min and max)
+    currentSpeedRef.current =
+      MIN_GROWTH_SPEED + Math.random() * (MAX_GROWTH_SPEED - MIN_GROWTH_SPEED);
+
     activeShapeRef.current = {
       type: nextType,
       size: 10,
@@ -160,7 +280,27 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
       color: nextColor,
       opacity: 0.8,
     };
-  };
+  }, []);
+
+  // Initialize first shape
+  useEffect(() => {
+    const startSize = Math.min(window.innerWidth, window.innerHeight) * 0.45;
+    const firstShape: Shape = {
+      type: "circle",
+      size: startSize,
+      rotation: 0,
+      color: COLORS[0],
+      opacity: 1,
+    };
+    shapesRef.current = [firstShape];
+    createNewActiveShape();
+  }, [createNewActiveShape]);
+
+  const endGame = useCallback(() => {
+    isGameOverRef.current = true;
+    audioManager.playFailSound();
+    onGameOver(scoreRef.current);
+  }, [onGameOver]);
 
   const handleTap = useCallback(() => {
     if (isGameOverRef.current || !activeShapeRef.current) return;
@@ -180,17 +320,24 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
     onScore(scoreRef.current);
     audioManager.playStackSound(scoreRef.current);
 
+    // Check for level up
+    const newLevel = Math.floor(scoreRef.current / STACKS_PER_LEVEL) + 1;
+    if (newLevel > levelRef.current) {
+      levelRef.current = newLevel;
+      onLevelUp(newLevel);
+      audioManager.playStackSound(scoreRef.current * 2); // Double pitch for level up
+    }
+
     // Create next active shape
     createNewActiveShape();
-  }, [onScore]);
+  }, [onScore, onLevelUp, endGame, createNewActiveShape]);
 
-  const endGame = () => {
-    isGameOverRef.current = true;
-    audioManager.playFailSound();
-    onGameOver(scoreRef.current);
-  };
-
-  const drawShape = (ctx: CanvasRenderingContext2D, shape: Shape, x: number, y: number) => {
+  const drawShape = (
+    ctx: CanvasRenderingContext2D,
+    shape: Shape,
+    x: number,
+    y: number
+  ) => {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(shape.rotation);
@@ -200,27 +347,36 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
     const size = shape.size;
 
     ctx.beginPath();
-    if (shape.type === 'circle') {
+    if (shape.type === "circle") {
       ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
-    } else if (shape.type === 'square') {
+    } else if (shape.type === "square") {
       ctx.rect(-size / 2, -size / 2, size, size);
-    } else if (shape.type === 'triangle') {
+    } else if (shape.type === "triangle") {
       const h = size * 0.866;
       ctx.moveTo(0, -h / 2);
       ctx.lineTo(size / 2, h / 2);
       ctx.lineTo(-size / 2, h / 2);
       ctx.closePath();
+    } else if (shape.type === "rectangle") {
+      const height = size * 0.6;
+      ctx.rect(-size / 2, -height / 2, size, height);
+    } else if (shape.type === "pentagon") {
+      drawRegularPolygon(ctx, 5, size);
+    } else if (shape.type === "hexagon") {
+      drawRegularPolygon(ctx, 6, size);
+    } else if (shape.type === "octagon") {
+      drawRegularPolygon(ctx, 8, size);
     }
-    
+
     ctx.fill();
-    
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
     ctx.lineWidth = 3;
     ctx.stroke();
-    
+
     ctx.shadowBlur = 15;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+
     ctx.restore();
   };
 
@@ -228,14 +384,14 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
-    window.addEventListener('resize', resize);
+    window.addEventListener("resize", resize);
     resize();
 
     const loop = (time: number) => {
@@ -253,15 +409,15 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
       const pulse = (Math.sin(time / 500) + 1) / 2;
 
       if (activeShapeRef.current) {
-        const growthSpeed = 40 + (scoreRef.current * 3);
-        activeShapeRef.current.size += growthSpeed * dt;
-        
-        // Add rotation based on score
-        const rotationSpeed = 0.5 + (scoreRef.current * 0.1);
+        // Use the fixed random speed assigned to this shape
+        activeShapeRef.current.size += currentSpeedRef.current * dt;
+
+        // Add rotation based on score (capped to prevent dizziness)
+        const rotationSpeed = 0.5 + Math.min(scoreRef.current * 0.05, 1.5);
         activeShapeRef.current.rotation += rotationSpeed * dt;
 
         const lastShape = shapesRef.current[shapesRef.current.length - 1];
-        
+
         // Auto-fail if it starts poking out
         if (!isContained(activeShapeRef.current, lastShape)) {
           endGame();
@@ -273,9 +429,16 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
       const centerY = canvas.height / 2;
 
       ctx.beginPath();
-      const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, canvas.width * 0.8);
+      const grad = ctx.createRadialGradient(
+        centerX,
+        centerY,
+        0,
+        centerX,
+        centerY,
+        canvas.width * 0.8
+      );
       grad.addColorStop(0, `rgba(255, 255, 255, ${0.03 + pulse * 0.02})`);
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      grad.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -284,9 +447,9 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
         if (age > 10) {
           shape.opacity = Math.max(0, shape.opacity - 0.005);
         }
-        
+
         shape.rotation += 0.005 * (index % 2 === 0 ? 1 : -1);
-        
+
         drawShape(ctx, shape, centerX, centerY);
       });
 
@@ -300,15 +463,15 @@ export const GameCanvas = ({ onScore, onGameOver }: GameCanvasProps) => {
     const animId = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(animId);
-      window.removeEventListener('resize', resize);
+      window.removeEventListener("resize", resize);
     };
-  }, [onGameOver]);
+  }, [endGame]);
 
   return (
-    <canvas 
-      ref={canvasRef} 
+    <canvas
+      ref={canvasRef}
       onClick={handleTap}
-      style={{ width: '100%', height: '100%', cursor: 'pointer' }}
+      style={{ width: "100%", height: "100%", cursor: "pointer" }}
     />
   );
 };
