@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { isContained } from "./geometry";
+import {
+  isContained,
+  getRegularPolygonVertices,
+  getVertices,
+} from "./geometry";
 import type { Shape } from "./geometry";
 
 describe("geometry utilities", () => {
@@ -218,6 +222,51 @@ describe("geometry utilities", () => {
         opacity: 1,
       };
       expect(isContained(circleOutside, square)).toBe(false);
+    });
+  });
+
+  describe("getRegularPolygonVertices", () => {
+    it("should generate the correct number of vertices", () => {
+      const v3 = getRegularPolygonVertices(3, 100, 0);
+      expect(v3.length).toBe(3);
+      const v8 = getRegularPolygonVertices(8, 100, 0);
+      expect(v8.length).toBe(8);
+    });
+
+    it("should follow symmetry for 0 rotation", () => {
+      // Triangle with 0 rotation: first point should be at (0, -radius)
+      const v3 = getRegularPolygonVertices(3, 100, 0);
+      expect(v3[0].x).toBeCloseTo(0);
+      expect(v3[0].y).toBeCloseTo(-50);
+    });
+  });
+
+  describe("getVertices", () => {
+    it("should return sample points for circles", () => {
+      const circle: Shape = {
+        type: "circle",
+        size: 100,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      const v = getVertices(circle);
+      expect(v.length).toBe(12); // Based on our implementation
+    });
+
+    it("should return correctly rotated square vertices", () => {
+      const square: Shape = {
+        type: "square",
+        size: 100,
+        rotation: Math.PI / 2,
+        color: "red",
+        opacity: 1,
+      };
+      const v = getVertices(square);
+      // At 90 degrees rotation, points shift index but relative positions stay same.
+      // (Originally -50,-50 becomes 50,-50 at 90deg CW)
+      expect(v[0].x).toBeCloseTo(50);
+      expect(v[0].y).toBeCloseTo(-50);
     });
   });
 });

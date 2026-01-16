@@ -38,6 +38,9 @@ In **Shape Stack**, the player's goal is to stack geometric shapes on top of eac
 - `npm run dev`: Start the development server.
 - `npm run build`: Build the project for production.
 - `npm run lint`: Run ESLint to check for code quality.
+- `npm run test`: Run unit tests with Vitest.
+- `npm run test:e2e`: Run integration and snapshot tests with Playwright.
+- `npm run test:e2e:ui`: Open Playwright UI for interactive testing.
 
 ## 🤖 AI Assistant Guidelines (Antigravity)
 
@@ -47,10 +50,11 @@ When working on this project, adhere to these principles:
 2.  **Type Safety**: Ensure all new game entities or state transitions are strictly typed. Avoid `any`.
 3.  **Aesthetics**: Maintain the minimalist, "premium" feel. Use the established color palette and CSS variables.
 4.  **Math Precision**: Collision detection is vertex-based. Be precise when adding new shapes or modified collision logic.
-5.  **Audio Integration**: Always consider how new features interact with the `audioManager`.
-6.  **Progressive Difficulty**: When adding mechanics, ensure they scale with `score` or `level` to maintain challenge.
-7.  **Asset Management**: Use `src/assets` for images/sounds. If new assets are needed, use the `generate_image` tool for visual assets.
-8.  **Documentation**: Keep `GAMEPLAY.md` updated with any changes to game mechanics, levels, or shape unlocks.
+5.  **Integration Testing**: When adding new UI elements or changing layouts, update Playwright snapshots using `npm run test:e2e -- --update-snapshots`.
+6.  **Audio Integration**: Always consider how new features interact with the `audioManager`.
+7.  **Progressive Difficulty**: When adding mechanics, ensure they scale with `score` or `level` to maintain challenge.
+8.  **Asset Management**: Use `src/assets` for images/sounds. If new assets are needed, use the `generate_image` tool for visual assets.
+9.  **Documentation**: Keep `GAMEPLAY.md` updated with any changes to game mechanics, levels, or shape unlocks.
 
 ## 🎨 Design System
 
