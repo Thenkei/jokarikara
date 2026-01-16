@@ -68,16 +68,7 @@ export const getVertices = (shape: Shape): Point[] => {
       y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
     }));
   } else if (shape.type === "triangle") {
-    const h = size * 0.866;
-    const points = [
-      { x: 0, y: -h / 2 },
-      { x: size / 2, y: h / 2 },
-      { x: -size / 2, y: h / 2 },
-    ];
-    return points.map((p) => ({
-      x: p.x * Math.cos(rot) - p.y * Math.sin(rot),
-      y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
-    }));
+    return getRegularPolygonVertices(3, size, rot);
   } else if (shape.type === "rectangle") {
     const halfW = size / 2;
     const halfH = (size * 0.6) / 2;
@@ -116,14 +107,6 @@ export const isPointInShape = (point: Point, shape: Shape): boolean => {
   } else if (shape.type === "square") {
     const half = size / 2;
     return Math.abs(localX) <= half + 0.5 && Math.abs(localY) <= half + 0.5;
-  } else if (shape.type === "triangle") {
-    const h = size * 0.866;
-    const halfW = size / 2;
-
-    if (localY < -h / 2 || localY > h / 2) return false;
-
-    const xLimit = (h / 2 - localY) * (halfW / h);
-    return Math.abs(localX) <= xLimit + 0.5;
   } else if (shape.type === "rectangle") {
     const halfW = size / 2;
     const halfH = (size * 0.6) / 2;
@@ -131,11 +114,18 @@ export const isPointInShape = (point: Point, shape: Shape): boolean => {
   } else if (
     shape.type === "pentagon" ||
     shape.type === "hexagon" ||
-    shape.type === "octagon"
+    shape.type === "octagon" ||
+    shape.type === "triangle"
   ) {
     // For regular polygons, use inscribed circle approximation for quick check
     const sides =
-      shape.type === "pentagon" ? 5 : shape.type === "hexagon" ? 6 : 8;
+      shape.type === "pentagon"
+        ? 5
+        : shape.type === "hexagon"
+        ? 6
+        : shape.type === "octagon"
+        ? 8
+        : 3;
     const radius = size / 2;
     // Inscribed circle radius for regular polygon
     const inRadius = radius * Math.cos(Math.PI / sides);

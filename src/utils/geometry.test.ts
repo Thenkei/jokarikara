@@ -109,5 +109,115 @@ describe("geometry utilities", () => {
       };
       expect(isContained(shape, shape)).toBe(true);
     });
+
+    it("should correctly handle triangle containment", () => {
+      const parent: Shape = {
+        type: "triangle",
+        size: 100,
+        rotation: 0,
+        color: "blue",
+        opacity: 1,
+      };
+      const child: Shape = {
+        type: "triangle",
+        size: 50,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(child, parent)).toBe(true);
+
+      const largeChild: Shape = {
+        type: "triangle",
+        size: 110,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(largeChild, parent)).toBe(false);
+    });
+
+    it("should correctly handle rectangle containment", () => {
+      const parent: Shape = {
+        type: "rectangle",
+        size: 100,
+        rotation: 0,
+        color: "blue",
+        opacity: 1,
+      };
+      const child: Shape = {
+        type: "rectangle",
+        size: 80,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(child, parent)).toBe(true);
+
+      const wideChild: Shape = {
+        type: "rectangle",
+        size: 110,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(wideChild, parent)).toBe(false);
+    });
+
+    it("should correctly handle regular polygon containment (pentagon, octagon)", () => {
+      const parent: Shape = {
+        type: "octagon",
+        size: 100,
+        rotation: 0,
+        color: "blue",
+        opacity: 1,
+      };
+      const child: Shape = {
+        type: "pentagon",
+        size: 50,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(child, parent)).toBe(true);
+
+      const largePentagon: Shape = {
+        type: "pentagon",
+        size: 100, // Pentagon of size 100 will likely poke out of Octagon of size 100
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(largePentagon, parent)).toBe(false);
+    });
+
+    it("should handle mixed shape containment", () => {
+      // Circle inside Square
+      const square: Shape = {
+        type: "square",
+        size: 100,
+        rotation: 0,
+        color: "blue",
+        opacity: 1,
+      };
+      const circleInside: Shape = {
+        type: "circle",
+        size: 100, // Diameter 100 inside Side 100
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      // For circle we sample perimeter, all should be within or on edge of square
+      expect(isContained(circleInside, square)).toBe(true);
+
+      const circleOutside: Shape = {
+        type: "circle",
+        size: 102,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(circleOutside, square)).toBe(false);
+    });
   });
 });

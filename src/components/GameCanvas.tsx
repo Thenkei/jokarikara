@@ -3,6 +3,7 @@ import { audioManager } from "../utils/audioManager";
 
 import type { Shape } from "../utils/geometry";
 import { isContained } from "../utils/geometry";
+import { calculateNextZoom } from "../utils/gameLogic";
 import {
   MIN_GROWTH_SPEED,
   MAX_GROWTH_SPEED,
@@ -134,11 +135,11 @@ export const GameCanvas = ({
 
       // Trigger zoom in
       // Calculate how much to zoom to keep shapes at a playable size
-      // We target the current last shape to become roughly 80% of initial size
-      const lastShapeSize = activeShape.size;
-      const newTargetZoom =
-        targetZoomRef.current * (initialSizeRef.current / lastShapeSize) * 0.8;
-      targetZoomRef.current = newTargetZoom;
+      targetZoomRef.current = calculateNextZoom(
+        targetZoomRef.current,
+        activeShape.size,
+        initialSizeRef.current
+      );
     }
 
     // Create next active shape
@@ -165,11 +166,7 @@ export const GameCanvas = ({
     } else if (shape.type === "square") {
       ctx.rect(-size / 2, -size / 2, size, size);
     } else if (shape.type === "triangle") {
-      const h = size * 0.866;
-      ctx.moveTo(0, -h / 2);
-      ctx.lineTo(size / 2, h / 2);
-      ctx.lineTo(-size / 2, h / 2);
-      ctx.closePath();
+      drawRegularPolygon(ctx, 3, size);
     } else if (shape.type === "rectangle") {
       const height = size * 0.6;
       ctx.rect(-size / 2, -height / 2, size, height);
