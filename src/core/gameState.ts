@@ -1,0 +1,182 @@
+import type { GameState } from "../types";
+import type { Shape } from "../utils/geometry";
+import { createActiveShape, createInitialShape } from "../shapes";
+import { isContained } from "../utils/geometry";
+import { calculateNextZoom } from "../utils/gameLogic";
+import {
+  MIN_GROWTH_SPEED,
+  MAX_GROWTH_SPEED,
+  STACKS_PER_LEVEL,
+} from "../constants/game";
+
+/**
+ * Create the initial game state.
+ * @param viewportSize - The smaller of viewport width/height
+ */
+export const createInitialState = (viewportSize: number): GameState => {
+  const initialShape = createInitialShape(viewportSize);
+  return {
+    shapes: [initialShape],
+    activeShape: null,
+    score: 0,
+    level: 1,
+    zoom: 1,
+    targetZoom: 1,
+    initialSize: initialShape.size,
+    currentSpeed: MIN_GROWTH_SPEED,
+    isGameOver: false,
+  };
+};
+
+/**
+ * Generate a random growth speed for the active shape.
+ */
+export const generateRandomSpeed = (): number => {
+  return (
+    MIN_GROWTH_SPEED + Math.random() * (MAX_GROWTH_SPEED - MIN_GROWTH_SPEED)
+  );
+};
+
+/**
+ * Create a new active shape and update the state.
+ */
+export const spawnActiveShape = (state: GameState): GameState => {
+  const lastShape = state.shapes[state.shapes.length - 1] ?? null;
+  const activeShape = createActiveShape(state.level, lastShape);
+  const currentSpeed = generateRandomSpeed();
+
+  return {
+    ...state,
+    activeShape,
+    currentSpeed,
+  };
+};
+
+/**
+ * Update the active shape's size and rotation based on delta time.
+ * @param state - Current game state
+ * @param dt - Delta time in seconds
+ */
+export const updateActiveShape = (state: GameState, dt: number): GameState => {
+  if (!state.activeShape) return state;
+
+  const difficultyMultiplier = 1 + state.score * 0.05;
+  const growthIncrement =
+    (state.currentSpeed * difficultyMultiplier) / state.zoom;
+  const rotationSpeed = 0.5 + Math.min(state.score * 0.05, 1.5);
+
+  const updatedShape: Shape = {
+    ...state.activeShape,
+    size: state.activeShape.size + growthIncrement * dt,
+    rotation: state.activeShape.rotation + rotationSpeed * dt,
+  };
+
+  return {
+    ...state,
+    activeShape: updatedShape,
+  };
+};
+
+/**
+ * Check if the active shape is still contained within the last stacked shape.
+ */
+export const checkContainment = (state: GameState): boolean => {
+  if (!state.activeShape) return true;
+  const lastShape = state.shapes[state.shapes.length - 1];
+  return isContained(state.activeShape, lastShape);
+};
+
+/**
+ * Stack the active shape and update score/level.
+ * Returns the new state and whether a level-up occurred.
+ */
+export const stackActiveShape = (
+  state: GameState
+): { state: GameState; leveledUp: boolean; newLevel: number } => {
+  if (!state.activeShape) {
+    return { state, leveledUp: false, newLevel: state.level };
+  }
+
+  const newShapes = [...state.shapes, { ...state.activeShape, opacity: 1 }];
+  const newScore = state.score + 1;
+  const newLevel = Math.floor(newScore / STACKS_PER_LEVEL) + 1;
+  const leveledUp = newLevel > state.level;
+
+  let newTargetZoom = state.targetZoom;
+  if (leveledUp) {
+    newTargetZoom = calculateNextZoom(
+      state.targetZoom,
+      state.activeShape.size,
+      state.initialSize
+    );
+  }
+
+  return {
+    state: {
+      ...state,
+      shapes: newShapes,
+      activeShape: null,
+      score: newScore,
+      level: newLevel,
+      targetZoom: newTargetZoom,
+    },
+    leveledUp,
+    newLevel,
+  };
+};
+
+/**
+ * Set the game over state.
+ */
+export const setGameOver = (state: GameState): GameState => {
+  return {
+    ...state,
+    isGameOver: true,
+  };
+};
+
+/**
+ * Interpolate zoom smoothly towards target.
+ * @param state - Current game state
+ * @param dt - Delta time in seconds
+ * @param lerpSpeed - Interpolation speed (default: 2)
+ */
+export const updateZoom = (
+  state: GameState,
+  dt: number,
+  lerpSpeed: number = 2
+): GameState => {
+  if (Math.abs(state.zoom - state.targetZoom) <= 0.001) {
+    return { ...state, zoom: state.targetZoom };
+  }
+
+  const newZoom = state.zoom + (state.targetZoom - state.zoom) * lerpSpeed * dt;
+  return { ...state, zoom: newZoom };
+};
+
+/**
+ * Update shape opacities (older shapes fade out).
+ */
+export const updateShapeOpacities = (state: GameState): GameState => {
+  const updatedShapes = state.shapes.map((shape, index) => {
+    const age = state.shapes.length - 1 - index;
+    if (age > 10) {
+      return { ...shape, opacity: Math.max(0, shape.opacity - 0.005) };
+    }
+    return shape;
+  });
+
+  return { ...state, shapes: updatedShapes };
+};
+
+/**
+ * Apply subtle rotation drift to stacked shapes.
+ */
+export const updateShapeRotations = (state: GameState): GameState => {
+  const updatedShapes = state.shapes.map((shape, index) => ({
+    ...shape,
+    rotation: shape.rotation + 0.005 * (index % 2 === 0 ? 1 : -1),
+  }));
+
+  return { ...state, shapes: updatedShapes };
+};

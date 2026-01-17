@@ -1,200 +1,90 @@
 import { useRef, useEffect, useCallback } from "react";
-import { audioManager } from "../utils/audioManager";
-
-import type { Shape } from "../utils/geometry";
-import { isContained } from "../utils/geometry";
-import { calculateNextZoom } from "../utils/gameLogic";
+import { audioManager as defaultAudioManager } from "../utils/audioManager";
+import type { IAudioService } from "../audio/types";
+import type { GameState } from "../types";
 import {
-  MIN_GROWTH_SPEED,
-  MAX_GROWTH_SPEED,
-  STACKS_PER_LEVEL,
-  COLORS,
-  getUnlockedShapes,
-} from "../constants/game";
+  createInitialState,
+  spawnActiveShape,
+  updateActiveShape,
+  updateZoom,
+  updateShapeRotations,
+  updateShapeOpacities,
+  stackActiveShape,
+  setGameOver,
+  checkContainment,
+} from "../core/gameState";
+import {
+  drawShape,
+  drawBackground,
+  clearCanvas,
+} from "../rendering/shapeRenderer";
 
 interface GameCanvasProps {
   onScore: (score: number) => void;
   onGameOver: (finalScore: number) => void;
   onLevelUp: (level: number) => void;
+  /** Optional audio service for dependency injection (testing) */
+  audioService?: IAudioService;
 }
 
-// Draw a regular polygon
-const drawRegularPolygon = (
-  ctx: CanvasRenderingContext2D,
-  sides: number,
-  size: number
-) => {
-  const radius = size / 2;
-  ctx.beginPath();
-  for (let i = 0; i < sides; i++) {
-    const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  }
-  ctx.closePath();
-};
-
+/**
+ * GameCanvas - Orchestrates the game loop and React lifecycle.
+ * Delegates to extracted modules for state, rendering, and audio.
+ */
 export const GameCanvas = ({
   onScore,
   onGameOver,
   onLevelUp,
+  audioService = defaultAudioManager,
 }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const shapesRef = useRef<Shape[]>([]);
-  const activeShapeRef = useRef<Shape | null>(null);
-  const scoreRef = useRef(0);
-  const levelRef = useRef(1);
+  const stateRef = useRef<GameState | null>(null);
   const lastTimeRef = useRef(0);
-  const isGameOverRef = useRef(false);
-  const currentSpeedRef = useRef(MIN_GROWTH_SPEED); // Store speed for the current active shape
-  const zoomRef = useRef(1);
-  const targetZoomRef = useRef(1);
-  const initialSizeRef = useRef(0);
 
-  const createNewActiveShape = useCallback(() => {
-    const unlockedShapes = getUnlockedShapes(levelRef.current);
-    const nextType =
-      unlockedShapes[Math.floor(Math.random() * unlockedShapes.length)];
-
-    // Get last color to avoid repetition
-    const lastColor =
-      shapesRef.current.length > 0
-        ? shapesRef.current[shapesRef.current.length - 1].color
-        : null;
-
-    let nextColor = COLORS[Math.floor(Math.random() * COLORS.length)];
-    // If choice is same as last, pick the next index as fallback
-    if (nextColor === lastColor) {
-      const idx = COLORS.indexOf(nextColor);
-      nextColor = COLORS[(idx + 1) % COLORS.length];
-    }
-
-    // Set a random speed for this specific shape instance (between min and max)
-    currentSpeedRef.current =
-      MIN_GROWTH_SPEED + Math.random() * (MAX_GROWTH_SPEED - MIN_GROWTH_SPEED);
-
-    // Start at a fraction of the last shape's size to ensure it's always smaller
-    // but not too small to see.
-    const lastShape = shapesRef.current[shapesRef.current.length - 1];
-    const startSize = lastShape ? lastShape.size * 0.05 : 10;
-
-    activeShapeRef.current = {
-      type: nextType,
-      size: startSize,
-      rotation: 0,
-      color: nextColor,
-      opacity: 0.8,
-    };
+  // Initialize game state
+  useEffect(() => {
+    const viewportSize = Math.min(window.innerWidth, window.innerHeight);
+    const initialState = createInitialState(viewportSize);
+    stateRef.current = spawnActiveShape(initialState);
   }, []);
 
-  // Initialize first shape
-  useEffect(() => {
-    const startSize = Math.min(window.innerWidth, window.innerHeight) * 0.45;
-    initialSizeRef.current = startSize;
-    const firstShape: Shape = {
-      type: "circle",
-      size: startSize,
-      rotation: 0,
-      color: COLORS[0],
-      opacity: 1,
-    };
-    shapesRef.current = [firstShape];
-    createNewActiveShape();
-  }, [createNewActiveShape]);
-
   const endGame = useCallback(() => {
-    isGameOverRef.current = true;
-    audioManager.playFailSound();
-    onGameOver(scoreRef.current);
-  }, [onGameOver]);
+    if (!stateRef.current) return;
+    stateRef.current = setGameOver(stateRef.current);
+    audioService.playFailSound();
+    onGameOver(stateRef.current.score);
+  }, [onGameOver, audioService]);
 
   const handleTap = useCallback(() => {
-    if (isGameOverRef.current || !activeShapeRef.current) return;
+    if (
+      !stateRef.current ||
+      stateRef.current.isGameOver ||
+      !stateRef.current.activeShape
+    )
+      return;
 
-    const activeShape = activeShapeRef.current;
-    const lastShape = shapesRef.current[shapesRef.current.length - 1];
-
-    // Precise Containment Check
-    if (!isContained(activeShape, lastShape)) {
+    // Check if active shape is contained
+    if (!checkContainment(stateRef.current)) {
       endGame();
       return;
     }
 
-    // Success: Add active shape to stack
-    shapesRef.current.push({ ...activeShape, opacity: 1 });
-    scoreRef.current += 1;
-    onScore(scoreRef.current);
-    audioManager.playStackSound(scoreRef.current);
+    // Stack the shape
+    const result = stackActiveShape(stateRef.current);
+    stateRef.current = result.state;
+
+    onScore(result.state.score);
+    audioService.playStackSound(result.state.score);
 
     // Check for level up
-    const newLevel = Math.floor(scoreRef.current / STACKS_PER_LEVEL) + 1;
-    if (newLevel > levelRef.current) {
-      levelRef.current = newLevel;
-      onLevelUp(newLevel);
-      audioManager.playStackSound(scoreRef.current * 2); // Double pitch for level up
-
-      // Trigger zoom in
-      // Calculate how much to zoom to keep shapes at a playable size
-      targetZoomRef.current = calculateNextZoom(
-        targetZoomRef.current,
-        activeShape.size,
-        initialSizeRef.current
-      );
+    if (result.leveledUp) {
+      onLevelUp(result.newLevel);
+      audioService.playStackSound(result.state.score * 2); // Double pitch for level up
     }
 
-    // Create next active shape
-    createNewActiveShape();
-  }, [onScore, onLevelUp, endGame, createNewActiveShape]);
-
-  const drawShape = (
-    ctx: CanvasRenderingContext2D,
-    shape: Shape,
-    x: number,
-    y: number,
-    zoom: number
-  ) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(shape.rotation);
-    ctx.globalAlpha = shape.opacity;
-    ctx.fillStyle = shape.color;
-
-    const size = shape.size * zoom;
-
-    ctx.beginPath();
-    if (shape.type === "circle") {
-      ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
-    } else if (shape.type === "square") {
-      ctx.rect(-size / 2, -size / 2, size, size);
-    } else if (shape.type === "triangle") {
-      drawRegularPolygon(ctx, 3, size);
-    } else if (shape.type === "rectangle") {
-      const height = size * 0.6;
-      ctx.rect(-size / 2, -height / 2, size, height);
-    } else if (shape.type === "pentagon") {
-      drawRegularPolygon(ctx, 5, size);
-    } else if (shape.type === "hexagon") {
-      drawRegularPolygon(ctx, 6, size);
-    } else if (shape.type === "octagon") {
-      drawRegularPolygon(ctx, 8, size);
-    }
-
-    ctx.fill();
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-
-    ctx.restore();
-  };
+    // Spawn next active shape
+    stateRef.current = spawnActiveShape(stateRef.current);
+  }, [onScore, onLevelUp, endGame, audioService]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -211,7 +101,7 @@ export const GameCanvas = ({
     resize();
 
     const loop = (time: number) => {
-      if (isGameOverRef.current) return;
+      if (!stateRef.current || stateRef.current.isGameOver) return;
 
       if (lastTimeRef.current === 0) {
         lastTimeRef.current = time;
@@ -224,76 +114,34 @@ export const GameCanvas = ({
 
       const pulse = (Math.sin(time / 500) + 1) / 2;
 
-      if (activeShapeRef.current) {
-        // Normalize growth speed by zoom and increase difficulty with score
-        const difficultyMultiplier = 1 + scoreRef.current * 0.05;
-        const growthIncrement =
-          (currentSpeedRef.current * difficultyMultiplier) / zoomRef.current;
-        activeShapeRef.current.size += growthIncrement * dt;
+      // Update state
+      let state = stateRef.current;
+      state = updateActiveShape(state, dt);
+      state = updateZoom(state, dt);
+      state = updateShapeRotations(state);
+      state = updateShapeOpacities(state);
+      stateRef.current = state;
 
-        // Add rotation based on score (capped to prevent dizziness)
-        const rotationSpeed = 0.5 + Math.min(scoreRef.current * 0.05, 1.5);
-        activeShapeRef.current.rotation += rotationSpeed * dt;
-
-        const lastShape = shapesRef.current[shapesRef.current.length - 1];
-
-        // Auto-fail if it starts poking out
-        if (!isContained(activeShapeRef.current, lastShape)) {
-          endGame();
-        }
+      // Check auto-fail if shape starts poking out
+      if (!checkContainment(state)) {
+        endGame();
+        return;
       }
 
-      // Smoothly interpolate zoom
-      const zoomLerpSpeed = 2; // Adjust for faster/slower zoom
-      if (Math.abs(zoomRef.current - targetZoomRef.current) > 0.001) {
-        zoomRef.current +=
-          (targetZoomRef.current - zoomRef.current) * zoomLerpSpeed * dt;
-      } else {
-        zoomRef.current = targetZoomRef.current;
-      }
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Render
+      clearCanvas(ctx, canvas.width, canvas.height);
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
-      // Manual geometric scaling (homothety)
-      // We don't use ctx.scale here to keep stroke widths consistent
-      // This ensures that stroke widths and shadows remain crisp at all zoom levels
       ctx.save();
+      drawBackground(ctx, canvas.width, canvas.height, pulse);
 
-      ctx.beginPath();
-      const grad = ctx.createRadialGradient(
-        centerX,
-        centerY,
-        0,
-        centerX,
-        centerY,
-        canvas.width * 0.8
-      );
-      grad.addColorStop(0, `rgba(255, 255, 255, ${0.03 + pulse * 0.02})`);
-      grad.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      shapesRef.current.forEach((shape, index) => {
-        const age = shapesRef.current.length - 1 - index;
-        if (age > 10) {
-          shape.opacity = Math.max(0, shape.opacity - 0.005);
-        }
-
-        shape.rotation += 0.005 * (index % 2 === 0 ? 1 : -1);
-
-        drawShape(ctx, shape, centerX, centerY, zoomRef.current);
+      state.shapes.forEach((shape) => {
+        drawShape(ctx, shape, centerX, centerY, state.zoom);
       });
 
-      if (activeShapeRef.current) {
-        drawShape(
-          ctx,
-          activeShapeRef.current,
-          centerX,
-          centerY,
-          zoomRef.current
-        );
+      if (state.activeShape) {
+        drawShape(ctx, state.activeShape, centerX, centerY, state.zoom);
       }
 
       ctx.restore();
