@@ -78,9 +78,14 @@ export const GameCanvas = ({
     currentSpeedRef.current =
       MIN_GROWTH_SPEED + Math.random() * (MAX_GROWTH_SPEED - MIN_GROWTH_SPEED);
 
+    // Start at a fraction of the last shape's size to ensure it's always smaller
+    // but not too small to see.
+    const lastShape = shapesRef.current[shapesRef.current.length - 1];
+    const startSize = lastShape ? lastShape.size * 0.05 : 10;
+
     activeShapeRef.current = {
       type: nextType,
-      size: 10,
+      size: startSize,
       rotation: 0,
       color: nextColor,
       opacity: 0.8,
@@ -150,7 +155,8 @@ export const GameCanvas = ({
     ctx: CanvasRenderingContext2D,
     shape: Shape,
     x: number,
-    y: number
+    y: number,
+    zoom: number
   ) => {
     ctx.save();
     ctx.translate(x, y);
@@ -158,7 +164,7 @@ export const GameCanvas = ({
     ctx.globalAlpha = shape.opacity;
     ctx.fillStyle = shape.color;
 
-    const size = shape.size;
+    const size = shape.size * zoom;
 
     ctx.beginPath();
     if (shape.type === "circle") {
@@ -219,8 +225,11 @@ export const GameCanvas = ({
       const pulse = (Math.sin(time / 500) + 1) / 2;
 
       if (activeShapeRef.current) {
-        // Use the fixed random speed assigned to this shape
-        activeShapeRef.current.size += currentSpeedRef.current * dt;
+        // Normalize growth speed by zoom and increase difficulty with score
+        const difficultyMultiplier = 1 + scoreRef.current * 0.05;
+        const growthIncrement =
+          (currentSpeedRef.current * difficultyMultiplier) / zoomRef.current;
+        activeShapeRef.current.size += growthIncrement * dt;
 
         // Add rotation based on score (capped to prevent dizziness)
         const rotationSpeed = 0.5 + Math.min(scoreRef.current * 0.05, 1.5);
@@ -247,11 +256,10 @@ export const GameCanvas = ({
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
+      // Manual geometric scaling (homothety)
+      // We don't use ctx.scale here to keep stroke widths consistent
+      // This ensures that stroke widths and shadows remain crisp at all zoom levels
       ctx.save();
-      // Apply zoom centered on the stack
-      ctx.translate(centerX, centerY);
-      ctx.scale(zoomRef.current, zoomRef.current);
-      ctx.translate(-centerX, -centerY);
 
       ctx.beginPath();
       const grad = ctx.createRadialGradient(
@@ -275,11 +283,17 @@ export const GameCanvas = ({
 
         shape.rotation += 0.005 * (index % 2 === 0 ? 1 : -1);
 
-        drawShape(ctx, shape, centerX, centerY);
+        drawShape(ctx, shape, centerX, centerY, zoomRef.current);
       });
 
       if (activeShapeRef.current) {
-        drawShape(ctx, activeShapeRef.current, centerX, centerY);
+        drawShape(
+          ctx,
+          activeShapeRef.current,
+          centerX,
+          centerY,
+          zoomRef.current
+        );
       }
 
       ctx.restore();

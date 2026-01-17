@@ -1,13 +1,13 @@
 import type { ShapeType } from "../utils/geometry";
 
-export const MIN_GROWTH_SPEED = 25;
-export const MAX_GROWTH_SPEED = 90;
-export const STACKS_PER_LEVEL = 5;
+export const MIN_GROWTH_SPEED = 35;
+export const MAX_GROWTH_SPEED = 80;
+export const STACKS_PER_LEVEL = 3;
 
 export const SHAPE_UNLOCKS: Record<number, ShapeType[]> = {
-  1: ["circle", "square"],
+  1: ["circle", "octagon"],
   2: ["pentagon", "hexagon"],
-  3: ["octagon"],
+  3: ["square"],
   4: ["triangle"],
   5: ["rectangle"],
 };
