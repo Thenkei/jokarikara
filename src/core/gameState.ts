@@ -2,11 +2,11 @@ import type { GameState } from "../types";
 import type { Shape } from "../utils/geometry";
 import { createActiveShape, createInitialShape } from "../shapes";
 import { isContained } from "../utils/geometry";
-import { calculateNextZoom } from "../utils/gameLogic";
 import {
   MIN_GROWTH_SPEED,
   MAX_GROWTH_SPEED,
   STACKS_PER_LEVEL,
+  getZoomForLevel,
 } from "../constants/game";
 
 /**
@@ -20,8 +20,8 @@ export const createInitialState = (viewportSize: number): GameState => {
     activeShape: null,
     score: 0,
     level: 1,
-    zoom: 1,
-    targetZoom: 1,
+    zoom: getZoomForLevel(1),
+    targetZoom: getZoomForLevel(1),
     initialSize: initialShape.size,
     currentSpeed: MIN_GROWTH_SPEED,
     isGameOver: false,
@@ -104,11 +104,7 @@ export const stackActiveShape = (
 
   let newTargetZoom = state.targetZoom;
   if (leveledUp) {
-    newTargetZoom = calculateNextZoom(
-      state.targetZoom,
-      state.activeShape.size,
-      state.initialSize
-    );
+    newTargetZoom = getZoomForLevel(newLevel);
   }
 
   return {

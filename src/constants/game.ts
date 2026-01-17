@@ -12,6 +12,18 @@ export const SHAPE_UNLOCKS: Record<number, ShapeType[]> = {
   5: ["rectangle"],
 };
 
+export const LEVEL_ZOOM_MAP: Record<number, number> = {
+  1: 1.0,
+  2: 1.25,
+  3: 1.6,
+  4: 2.0,
+  5: 2.5,
+};
+
+export const getZoomForLevel = (level: number): number => {
+  return LEVEL_ZOOM_MAP[level] ?? LEVEL_ZOOM_MAP[5];
+};
+
 export const COLORS = [
   "#3b82f6", // blue
   "#10b981", // emerald

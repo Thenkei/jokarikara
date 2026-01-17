@@ -42,6 +42,19 @@ In **Shape Stack**, the player's goal is to stack geometric shapes on top of eac
 - `npm run test:e2e`: Run integration and snapshot tests with Playwright.
 - `npm run test:e2e:ui`: Open Playwright UI for interactive testing.
 
+### Debugging & Testing Tips
+
+- **Fast Leveling**: To test high-level mechanics (like zoom or new shapes), temporarily modify `src/constants/game.ts`:
+  ```typescript
+  export const STACKS_PER_LEVEL = 1; // Level up every stack
+  export const MIN_GROWTH_SPEED = 0; // Disable growth for easy stacking
+  export const MAX_GROWTH_SPEED = 0;
+  ```
+- **Large Start Size**: To test collision boundaries without waiting for growth, modify `src/shapes/index.ts`:
+  ```typescript
+  const startSize = lastShape ? lastShape.size * 0.9 : 100;
+  ```
+
 ## 🤖 AI Assistant Guidelines (Antigravity)
 
 When working on this project, adhere to these principles:
