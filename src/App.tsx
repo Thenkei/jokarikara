@@ -1,8 +1,9 @@
-import { useState, useCallback } from "react";
-import { GameCanvas } from "./components/GameCanvas";
+import { useState, useCallback, useRef } from "react";
+import { GameCanvas, type GameCanvasHandle } from "./components/GameCanvas";
 import { audioManager } from "./utils/audioManager";
 import { getHighScores, saveHighScore } from "./utils/storage";
 import type { HighScore } from "./utils/storage";
+import type { GameMode } from "./types";
 import "./App.css";
 
 function App() {
@@ -15,13 +16,18 @@ function App() {
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [showWorldUp, setShowWorldUp] = useState(false);
   const [highScores, setHighScores] = useState<HighScore[]>([]);
+  const [mode, setMode] = useState<GameMode>("CLASSIC");
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const canvasRef = useRef<GameCanvasHandle>(null);
 
-  const startGame = () => {
+  const startGame = (selectedMode: GameMode = mode) => {
+    setMode(selectedMode);
     audioManager.init();
     audioManager.resume();
     setScore(0);
     setLevel(1);
     setWorld(1);
+    setTimeRemaining(null);
     setGameState("PLAYING");
   };
 
@@ -56,13 +62,43 @@ function App() {
     setTimeout(() => setShowWorldUp(false), 2000);
   }, []);
 
+  const handleTimeUpdate = useCallback((time: number) => {
+    setTimeRemaining(time);
+  }, []);
+
+  const handleRestartShape = () => {
+    canvasRef.current?.restartShape();
+  };
+
   return (
     <div className="game-container">
       {gameState === "START" && (
         <div className="screen start-screen">
           <h1 className="title">SHAPE STACK</h1>
           <p className="subtitle">Tap to stack. Don't overlap.</p>
-          <button className="start-btn" onClick={startGame}>
+
+          <div className="mode-selection">
+            <button
+              className={`mode-btn ${mode === "CLASSIC" ? "active" : ""}`}
+              onClick={() => setMode("CLASSIC")}
+            >
+              CLASSIC
+            </button>
+            <button
+              className={`mode-btn ${mode === "ZEN" ? "active" : ""}`}
+              onClick={() => setMode("ZEN")}
+            >
+              ZEN
+            </button>
+            <button
+              className={`mode-btn ${mode === "TIME_ATTACK" ? "active" : ""}`}
+              onClick={() => setMode("TIME_ATTACK")}
+            >
+              TIME
+            </button>
+          </div>
+
+          <button className="start-btn" onClick={() => startGame(mode)}>
             START
           </button>
         </div>
@@ -70,13 +106,36 @@ function App() {
 
       {gameState === "PLAYING" && (
         <div className="game-screen" style={{ width: "100%", height: "100%" }}>
+          <div className="canvas-container">
+            <GameCanvas
+              ref={canvasRef}
+              mode={mode}
+              onScore={handleScore}
+              onGameOver={handleGameOver}
+              onLevelUp={handleLevelUp}
+              onWorldUp={handleWorldUp}
+              onTimeUpdate={handleTimeUpdate}
+            />
+          </div>
+
           <div className="hud">
             <div className="hud-row">
               <span className="world-badge">WORLD {world}</span>
               <span className="level-badge">LVL {level}</span>
+              {mode === "TIME_ATTACK" && timeRemaining !== null && (
+                <span className="timer-badge">{Math.ceil(timeRemaining)}s</span>
+              )}
             </div>
-            <span className="score">{score}</span>
+            <div className="hud-row main-hud">
+              <span className="score">{score}</span>
+              {mode === "ZEN" && (
+                <button className="restart-btn" onClick={handleRestartShape}>
+                  RESTART
+                </button>
+              )}
+            </div>
           </div>
+
           {showLevelUp && !showWorldUp && (
             <div className="level-up-overlay">
               <span className="level-up-text">LEVEL {level}</span>
@@ -88,14 +147,6 @@ function App() {
               <span className="world-up-text">WORLD {world}</span>
             </div>
           )}
-          <div className="canvas-container">
-            <GameCanvas
-              onScore={handleScore}
-              onGameOver={handleGameOver}
-              onLevelUp={handleLevelUp}
-              onWorldUp={handleWorldUp}
-            />
-          </div>
         </div>
       )}
 
@@ -127,8 +178,11 @@ function App() {
               </ul>
             )}
           </div>
-          <button className="retry-btn" onClick={startGame}>
+          <button className="retry-btn" onClick={() => startGame(mode)}>
             RETRY
+          </button>
+          <button className="menu-btn" onClick={() => setGameState("START")}>
+            MAIN MENU
           </button>
         </div>
       )}

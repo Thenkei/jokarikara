@@ -1,5 +1,7 @@
 import type { Shape, ShapeType } from "./utils/geometry";
 
+export type GameMode = "CLASSIC" | "ZEN" | "TIME_ATTACK";
+
 /**
  * Game state representing all mutable game data.
  */
@@ -14,6 +16,10 @@ export interface GameState {
   initialSize: number;
   currentSpeed: number;
   isGameOver: boolean;
+  mode: GameMode;
+  timeRemaining?: number; // For Time Attack
+  undoStack?: Shape[][]; // For Zen Mode - stores previous stacks of shapes
+  isBossLevel?: boolean; // For Boss Mechanics
 }
 
 /**

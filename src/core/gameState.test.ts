@@ -10,6 +10,9 @@ import {
   updateZoom,
   updateShapeOpacities,
   updateShapeRotations,
+  updateTimer,
+  handleMiss,
+  restartActiveShape,
 } from "./gameState";
 
 import { MIN_GROWTH_SPEED, MAX_GROWTH_SPEED } from "../constants/game";
@@ -35,6 +38,17 @@ describe("gameState", () => {
       expect(state.zoom).toBe(1);
       expect(state.targetZoom).toBe(1);
     });
+
+    it("should initialize Zen Mode", () => {
+      const state = createInitialState(1000, "ZEN");
+      expect(state.mode).toBe("ZEN");
+    });
+
+    it("should initialize Time Attack with timer", () => {
+      const state = createInitialState(1000, "TIME_ATTACK");
+      expect(state.mode).toBe("TIME_ATTACK");
+      expect(state.timeRemaining).toBe(60);
+    });
   });
 
   describe("generateRandomSpeed", () => {
@@ -59,6 +73,14 @@ describe("gameState", () => {
       const newState = spawnActiveShape(state);
       expect(newState.currentSpeed).toBeGreaterThanOrEqual(MIN_GROWTH_SPEED);
       expect(newState.currentSpeed).toBeLessThanOrEqual(MAX_GROWTH_SPEED);
+    });
+
+    it("should handle boss spawning at level 5 threshold", () => {
+      const state = createInitialState(1000);
+      state.score = 4; // next is 5
+      const newState = spawnActiveShape(state);
+      expect(newState.isBossLevel).toBe(true);
+      expect(newState.activeShape?.type).toBe("hexagon");
     });
   });
 
@@ -99,6 +121,57 @@ describe("gameState", () => {
     it("should return true when no active shape", () => {
       const state = createInitialState(1000);
       expect(checkContainment(state)).toBe(true);
+    });
+  });
+
+  describe("handleMiss", () => {
+    it("should end game in CLASSIC mode", () => {
+      let state = createInitialState(1000, "CLASSIC");
+      state = spawnActiveShape(state);
+      const newState = handleMiss(state);
+      expect(newState.isGameOver).toBe(true);
+    });
+
+    it("should not end game in ZEN mode, but reset active shape", () => {
+      let state = createInitialState(1000, "ZEN");
+      state = spawnActiveShape(state);
+      // Grow the shape first
+      state.activeShape!.size = state.shapes[0].size * 2;
+      const initialSize = state.activeShape!.size;
+
+      const newState = handleMiss(state);
+      expect(newState.isGameOver).toBe(false);
+      expect(newState.activeShape?.size).toBeLessThan(initialSize);
+      expect(newState.activeShape?.size).toBe(state.shapes[0].size * 0.05);
+    });
+  });
+
+  describe("updateTimer", () => {
+    it("should decrement time in TIME_ATTACK mode", () => {
+      const state = createInitialState(1000, "TIME_ATTACK");
+      const newState = updateTimer(state, 10);
+      expect(newState.timeRemaining).toBe(50);
+    });
+
+    it("should end game when timer reaches zero", () => {
+      const state = createInitialState(1000, "TIME_ATTACK");
+      state.timeRemaining = 1;
+      const newState = updateTimer(state, 2);
+      expect(newState.timeRemaining).toBe(0);
+      expect(newState.isGameOver).toBe(true);
+    });
+  });
+
+  describe("restartActiveShape", () => {
+    it("should reset active shape in ZEN mode", () => {
+      let state = createInitialState(1000, "ZEN");
+      state = spawnActiveShape(state);
+      // Grow the shape
+      state.activeShape!.size = 1000;
+
+      const reset = restartActiveShape(state);
+      expect(reset.activeShape?.size).toBeLessThan(1000);
+      expect(reset.activeShape?.size).toBe(state.shapes[0].size * 0.05);
     });
   });
 

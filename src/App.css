@@ -53,6 +53,7 @@
   display: flex;
   gap: 1rem;
   align-items: center;
+  pointer-events: auto; /* Enable clicks on HUD rows */
 }
 
 .world-badge {
@@ -292,6 +293,90 @@ button:active {
   width: 100%;
   height: 100%;
   z-index: 1;
+}
+
+.mode-selection {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.mode-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+  padding: 0.8rem 1.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mode-btn.active {
+  background: #fff;
+  color: #000;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(255, 255, 255, 0.2);
+}
+
+.mode-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.timer-badge {
+  background: linear-gradient(135deg, #ff4e50 0%, #f9d423 100%);
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  box-shadow: 0 4px 15px rgba(255, 78, 80, 0.4);
+}
+
+.main-hud {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+}
+
+.restart-btn {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  backdrop-filter: blur(5px);
+  pointer-events: auto;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.restart-btn:hover {
+  background: rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.restart-btn:active {
+  transform: scale(0.95);
+}
+
+.menu-btn {
+  background: transparent;
+  color: #666;
+  border: 1px solid #333;
+  margin-top: 1rem;
+  padding: 0.8rem 2rem;
+}
+
+.menu-btn:hover {
+  color: #fff;
+  border-color: #666;
 }
 
 @keyframes fadeIn {

@@ -91,6 +91,32 @@ export const MAX_GROWTH_SPEED = 80;
 export const STACKS_PER_LEVEL = 3;
 export const LEVELS_PER_WORLD = 5;
 
+// Mode specific constants
+export const TIME_ATTACK_START_TIME = 60;
+export const PERFECT_STACK_TIME_BONUS = 5;
+
+export interface BossShapeConfig {
+  type: ShapeType;
+  growthSpeedMultiplier: number;
+  rotationSpeedMultiplier: number;
+  hueShift: boolean;
+}
+
+export const BOSS_SHAPES: Record<number, BossShapeConfig> = {
+  5: {
+    type: "hexagon",
+    growthSpeedMultiplier: 1.5,
+    rotationSpeedMultiplier: 2.0,
+    hueShift: true,
+  },
+  10: {
+    type: "octagon",
+    growthSpeedMultiplier: 2.0,
+    rotationSpeedMultiplier: 2.5,
+    hueShift: true,
+  },
+};
+
 export const SHAPE_UNLOCKS: Record<number, ShapeType[]> = {
   1: ["circle", "octagon"],
   2: ["pentagon", "hexagon"],
