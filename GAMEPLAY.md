@@ -48,11 +48,25 @@ For every **5 successful stacks**, you reach a new level. Leveling up is signale
 
 New levels unlock more complex geometric shapes, increasing the difficulty of containment:
 
-- **Level 1**: Circle, Square
+- **Level 1**: Circle, Octagon
 - **Level 2**: Pentagon, Hexagon
-- **Level 3**: Octagon
+- **Level 3**: Square
 - **Level 4**: Triangle (challenging vertices!)
-- **Level 5+**: Rectangle
+- **Level 5**: Rectangle
+
+### 🌍 World Mechanics
+
+After completing level 5, you advance to **World 2**, resetting the level counter but introducing new visual and gameplay effects. Each subsequent world adds cumulative mechanics:
+
+| World | Effect                 | Description                                                                    |
+| ----- | ---------------------- | ------------------------------------------------------------------------------ |
+| **1** | Baseline               | No special effects                                                             |
+| **2** | 🫁 Breathing           | Stacked shapes subtly pulse in size                                            |
+| **3** | 🚀 Accelerating Growth | Active shape grows faster with each stack in a level (1x → 1.25x → 1.5x)       |
+| **4** | 🌊 Wave                | Stacked shapes sway horizontally (active shape stays stable for fair gameplay) |
+| **5** | 🌈 Color Shift         | Stacked shapes cycle through rainbow hues                                      |
+
+> **Note**: Effects are additive. World 5 includes all previous effects: breathing + accelerating growth + wave + color shift.
 
 ## 🎵 Dynamic Audio
 
