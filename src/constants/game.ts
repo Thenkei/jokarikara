@@ -15,9 +15,9 @@ export const SHAPE_UNLOCKS: Record<number, ShapeType[]> = {
 export const LEVEL_ZOOM_MAP: Record<number, number> = {
   1: 1.0,
   2: 1.25,
-  3: 1.6,
-  4: 2.0,
-  5: 2.5,
+  3: 2.0,
+  4: 4.5,
+  5: 12,
 };
 
 export const getZoomForLevel = (level: number): number => {
