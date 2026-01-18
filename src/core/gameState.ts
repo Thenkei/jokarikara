@@ -18,6 +18,7 @@ export const createInitialState = (viewportSize: number): GameState => {
   return {
     shapes: [initialShape],
     activeShape: null,
+    world: 1,
     score: 0,
     level: 1,
     zoom: getZoomForLevel(1),
@@ -92,15 +93,35 @@ export const checkContainment = (state: GameState): boolean => {
  */
 export const stackActiveShape = (
   state: GameState
-): { state: GameState; leveledUp: boolean; newLevel: number } => {
+): {
+  state: GameState;
+  leveledUp: boolean;
+  newLevel: number;
+  worldUp: boolean;
+} => {
   if (!state.activeShape) {
-    return { state, leveledUp: false, newLevel: state.level };
+    return { state, leveledUp: false, newLevel: state.level, worldUp: false };
   }
 
   const newShapes = [...state.shapes, { ...state.activeShape, opacity: 1 }];
   const newScore = state.score + 1;
-  const newLevel = Math.floor(newScore / STACKS_PER_LEVEL) + 1;
-  const leveledUp = newLevel > state.level;
+  let newLevel = Math.floor(newScore / STACKS_PER_LEVEL) + 1;
+  let newWorld = state.world;
+  let leveledUp = newLevel > state.level;
+  let worldUp = false;
+
+  let finalShapes = newShapes;
+
+  if (newLevel > 5) {
+    newWorld++;
+    newLevel = 1;
+    worldUp = true;
+    leveledUp = true; // World up also counts as level up (to level 1 of next world)
+
+    // Reset stack but keep the first shape as base
+    const firstShape = newShapes[0];
+    finalShapes = [{ ...firstShape, opacity: 1 }];
+  }
 
   let newTargetZoom = state.targetZoom;
   if (leveledUp) {
@@ -110,14 +131,16 @@ export const stackActiveShape = (
   return {
     state: {
       ...state,
-      shapes: newShapes,
+      shapes: finalShapes,
       activeShape: null,
+      world: newWorld,
       score: newScore,
       level: newLevel,
       targetZoom: newTargetZoom,
     },
     leveledUp,
     newLevel,
+    worldUp,
   };
 };
 

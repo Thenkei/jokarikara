@@ -135,6 +135,23 @@ describe("gameState", () => {
         }
       }
     });
+
+    it("should transition to next world and reset level when level > 5", () => {
+      let state = createInitialState(1000);
+      // STACKS_PER_LEVEL = 3. Level 6 is reached at 3 * 5 = 15 stacks.
+      for (let i = 0; i < 15; i++) {
+        state = spawnActiveShape(state);
+        const result = stackActiveShape(state);
+        state = result.state;
+
+        if (i === 14) {
+          expect(result.worldUp).toBe(true);
+          expect(state.world).toBe(2);
+          expect(state.level).toBe(1);
+          expect(state.shapes.length).toBe(1); // Stack should reset
+        }
+      }
+    });
   });
 
   describe("setGameOver", () => {

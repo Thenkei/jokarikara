@@ -23,6 +23,7 @@ interface GameCanvasProps {
   onScore: (score: number) => void;
   onGameOver: (finalScore: number) => void;
   onLevelUp: (level: number) => void;
+  onWorldUp: (world: number) => void;
   /** Optional audio service for dependency injection (testing) */
   audioService?: IAudioService;
 }
@@ -35,6 +36,7 @@ export const GameCanvas = ({
   onScore,
   onGameOver,
   onLevelUp,
+  onWorldUp,
   audioService = defaultAudioManager,
 }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,13 +80,19 @@ export const GameCanvas = ({
 
     // Check for level up
     if (result.leveledUp) {
-      onLevelUp(result.newLevel);
-      audioService.playStackSound(result.state.score * 2); // Double pitch for level up
+      if (result.worldUp) {
+        onWorldUp(result.state.world);
+        // Maybe a special sound?
+        audioService.playStackSound(result.state.score * 3);
+      } else {
+        onLevelUp(result.newLevel);
+        audioService.playStackSound(result.state.score * 2); // Double pitch for level up
+      }
     }
 
     // Spawn next active shape
     stateRef.current = spawnActiveShape(stateRef.current);
-  }, [onScore, onLevelUp, endGame, audioService]);
+  }, [onScore, onLevelUp, onWorldUp, endGame, audioService]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -137,11 +145,27 @@ export const GameCanvas = ({
       drawBackground(ctx, canvas.width, canvas.height, pulse);
 
       state.shapes.forEach((shape) => {
-        drawShape(ctx, shape, centerX, centerY, state.zoom);
+        drawShape(
+          ctx,
+          shape,
+          centerX,
+          centerY,
+          state.zoom,
+          state.world,
+          time / 1000
+        );
       });
 
       if (state.activeShape) {
-        drawShape(ctx, state.activeShape, centerX, centerY, state.zoom);
+        drawShape(
+          ctx,
+          state.activeShape,
+          centerX,
+          centerY,
+          state.zoom,
+          state.world,
+          time / 1000
+        );
       }
 
       ctx.restore();

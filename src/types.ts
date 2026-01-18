@@ -6,6 +6,7 @@ import type { Shape, ShapeType } from "./utils/geometry";
 export interface GameState {
   shapes: Shape[];
   activeShape: Shape | null;
+  world: number;
   score: number;
   level: number;
   zoom: number;
@@ -22,6 +23,7 @@ export interface GameCallbacks {
   onScore: (score: number) => void;
   onGameOver: (finalScore: number) => void;
   onLevelUp: (level: number) => void;
+  onWorldUp: (world: number) => void;
 }
 
 /**

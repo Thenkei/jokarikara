@@ -55,6 +55,17 @@
   align-items: center;
 }
 
+.world-badge {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+}
+
 .level-badge {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -71,6 +82,62 @@
   font-weight: 900;
   opacity: 0.2;
   font-variant-numeric: tabular-nums;
+}
+
+/* World up overlay */
+.world-up-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: worldUpPop 2s ease-out forwards;
+}
+
+.world-up-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.3em;
+  opacity: 0.8;
+  margin-bottom: -1rem;
+}
+
+.world-up-text {
+  font-size: clamp(3rem, 25vw, 8.5rem);
+  font-weight: 950;
+  background: linear-gradient(135deg, #00dbde 0%, #fc00ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 40px rgba(252, 0, 255, 0.6));
+  letter-spacing: -0.02em;
+}
+
+@keyframes worldUpPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8) rotate(-5deg);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1) rotate(0deg);
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -60%) scale(1.2);
+  }
 }
 
 /* Level up overlay */
@@ -122,7 +189,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
 }
 
 .final-level {
@@ -139,6 +206,65 @@
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.progression-score {
+  font-size: 1.1rem;
+  color: var(--accent-color);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* Leaderboard */
+.leaderboard {
+  width: 100%;
+  max-width: 300px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  backdrop-filter: blur(10px);
+  margin-bottom: 2rem;
+}
+
+.leaderboard h3 {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #666;
+  letter-spacing: 0.2em;
+  margin-bottom: 1rem;
+}
+
+.leaderboard ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.leaderboard li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.leaderboard li span:nth-child(1) {
+  color: #555;
+  width: 2rem;
+}
+
+.leaderboard li span:nth-child(2) {
+  color: #fff;
+  flex-grow: 1;
+  text-align: left;
+}
+
+.leaderboard li span:nth-child(3) {
+  color: #444;
+  font-size: 0.8rem;
 }
 
 button {

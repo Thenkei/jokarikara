@@ -36,10 +36,21 @@ export const drawShape = (
   shape: Shape,
   x: number,
   y: number,
-  zoom: number
+  zoom: number,
+  world: number = 1,
+  time: number = 0
 ): void => {
   ctx.save();
   ctx.translate(x, y);
+  console.log("wave", world);
+  if (world >= 2) {
+    // Waving effect: horizontal displacement based on time and vertical position (approx by size/index)
+    // Using shape's size as a seed for variety if we don't have index
+    const wave = Math.sin(time * 3 + shape.size * 0.1) * 15;
+    console.log(wave);
+    ctx.translate(wave, 0);
+  }
+
   ctx.rotate(shape.rotation);
   ctx.globalAlpha = shape.opacity;
   ctx.fillStyle = shape.color;
