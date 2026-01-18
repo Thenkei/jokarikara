@@ -7,6 +7,8 @@ import {
   MAX_GROWTH_SPEED,
   STACKS_PER_LEVEL,
   getZoomForLevel,
+  getWorldMechanics,
+  type WorldMechanics,
 } from "../constants/game";
 
 /**
@@ -54,6 +56,29 @@ export const spawnActiveShape = (state: GameState): GameState => {
 };
 
 /**
+ * Calculate growth speed multiplier based on world mechanics pattern.
+ * @param pattern - The growth pattern from world mechanics
+ * @param stackPositionInLevel - Current stack position within the level (0 to STACKS_PER_LEVEL-1)
+ */
+export const getGrowthMultiplier = (
+  pattern: WorldMechanics["growthPattern"],
+  stackPositionInLevel: number
+): number => {
+  switch (pattern) {
+    case "linear":
+      return 1;
+    case "accelerating":
+      // Speed increases each stack within level: 1x, 1.25x, 1.5x (for STACKS_PER_LEVEL=3)
+      return 1 + stackPositionInLevel * 0.25;
+    case "wave":
+      // Sinusoidal pattern across level
+      return (
+        1 + Math.sin((stackPositionInLevel / STACKS_PER_LEVEL) * Math.PI) * 0.5
+      );
+  }
+};
+
+/**
  * Update the active shape's size and rotation based on delta time.
  * @param state - Current game state
  * @param dt - Delta time in seconds
@@ -61,9 +86,18 @@ export const spawnActiveShape = (state: GameState): GameState => {
 export const updateActiveShape = (state: GameState, dt: number): GameState => {
   if (!state.activeShape) return state;
 
+  // Get world mechanics for growth pattern
+  const mechanics = getWorldMechanics(state.world);
+  const stackPositionInLevel = state.score % STACKS_PER_LEVEL;
+  const growthPatternMultiplier = getGrowthMultiplier(
+    mechanics.growthPattern,
+    stackPositionInLevel
+  );
+
   const difficultyMultiplier = 1 + state.score * 0.05;
   const growthIncrement =
-    (state.currentSpeed * difficultyMultiplier) / state.zoom;
+    (state.currentSpeed * difficultyMultiplier * growthPatternMultiplier) /
+    state.zoom;
   const rotationSpeed = 0.5 + Math.min(state.score * 0.05, 1.5);
 
   const updatedShape: Shape = {

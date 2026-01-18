@@ -1,4 +1,5 @@
 import type { Shape } from "../utils/geometry";
+import type { WorldMechanics } from "../constants/game";
 
 /**
  * ShapeRenderer - Separates drawing logic from game loop (SRP).
@@ -29,7 +30,48 @@ export const drawRegularPolygonPath = (
 };
 
 /**
+ * Convert hex color to HSL and shift hue.
+ */
+const shiftHue = (hexColor: string, hueShift: number): string => {
+  // Parse hex to RGB
+  const hex = hexColor.replace("#", "");
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  let h = 0;
+  let s = 0;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+
+  // Apply hue shift
+  h = (h * 360 + hueShift) % 360;
+
+  return `hsl(${h}, ${s * 100}%, ${l * 100}%)`;
+};
+
+/**
  * Draw a shape at the specified position with zoom.
+ * @param ctx - Canvas context
+ * @param shape - The shape to draw
+ * @param x - Center X position
+ * @param y - Center Y position
+ * @param zoom - Zoom level
+ * @param mechanics - World mechanics configuration
+ * @param time - Time in seconds (for animations)
+ * @param isStacked - Whether this is a stacked shape (vs active)
+ * @param stackIndex - Index of shape in stack (for phase offsets)
  */
 export const drawShape = (
   ctx: CanvasRenderingContext2D,
@@ -37,25 +79,43 @@ export const drawShape = (
   x: number,
   y: number,
   zoom: number,
-  world: number = 1,
-  time: number = 0
+  mechanics: WorldMechanics,
+  time: number = 0,
+  isStacked: boolean = false,
+  stackIndex: number = 0
 ): void => {
   ctx.save();
   ctx.translate(x, y);
-  console.log("wave", world);
-  if (world >= 2) {
-    // Waving effect: horizontal displacement based on time and vertical position (approx by size/index)
-    // Using shape's size as a seed for variety if we don't have index
-    const wave = Math.sin(time * 3 + shape.size * 0.1) * 15;
-    console.log(wave);
+
+  // Wave effect: horizontal displacement (stacked shapes only)
+  if (mechanics.waveEffect && isStacked) {
+    const wave =
+      Math.sin(time * mechanics.waveSpeed + stackIndex * 0.5) *
+      mechanics.waveAmplitude;
     ctx.translate(wave, 0);
   }
 
   ctx.rotate(shape.rotation);
   ctx.globalAlpha = shape.opacity;
-  ctx.fillStyle = shape.color;
 
-  const size = shape.size * zoom;
+  // Color shift effect (stacked shapes only)
+  let fillColor = shape.color;
+  if (mechanics.colorShift && isStacked) {
+    const hueShift = time * mechanics.colorShiftSpeed + stackIndex * 30;
+    fillColor = shiftHue(shape.color, hueShift);
+  }
+  ctx.fillStyle = fillColor;
+
+  // Calculate size with breathing effect (stacked shapes only)
+  let sizeMultiplier = 1;
+  if (mechanics.breathingEffect && isStacked) {
+    sizeMultiplier =
+      1 +
+      Math.sin(time * mechanics.breathingSpeed + stackIndex * 0.3) *
+        mechanics.breathingAmplitude;
+  }
+
+  const size = shape.size * zoom * sizeMultiplier;
 
   ctx.beginPath();
   if (shape.type === "circle") {
@@ -122,10 +182,12 @@ export const drawShapeStack = (
   shapes: Shape[],
   centerX: number,
   centerY: number,
-  zoom: number
+  zoom: number,
+  mechanics: WorldMechanics,
+  time: number
 ): void => {
-  shapes.forEach((shape) => {
-    drawShape(ctx, shape, centerX, centerY, zoom);
+  shapes.forEach((shape, index) => {
+    drawShape(ctx, shape, centerX, centerY, zoom, mechanics, time, true, index);
   });
 };
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   drawRegularPolygonPath,
   drawShape,
@@ -7,6 +7,7 @@ import {
   drawShapeStack,
 } from "./shapeRenderer";
 import type { Shape } from "../utils/geometry";
+import { getWorldMechanics } from "../constants/game";
 
 // Mock CanvasRenderingContext2D
 const createMockContext = () => {
@@ -37,7 +38,8 @@ const createMockContext = () => {
   } as unknown as CanvasRenderingContext2D;
 };
 
-import { vi } from "vitest";
+// Helper: default world 1 mechanics (no effects)
+const defaultMechanics = getWorldMechanics(1);
 
 describe("shapeRenderer", () => {
   describe("drawRegularPolygonPath", () => {
@@ -69,7 +71,7 @@ describe("shapeRenderer", () => {
         opacity: 0.8,
       };
 
-      drawShape(ctx, shape, 400, 300, 1);
+      drawShape(ctx, shape, 400, 300, 1, defaultMechanics);
 
       expect(ctx.save).toHaveBeenCalled();
       expect(ctx.restore).toHaveBeenCalled();
@@ -85,7 +87,7 @@ describe("shapeRenderer", () => {
         opacity: 1,
       };
 
-      drawShape(ctx, shape, 400, 300, 1);
+      drawShape(ctx, shape, 400, 300, 1, defaultMechanics);
 
       expect(ctx.translate).toHaveBeenCalledWith(400, 300);
     });
@@ -100,7 +102,7 @@ describe("shapeRenderer", () => {
         opacity: 1,
       };
 
-      drawShape(ctx, shape, 0, 0, 1);
+      drawShape(ctx, shape, 0, 0, 1, defaultMechanics);
 
       expect(ctx.rotate).toHaveBeenCalledWith(Math.PI / 4);
     });
@@ -115,7 +117,7 @@ describe("shapeRenderer", () => {
         opacity: 1,
       };
 
-      drawShape(ctx, shape, 0, 0, 2);
+      drawShape(ctx, shape, 0, 0, 2, defaultMechanics);
 
       // Circle uses arc with radius = (size * zoom) / 2 = (100 * 2) / 2 = 100
       expect(ctx.arc).toHaveBeenCalledWith(0, 0, 100, 0, Math.PI * 2);
@@ -131,7 +133,7 @@ describe("shapeRenderer", () => {
         opacity: 1,
       };
 
-      drawShape(ctx, shape, 0, 0, 1);
+      drawShape(ctx, shape, 0, 0, 1, defaultMechanics);
 
       expect(ctx.rect).toHaveBeenCalledWith(-50, -50, 100, 100);
     });
@@ -165,7 +167,7 @@ describe("shapeRenderer", () => {
         { type: "hexagon", size: 60, rotation: 0, color: "#00f", opacity: 1 },
       ];
 
-      drawShapeStack(ctx, shapes, 400, 300, 1);
+      drawShapeStack(ctx, shapes, 400, 300, 1, defaultMechanics, 0);
 
       // Each shape calls save/restore
       expect(ctx.save).toHaveBeenCalledTimes(3);

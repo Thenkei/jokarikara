@@ -13,6 +13,7 @@ import {
   setGameOver,
   checkContainment,
 } from "../core/gameState";
+import { getWorldMechanics } from "../constants/game";
 import {
   drawShape,
   drawBackground,
@@ -144,15 +145,21 @@ export const GameCanvas = ({
       ctx.save();
       drawBackground(ctx, canvas.width, canvas.height, pulse);
 
-      state.shapes.forEach((shape) => {
+      // Get world mechanics for current world
+      const mechanics = getWorldMechanics(state.world);
+      const timeInSeconds = time / 1000;
+
+      state.shapes.forEach((shape, index) => {
         drawShape(
           ctx,
           shape,
           centerX,
           centerY,
           state.zoom,
-          state.world,
-          time / 1000
+          mechanics,
+          timeInSeconds,
+          true, // isStacked
+          index // stackIndex
         );
       });
 
@@ -163,8 +170,10 @@ export const GameCanvas = ({
           centerX,
           centerY,
           state.zoom,
-          state.world,
-          time / 1000
+          mechanics,
+          timeInSeconds,
+          false, // NOT stacked (active)
+          state.shapes.length // stackIndex for phase offset
         );
       }
 
