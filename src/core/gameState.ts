@@ -9,6 +9,7 @@ import {
   getZoomForLevel,
   getWorldMechanics,
   type WorldMechanics,
+  LEVELS_PER_WORLD,
 } from "../constants/game";
 
 /**
@@ -139,28 +140,22 @@ export const stackActiveShape = (
 
   const newShapes = [...state.shapes, { ...state.activeShape, opacity: 1 }];
   const newScore = state.score + 1;
-  let newLevel = Math.floor(newScore / STACKS_PER_LEVEL) + 1;
-  let newWorld = state.world;
-  let leveledUp = newLevel > state.level;
-  let worldUp = false;
+  const totalLevels = Math.floor(newScore / STACKS_PER_LEVEL);
+  const newWorld = Math.floor(totalLevels / LEVELS_PER_WORLD) + 1;
+  const newLevel = (totalLevels % LEVELS_PER_WORLD) + 1;
+
+  const worldUp = newWorld > state.world;
+  const leveledUp = worldUp || (newLevel > state.level && !worldUp);
 
   let finalShapes = newShapes;
 
-  if (newLevel > 5) {
-    newWorld++;
-    newLevel = 1;
-    worldUp = true;
-    leveledUp = true; // World up also counts as level up (to level 1 of next world)
-
+  if (worldUp) {
     // Reset stack but keep the first shape as base
     const firstShape = newShapes[0];
     finalShapes = [{ ...firstShape, opacity: 1 }];
   }
 
-  let newTargetZoom = state.targetZoom;
-  if (leveledUp) {
-    newTargetZoom = getZoomForLevel(newLevel);
-  }
+  const newTargetZoom = getZoomForLevel(newLevel);
 
   return {
     state: {

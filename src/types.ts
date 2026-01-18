@@ -21,7 +21,7 @@ export interface GameState {
  */
 export interface GameCallbacks {
   onScore: (score: number) => void;
-  onGameOver: (finalScore: number) => void;
+  onGameOver: (finalScore: number, world: number, level: number) => void;
   onLevelUp: (level: number) => void;
   onWorldUp: (world: number) => void;
 }

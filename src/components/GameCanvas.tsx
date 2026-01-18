@@ -22,7 +22,7 @@ import {
 
 interface GameCanvasProps {
   onScore: (score: number) => void;
-  onGameOver: (finalScore: number) => void;
+  onGameOver: (finalScore: number, world: number, level: number) => void;
   onLevelUp: (level: number) => void;
   onWorldUp: (world: number) => void;
   /** Optional audio service for dependency injection (testing) */
@@ -55,7 +55,11 @@ export const GameCanvas = ({
     if (!stateRef.current) return;
     stateRef.current = setGameOver(stateRef.current);
     audioService.playFailSound();
-    onGameOver(stateRef.current.score);
+    onGameOver(
+      stateRef.current.score,
+      stateRef.current.world,
+      stateRef.current.level
+    );
   }, [onGameOver, audioService]);
 
   const handleTap = useCallback(() => {
@@ -101,6 +105,8 @@ export const GameCanvas = ({
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    lastTimeRef.current = 0; // Reset time when loop starts/restarts
 
     const resize = () => {
       canvas.width = window.innerWidth;

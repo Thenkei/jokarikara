@@ -152,6 +152,29 @@ describe("gameState", () => {
         }
       }
     });
+
+    it("should stay on world 2 for multiple stacks after reaching it", () => {
+      let state = createInitialState(1000);
+      // STACKS_PER_LEVEL = 3. 15 stacks to reach world 2.
+      for (let i = 0; i < 15; i++) {
+        state = spawnActiveShape(state);
+        state = stackActiveShape(state).state;
+      }
+      expect(state.world).toBe(2);
+
+      // Stack one more
+      state = spawnActiveShape(state);
+      state = stackActiveShape(state).state;
+      expect(state.world).toBe(2); // Should STILL be world 2
+
+      // Stack until level 2 of world 2 (score 18)
+      state = spawnActiveShape(state);
+      state = stackActiveShape(state).state; // Score 17
+      state = spawnActiveShape(state);
+      state = stackActiveShape(state).state; // Score 18
+      expect(state.world).toBe(2);
+      expect(state.level).toBe(2);
+    });
   });
 
   describe("setGameOver", () => {

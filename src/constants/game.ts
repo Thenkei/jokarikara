@@ -89,6 +89,7 @@ export const getWorldMechanics = (world: number): WorldMechanics => {
 export const MIN_GROWTH_SPEED = 35;
 export const MAX_GROWTH_SPEED = 80;
 export const STACKS_PER_LEVEL = 3;
+export const LEVELS_PER_WORLD = 5;
 
 export const SHAPE_UNLOCKS: Record<number, ShapeType[]> = {
   1: ["circle", "octagon"],

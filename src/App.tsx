@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { GameCanvas } from "./components/GameCanvas";
 import { audioManager } from "./utils/audioManager";
 import { getHighScores, saveHighScore } from "./utils/storage";
@@ -25,31 +25,36 @@ function App() {
     setGameState("PLAYING");
   };
 
-  const handleGameOver = (finalScore: number) => {
-    // Calculated score = world * 5 + level
-    const progressionScore = world * 5 + level;
-    saveHighScore(progressionScore);
-    setHighScores(getHighScores());
-    setScore(finalScore);
-    setGameState("GAMEOVER");
-  };
+  const handleGameOver = useCallback(
+    (finalScore: number, finalWorld: number, finalLevel: number) => {
+      // Calculated score = world * 5 + level
+      const progressionScore = finalWorld * 5 + finalLevel;
+      saveHighScore(progressionScore);
+      setHighScores(getHighScores());
+      setScore(finalScore);
+      setWorld(finalWorld);
+      setLevel(finalLevel);
+      setGameState("GAMEOVER");
+    },
+    []
+  );
 
-  const handleScore = (newScore: number) => {
+  const handleScore = useCallback((newScore: number) => {
     setScore(newScore);
-  };
+  }, []);
 
-  const handleLevelUp = (newLevel: number) => {
+  const handleLevelUp = useCallback((newLevel: number) => {
     setLevel(newLevel);
     setShowLevelUp(true);
     setTimeout(() => setShowLevelUp(false), 1500);
-  };
+  }, []);
 
-  const handleWorldUp = (newWorld: number) => {
+  const handleWorldUp = useCallback((newWorld: number) => {
     setWorld(newWorld);
     setLevel(1);
     setShowWorldUp(true);
     setTimeout(() => setShowWorldUp(false), 2000);
-  };
+  }, []);
 
   return (
     <div className="game-container">
