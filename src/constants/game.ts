@@ -100,6 +100,8 @@ export interface BossShapeConfig {
   growthSpeedMultiplier: number;
   rotationSpeedMultiplier: number;
   hueShift: boolean;
+  pulseEnabled?: boolean;
+  erraticRotationEnabled?: boolean;
 }
 
 export const BOSS_SHAPES: Record<number, BossShapeConfig> = {
@@ -108,12 +110,29 @@ export const BOSS_SHAPES: Record<number, BossShapeConfig> = {
     growthSpeedMultiplier: 1.5,
     rotationSpeedMultiplier: 2.0,
     hueShift: true,
+    pulseEnabled: true,
   },
   10: {
     type: "octagon",
     growthSpeedMultiplier: 2.0,
     rotationSpeedMultiplier: 2.5,
     hueShift: true,
+    erraticRotationEnabled: true,
+  },
+  15: {
+    type: "diamond",
+    growthSpeedMultiplier: 2.2,
+    rotationSpeedMultiplier: 3.0,
+    hueShift: true,
+    pulseEnabled: true,
+  },
+  20: {
+    type: "star",
+    growthSpeedMultiplier: 2.5,
+    rotationSpeedMultiplier: 3.5,
+    hueShift: true,
+    pulseEnabled: true,
+    erraticRotationEnabled: true,
   },
 };
 

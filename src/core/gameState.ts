@@ -58,7 +58,9 @@ export const spawnActiveShape = (state: GameState): GameState => {
   const lastShape = state.shapes[state.shapes.length - 1] ?? null;
 
   // Boss mechanics: Check if current level/score triggers a boss
-  const isBossLevel = state.mode !== "ZEN" && !!BOSS_SHAPES[state.score + 1];
+  // We keep bosses in ZEN mode for visual variety and testing,
+  // but they won't end the game on miss.
+  const isBossLevel = !!BOSS_SHAPES[state.score + 1];
 
   let activeShape = createActiveShape(state.level, lastShape);
 
@@ -122,13 +124,39 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
 
   let bossMultiplier = 1;
   let bossRotationMultiplier = 1;
+  let pulseOffset = 0;
+  let finalRotationSpeed = 0;
+
+  const time = Date.now() / 1000;
 
   if (state.isBossLevel) {
     const bossConfig = BOSS_SHAPES[state.score + 1];
     if (bossConfig) {
       bossMultiplier = bossConfig.growthSpeedMultiplier;
       bossRotationMultiplier = bossConfig.rotationSpeedMultiplier;
+
+      if (bossConfig.pulseEnabled) {
+        // Pulsing: adds a sinusoidal oscillation to the size
+        // Speed and amplitude scale with score/difficulty
+        const pulseSpeed = 4 + state.score * 0.1;
+        const pulseAmplitude = 5 + state.score * 0.2;
+        pulseOffset = Math.sin(time * pulseSpeed) * pulseAmplitude;
+      }
+
+      const baseRotationSpeed =
+        (0.5 + Math.min(state.score * 0.05, 1.5)) * bossRotationMultiplier;
+
+      if (bossConfig.erraticRotationEnabled) {
+        // Erratic rotation: varies the rotation speed over time
+        const erraticFreq = 2 + state.score * 0.05;
+        finalRotationSpeed =
+          baseRotationSpeed * (1 + Math.sin(time * erraticFreq) * 0.5);
+      } else {
+        finalRotationSpeed = baseRotationSpeed;
+      }
     }
+  } else {
+    finalRotationSpeed = 0.5 + Math.min(state.score * 0.05, 1.5);
   }
 
   const difficultyMultiplier = 1 + state.score * 0.05;
@@ -138,26 +166,36 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
       growthPatternMultiplier *
       bossMultiplier) /
     state.zoom;
-  const rotationSpeed =
-    (0.5 + Math.min(state.score * 0.05, 1.5)) * bossRotationMultiplier;
 
   let color = state.activeShape.color;
   if (state.isBossLevel) {
-    const time = Date.now() / 1000;
     const hue = (time * 100) % 360;
     color = `hsl(${hue}, 80%, 60%)`;
   }
 
+  const baseSize = state.activeShape.size + growthIncrement * dt;
   const updatedShape: Shape = {
     ...state.activeShape,
-    size: state.activeShape.size + growthIncrement * dt,
-    rotation: state.activeShape.rotation + rotationSpeed * dt,
+    size: baseSize + pulseOffset * dt, // Apply pulse as a rate change or absolute offset?
+    // If I apply it as pulseOffset * dt, it's more like a speed variation.
+    // If I apply it as baseSize + pulseOffset, it's an oscillation around the base size.
+    // Let's go with oscillation around base size for better visual "pulsing".
+    rotation: state.activeShape.rotation + finalRotationSpeed * dt,
     color,
+  };
+
+  // However, if I use pulseOffset directly, it might jump since I'm not storing the "base size" separately.
+  // Let's refine this to be a speed variation instead, or store baseSize in the state if needed.
+  // Actually, a speed variation is easier to implement without changing state structure.
+
+  const updatedShapeWithPulse: Shape = {
+    ...updatedShape,
+    size: baseSize + pulseOffset * 5 * dt, // Scale pulseOffset to be a speed change
   };
 
   return {
     ...state,
-    activeShape: updatedShape,
+    activeShape: updatedShapeWithPulse,
   };
 };
 
@@ -297,6 +335,35 @@ export const restartActiveShape = (state: GameState): GameState => {
     ...state,
     activeShape: newActiveShape,
     currentSpeed,
+  };
+};
+
+/**
+ * Undo the last stack operation in Zen Mode.
+ */
+export const undoLastStack = (state: GameState): GameState => {
+  if (state.mode !== "ZEN" || state.shapes.length <= 1) {
+    return state;
+  }
+
+  // Remove the last shape
+  const newShapes = state.shapes.slice(0, -1);
+  const newScore = Math.max(0, state.score - 1);
+
+  // Recalculate level/world
+  const totalLevels = Math.floor(newScore / STACKS_PER_LEVEL);
+  const newWorld = Math.floor(totalLevels / LEVELS_PER_WORLD) + 1;
+  const newLevel = (totalLevels % LEVELS_PER_WORLD) + 1;
+  const newTargetZoom = getZoomForLevel(newLevel);
+
+  return {
+    ...state,
+    shapes: newShapes,
+    score: newScore,
+    world: newWorld,
+    level: newLevel,
+    targetZoom: newTargetZoom,
+    activeShape: null, // Force spawn of new shape
   };
 };
 

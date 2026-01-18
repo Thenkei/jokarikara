@@ -15,6 +15,7 @@ import {
   updateTimer,
   handleMiss,
   restartActiveShape,
+  undoLastStack,
 } from "../core/gameState";
 import { getWorldMechanics } from "../constants/game";
 import type { GameMode } from "../types";
@@ -38,6 +39,7 @@ interface GameCanvasProps {
 
 export interface GameCanvasHandle {
   restartShape: () => void;
+  undo: () => void;
 }
 
 /**
@@ -61,6 +63,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     const stateRef = useRef<GameState | null>(null);
     const lastTimeRef = useRef(0);
     const restartRequestedRef = useRef(false);
+    const undoRequestedRef = useRef(false);
 
     // Initialize game state
     useEffect(() => {
@@ -75,6 +78,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         restartShape: () => {
           if (!stateRef.current || stateRef.current.isGameOver) return;
           restartRequestedRef.current = true;
+        },
+        undo: () => {
+          if (!stateRef.current || stateRef.current.isGameOver) return;
+          undoRequestedRef.current = true;
         },
       }),
       []
@@ -187,6 +194,19 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           audioService.playStackSound(0);
         }
 
+        if (undoRequestedRef.current) {
+          state = undoLastStack(state);
+          undoRequestedRef.current = false;
+          // If undo resulted in no active shape, spawn one
+          if (!state.activeShape) {
+            state = spawnActiveShape(state);
+          }
+          onScore(state.score);
+          onLevelUp(state.level);
+          onWorldUp(state.world);
+          audioService.playStackSound(state.score);
+        }
+
         state = updateActiveShape(state, dt);
         state = updateZoom(state, dt);
         state = updateShapeRotations(state);
@@ -208,6 +228,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         // Check auto-fail if shape starts poking out
         if (!checkContainment(state)) {
           miss();
+          // In Zen mode, we must continue the loop because miss() doesn't end the game
+          if (state.mode === "ZEN") {
+            requestAnimationFrame(loop);
+          }
           return;
         }
 
@@ -261,7 +285,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         cancelAnimationFrame(animId);
         window.removeEventListener("resize", resize);
       };
-    }, [audioService, endGame, miss, onGameOver, onTimeUpdate]);
+    }, [
+      audioService,
+      endGame,
+      miss,
+      onGameOver,
+      onTimeUpdate,
+      onScore,
+      onLevelUp,
+      onWorldUp,
+    ]);
     return (
       <canvas
         ref={canvasRef}

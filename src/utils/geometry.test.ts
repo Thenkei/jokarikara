@@ -223,6 +223,60 @@ describe("geometry utilities", () => {
       };
       expect(isContained(circleOutside, square)).toBe(false);
     });
+
+    it("should correctly handle diamond containment", () => {
+      const parent: Shape = {
+        type: "diamond",
+        size: 100,
+        rotation: 0,
+        color: "blue",
+        opacity: 1,
+      };
+      const child: Shape = {
+        type: "diamond",
+        size: 80,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(child, parent)).toBe(true);
+
+      const rotatedChild: Shape = {
+        type: "diamond",
+        size: 80,
+        rotation: Math.PI / 4,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(rotatedChild, parent)).toBe(false);
+    });
+
+    it("should correctly handle star containment", () => {
+      const parent: Shape = {
+        type: "star",
+        size: 100,
+        rotation: 0,
+        color: "blue",
+        opacity: 1,
+      };
+      const child: Shape = {
+        type: "star",
+        size: 50,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(child, parent)).toBe(true);
+
+      const largeStar: Shape = {
+        type: "star",
+        size: 110,
+        rotation: 0,
+        color: "red",
+        opacity: 1,
+      };
+      expect(isContained(largeStar, parent)).toBe(false);
+    });
   });
 
   describe("getRegularPolygonVertices", () => {

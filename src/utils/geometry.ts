@@ -5,7 +5,9 @@ export type ShapeType =
   | "rectangle"
   | "pentagon"
   | "hexagon"
-  | "octagon";
+  | "octagon"
+  | "star"
+  | "diamond";
 
 export interface Shape {
   type: ShapeType;
@@ -33,6 +35,26 @@ export const getRegularPolygonVertices = (
     vertices.push({
       x: Math.cos(angle) * radius,
       y: Math.sin(angle) * radius,
+    });
+  }
+  return vertices;
+};
+
+// Helper to get vertices of a 5-pointed star
+export const getStarVertices = (
+  size: number,
+  rotation: number,
+  innerRatio: number = 0.4
+): Point[] => {
+  const vertices: Point[] = [];
+  const radius = size / 2;
+  const innerRadius = radius * innerRatio;
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? radius : innerRadius;
+    const angle = (i / 10) * Math.PI * 2 - Math.PI / 2 + rotation;
+    vertices.push({
+      x: Math.cos(angle) * r,
+      y: Math.sin(angle) * r,
     });
   }
   return vertices;
@@ -88,6 +110,21 @@ export const getVertices = (shape: Shape): Point[] => {
     return getRegularPolygonVertices(6, size, rot);
   } else if (shape.type === "octagon") {
     return getRegularPolygonVertices(8, size, rot);
+  } else if (shape.type === "star") {
+    return getStarVertices(size, rot);
+  } else if (shape.type === "diamond") {
+    const halfW = size / 2;
+    const halfH = (size * 0.7) / 2;
+    const corners = [
+      { x: 0, y: -halfH },
+      { x: halfW, y: 0 },
+      { x: 0, y: halfH },
+      { x: -halfW, y: 0 },
+    ];
+    return corners.map((p) => ({
+      x: p.x * Math.cos(rot) - p.y * Math.sin(rot),
+      y: p.x * Math.sin(rot) + p.y * Math.cos(rot),
+    }));
   }
   return [];
 };
@@ -138,6 +175,29 @@ export const isPointInShape = (point: Point, shape: Shape): boolean => {
 
     // Detailed check: use ray casting algorithm
     const vertices = getRegularPolygonVertices(sides, size + 1.0, 0); // 1px buffer
+    let inside = false;
+    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+      const xi = vertices[i].x,
+        yi = vertices[i].y;
+      const xj = vertices[j].x,
+        yj = vertices[j].y;
+
+      if (
+        yi > localY !== yj > localY &&
+        localX < ((xj - xi) * (localY - yi)) / (yj - yi) + xi
+      ) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  } else if (shape.type === "diamond") {
+    const halfW = size / 2;
+    const halfH = (size * 0.7) / 2;
+    // Normalized diamond: |x/w| + |y/h| <= 1
+    return Math.abs(localX) / halfW + Math.abs(localY) / halfH <= 1.05; // 0.05 buffer
+  } else if (shape.type === "star") {
+    // Star detailed check using ray casting
+    const vertices = getStarVertices(size + 1.0, 0, 0.4);
     let inside = false;
     for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
       const xi = vertices[i].x,

@@ -70,6 +70,10 @@ function App() {
     canvasRef.current?.restartShape();
   };
 
+  const handleUndo = () => {
+    canvasRef.current?.undo();
+  };
+
   return (
     <div className="game-container">
       {gameState === "START" && (
@@ -129,9 +133,14 @@ function App() {
             <div className="hud-row main-hud">
               <span className="score">{score}</span>
               {mode === "ZEN" && (
-                <button className="restart-btn" onClick={handleRestartShape}>
-                  RESTART
-                </button>
+                <div className="zen-controls">
+                  <button className="restart-btn" onClick={handleRestartShape}>
+                    RESTART
+                  </button>
+                  <button className="undo-btn" onClick={handleUndo}>
+                    UNDO
+                  </button>
+                </div>
               )}
             </div>
           </div>

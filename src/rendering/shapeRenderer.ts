@@ -1,4 +1,5 @@
 import type { Shape } from "../utils/geometry";
+import { getStarVertices } from "../utils/geometry";
 import type { WorldMechanics } from "../constants/game";
 
 /**
@@ -26,6 +27,72 @@ export const drawRegularPolygonPath = (
       ctx.lineTo(x, y);
     }
   }
+  ctx.closePath();
+};
+
+/**
+ * Draw a circle path centered at origin.
+ */
+export const drawCirclePath = (
+  ctx: CanvasRenderingContext2D,
+  size: number
+): void => {
+  ctx.beginPath();
+  ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+};
+
+/**
+ * Draw a square path centered at origin.
+ */
+export const drawSquarePath = (
+  ctx: CanvasRenderingContext2D,
+  size: number
+): void => {
+  ctx.beginPath();
+  ctx.rect(-size / 2, -size / 2, size, size);
+};
+
+/**
+ * Draw a rectangle path centered at origin.
+ */
+export const drawRectanglePath = (
+  ctx: CanvasRenderingContext2D,
+  size: number
+): void => {
+  const height = size * 0.6;
+  ctx.beginPath();
+  ctx.rect(-size / 2, -height / 2, size, height);
+};
+
+/**
+ * Draw a diamond path centered at origin.
+ */
+export const drawDiamondPath = (
+  ctx: CanvasRenderingContext2D,
+  size: number
+): void => {
+  const height = size * 0.7;
+  ctx.beginPath();
+  ctx.moveTo(0, -height / 2);
+  ctx.lineTo(size / 2, 0);
+  ctx.lineTo(0, height / 2);
+  ctx.lineTo(-size / 2, 0);
+  ctx.closePath();
+};
+
+/**
+ * Draw a star path centered at origin.
+ */
+export const drawStarPath = (
+  ctx: CanvasRenderingContext2D,
+  size: number
+): void => {
+  const starVertices = getStarVertices(size, 0);
+  ctx.beginPath();
+  starVertices.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
   ctx.closePath();
 };
 
@@ -117,22 +184,34 @@ export const drawShape = (
 
   const size = shape.size * zoom * sizeMultiplier;
 
-  ctx.beginPath();
-  if (shape.type === "circle") {
-    ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
-  } else if (shape.type === "square") {
-    ctx.rect(-size / 2, -size / 2, size, size);
-  } else if (shape.type === "triangle") {
-    drawRegularPolygonPath(ctx, 3, size);
-  } else if (shape.type === "rectangle") {
-    const height = size * 0.6;
-    ctx.rect(-size / 2, -height / 2, size, height);
-  } else if (shape.type === "pentagon") {
-    drawRegularPolygonPath(ctx, 5, size);
-  } else if (shape.type === "hexagon") {
-    drawRegularPolygonPath(ctx, 6, size);
-  } else if (shape.type === "octagon") {
-    drawRegularPolygonPath(ctx, 8, size);
+  switch (shape.type) {
+    case "circle":
+      drawCirclePath(ctx, size);
+      break;
+    case "square":
+      drawSquarePath(ctx, size);
+      break;
+    case "triangle":
+      drawRegularPolygonPath(ctx, 3, size);
+      break;
+    case "rectangle":
+      drawRectanglePath(ctx, size);
+      break;
+    case "pentagon":
+      drawRegularPolygonPath(ctx, 5, size);
+      break;
+    case "hexagon":
+      drawRegularPolygonPath(ctx, 6, size);
+      break;
+    case "octagon":
+      drawRegularPolygonPath(ctx, 8, size);
+      break;
+    case "diamond":
+      drawDiamondPath(ctx, size);
+      break;
+    case "star":
+      drawStarPath(ctx, size);
+      break;
   }
 
   ctx.fill();
