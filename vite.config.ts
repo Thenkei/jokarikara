@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     exclude: ["**/node_modules/**", "**/dist/**", "tests/**"],
+    setupFiles: ["vitest-canvas-mock"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });
