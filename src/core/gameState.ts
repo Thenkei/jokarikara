@@ -13,6 +13,7 @@ import {
   TIME_ATTACK_START_TIME,
   PERFECT_STACK_TIME_BONUS,
   BOSS_SHAPES,
+  REFERENCE_INITIAL_SIZE,
 } from "../constants/game";
 import type { GameMode } from "../types";
 
@@ -160,11 +161,14 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
   }
 
   const difficultyMultiplier = 1 + state.score * 0.05;
+  // Normalize growth speed by initial shape size so gameplay feels consistent across screen sizes
+  const sizeNormalization = state.initialSize / REFERENCE_INITIAL_SIZE;
   const growthIncrement =
     (state.currentSpeed *
       difficultyMultiplier *
       growthPatternMultiplier *
-      bossMultiplier) /
+      bossMultiplier *
+      sizeNormalization) /
     state.zoom;
 
   let color = state.activeShape.color;

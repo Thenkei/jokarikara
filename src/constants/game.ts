@@ -89,6 +89,13 @@ export const getWorldMechanics = (world: number): WorldMechanics => {
 export const MIN_GROWTH_SPEED = 35;
 export const MAX_GROWTH_SPEED = 80;
 export const STACKS_PER_LEVEL = 3;
+
+/**
+ * Reference initial shape size for normalizing growth speed.
+ * Based on an 800px viewport (800 * 0.45 = 360).
+ * Growth speed is scaled so gameplay feels consistent across screen sizes.
+ */
+export const REFERENCE_INITIAL_SIZE = 360;
 export const LEVELS_PER_WORLD = 5;
 
 // Mode specific constants
