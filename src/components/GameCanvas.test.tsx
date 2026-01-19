@@ -38,7 +38,8 @@ describe("GameCanvas", () => {
     );
     const canvas = container.querySelector("canvas");
     expect(canvas).toBeDefined();
-    expect(canvas?.style.width).toBe("100%");
+    // Canvas now uses pixel dimensions for high-DPI support
+    expect(canvas?.style.width).toMatch(/^\d+px$/);
   });
 
   it("calls onScore and plays sound when tapped correctly", async () => {

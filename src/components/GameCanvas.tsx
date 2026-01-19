@@ -64,6 +64,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     const lastTimeRef = useRef(0);
     const restartRequestedRef = useRef(false);
     const undoRequestedRef = useRef(false);
+    const dimensionsRef = useRef({ width: 0, height: 0 });
 
     // Initialize game state
     useEffect(() => {
@@ -164,8 +165,23 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       lastTimeRef.current = 0; // Reset time when loop starts/restarts
 
       const resize = () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const dpr = window.devicePixelRatio || 1;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // Store logical dimensions
+        dimensionsRef.current = { width, height };
+
+        // Set display size (CSS)
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+
+        // Set actual size in memory (scaled for high-DPI)
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+
+        // Scale context to match DPR
+        ctx.scale(dpr, dpr);
       };
       window.addEventListener("resize", resize);
       resize();
@@ -235,13 +251,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           return;
         }
 
-        // Render
-        clearCanvas(ctx, canvas.width, canvas.height);
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
+        // Render (use logical dimensions, not scaled canvas size)
+        const { width, height } = dimensionsRef.current;
+        clearCanvas(ctx, width, height);
+        const centerX = width / 2;
+        const centerY = height / 2;
 
         ctx.save();
-        drawBackground(ctx, canvas.width, canvas.height, pulse);
+        drawBackground(ctx, width, height, pulse);
 
         // Get world mechanics for current world
         const mechanics = getWorldMechanics(state.world);
