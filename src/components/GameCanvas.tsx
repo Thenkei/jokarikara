@@ -57,7 +57,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onTimeUpdate,
       audioService = defaultAudioManager,
     },
-    ref
+    ref,
   ) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const stateRef = useRef<GameState | null>(null);
@@ -85,7 +85,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           undoRequestedRef.current = true;
         },
       }),
-      []
+      [],
     );
 
     const endGame = useCallback(() => {
@@ -95,7 +95,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onGameOver(
         stateRef.current.score,
         stateRef.current.world,
-        stateRef.current.level
+        stateRef.current.level,
       );
     }, [onGameOver, audioService]);
 
@@ -110,7 +110,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         onGameOver(
           stateRef.current.score,
           stateRef.current.world,
-          stateRef.current.level
+          stateRef.current.level,
         );
       } else {
         // Just reset shape in Zen
@@ -258,11 +258,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const centerY = height / 2;
 
         ctx.save();
-        drawBackground(ctx, width, height, pulse);
 
         // Get world mechanics for current world
         const mechanics = getWorldMechanics(state.world);
         const timeInSeconds = time / 1000;
+
+        drawBackground(ctx, width, height, pulse, mechanics);
 
         state.shapes.forEach((shape, index) => {
           drawShape(
@@ -274,7 +275,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             mechanics,
             timeInSeconds,
             true, // isStacked
-            index // stackIndex
+            index, // stackIndex
+            index === state.shapes.length - 1, // isContainer
           );
         });
 
@@ -288,7 +290,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             mechanics,
             timeInSeconds,
             false, // NOT stacked (active)
-            state.shapes.length // stackIndex for phase offset
+            state.shapes.length, // stackIndex for phase offset
           );
         }
 
@@ -319,5 +321,5 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         style={{ width: "100%", height: "100%", cursor: "pointer" }}
       />
     );
-  }
+  },
 );

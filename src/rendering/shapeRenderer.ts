@@ -13,7 +13,7 @@ import type { WorldMechanics } from "../constants/game";
 export const drawRegularPolygonPath = (
   ctx: CanvasRenderingContext2D,
   sides: number,
-  size: number
+  size: number,
 ): void => {
   const radius = size / 2;
   ctx.beginPath();
@@ -35,7 +35,7 @@ export const drawRegularPolygonPath = (
  */
 export const drawCirclePath = (
   ctx: CanvasRenderingContext2D,
-  size: number
+  size: number,
 ): void => {
   ctx.beginPath();
   ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
@@ -46,7 +46,7 @@ export const drawCirclePath = (
  */
 export const drawSquarePath = (
   ctx: CanvasRenderingContext2D,
-  size: number
+  size: number,
 ): void => {
   ctx.beginPath();
   ctx.rect(-size / 2, -size / 2, size, size);
@@ -57,7 +57,7 @@ export const drawSquarePath = (
  */
 export const drawRectanglePath = (
   ctx: CanvasRenderingContext2D,
-  size: number
+  size: number,
 ): void => {
   const height = size * 0.6;
   ctx.beginPath();
@@ -69,7 +69,7 @@ export const drawRectanglePath = (
  */
 export const drawDiamondPath = (
   ctx: CanvasRenderingContext2D,
-  size: number
+  size: number,
 ): void => {
   const height = size * 0.7;
   ctx.beginPath();
@@ -85,7 +85,7 @@ export const drawDiamondPath = (
  */
 export const drawStarPath = (
   ctx: CanvasRenderingContext2D,
-  size: number
+  size: number,
 ): void => {
   const starVertices = getStarVertices(size, 0);
   ctx.beginPath();
@@ -149,7 +149,8 @@ export const drawShape = (
   mechanics: WorldMechanics,
   time: number = 0,
   isStacked: boolean = false,
-  stackIndex: number = 0
+  stackIndex: number = 0,
+  isContainer: boolean = false,
 ): void => {
   ctx.save();
   ctx.translate(x, y);
@@ -163,7 +164,13 @@ export const drawShape = (
   }
 
   ctx.rotate(shape.rotation);
-  ctx.globalAlpha = shape.opacity;
+
+  let opacity = shape.opacity;
+  if (mechanics.eclipseEffect && isStacked) {
+    // In Eclipse mode, stacked shapes are almost invisible unless they are the container pulsing
+    opacity = isContainer ? 0.05 : 0.02;
+  }
+  ctx.globalAlpha = opacity;
 
   // Color shift effect (stacked shapes only)
   let fillColor = shape.color;
@@ -216,8 +223,19 @@ export const drawShape = (
 
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-  ctx.lineWidth = 3;
+  let strokeStyle = "rgba(255, 255, 255, 0.4)";
+  let lineWidth = 3;
+
+  if (mechanics.eclipseEffect && isContainer) {
+    // Pulse the outline of the container shape
+    const pulse =
+      (Math.sin(time * Math.PI * 2 * mechanics.eclipsePulseSpeed) + 1) / 2;
+    strokeStyle = `rgba(255, 255, 255, ${0.1 + pulse * 0.5})`;
+    lineWidth = 4;
+  }
+
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = lineWidth;
   ctx.stroke();
 
   ctx.shadowBlur = 15;
@@ -233,10 +251,32 @@ export const drawBackground = (
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  pulse: number
+  pulse: number,
+  mechanics?: WorldMechanics,
 ): void => {
   const centerX = width / 2;
   const centerY = height / 2;
+
+  if (mechanics?.eclipseEffect) {
+    // Pitch black background for Eclipse
+    ctx.fillStyle = "#100e0eff";
+    ctx.fillRect(0, 0, width, height);
+
+    // Very subtle center glow
+    const grad = ctx.createRadialGradient(
+      centerX,
+      centerY,
+      0,
+      centerX,
+      centerY,
+      width * 0.5,
+    );
+    grad.addColorStop(0, `rgba(255, 255, 255, ${0.01 + pulse * 0.005})`);
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
 
   ctx.beginPath();
   const grad = ctx.createRadialGradient(
@@ -245,7 +285,7 @@ export const drawBackground = (
     0,
     centerX,
     centerY,
-    width * 0.8
+    width * 0.8,
   );
   grad.addColorStop(0, `rgba(255, 255, 255, ${0.03 + pulse * 0.02})`);
   grad.addColorStop(1, "rgba(0, 0, 0, 0)");
@@ -263,7 +303,7 @@ export const drawShapeStack = (
   centerY: number,
   zoom: number,
   mechanics: WorldMechanics,
-  time: number
+  time: number,
 ): void => {
   shapes.forEach((shape, index) => {
     drawShape(ctx, shape, centerX, centerY, zoom, mechanics, time, true, index);
@@ -276,7 +316,7 @@ export const drawShapeStack = (
 export const clearCanvas = (
   ctx: CanvasRenderingContext2D,
   width: number,
-  height: number
+  height: number,
 ): void => {
   ctx.clearRect(0, 0, width, height);
 };

@@ -21,6 +21,10 @@ export interface WorldMechanics {
   /** Color shift: hue rotation for stacked shapes */
   colorShift: boolean;
   colorShiftSpeed: number; // degrees/sec
+
+  /** Eclipse: darker background and pulsing container visibility */
+  eclipseEffect: boolean;
+  eclipsePulseSpeed: number; // pulses per second (relative)
 }
 
 const DEFAULT_MECHANICS: WorldMechanics = {
@@ -33,6 +37,8 @@ const DEFAULT_MECHANICS: WorldMechanics = {
   waveSpeed: 0,
   colorShift: false,
   colorShiftSpeed: 0,
+  eclipseEffect: false,
+  eclipsePulseSpeed: 0,
 };
 
 /**
@@ -76,14 +82,31 @@ export const WORLD_MECHANICS: Record<number, WorldMechanics> = {
     colorShift: true,
     colorShiftSpeed: 30,
   },
+  6: {
+    ...DEFAULT_MECHANICS,
+    breathingEffect: true,
+    breathingAmplitude: 0.03,
+    breathingSpeed: 2,
+    growthPattern: "accelerating",
+    waveEffect: true,
+    waveAmplitude: 15,
+    waveSpeed: 3,
+    colorShift: true,
+    colorShiftSpeed: 30,
+    eclipseEffect: true,
+    eclipsePulseSpeed: 0.5,
+  },
 };
 
 /**
  * Get mechanics for a specific world.
- * Falls back to world 5 mechanics for worlds > 5.
+ * Falls back to last world mechanics for worlds > max.
  */
 export const getWorldMechanics = (world: number): WorldMechanics => {
-  return WORLD_MECHANICS[world] ?? WORLD_MECHANICS[5];
+  return (
+    WORLD_MECHANICS[world] ??
+    WORLD_MECHANICS[Object.keys(WORLD_MECHANICS).length - 1]
+  );
 };
 
 export const MIN_GROWTH_SPEED = 35;

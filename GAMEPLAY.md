@@ -65,6 +65,7 @@ After completing level 5, you advance to **World 2**, resetting the level counte
 | **3** | 🚀 Accelerating Growth | Active shape grows faster with each stack in a level (1x → 1.25x → 1.5x)       |
 | **4** | 🌊 Wave                | Stacked shapes sway horizontally (active shape stays stable for fair gameplay) |
 | **5** | 🌈 Color Shift         | Stacked shapes cycle through rainbow hues                                      |
+| **6** | 🌑 The Eclipse         | Background turns black; the container shape is invisible and pulses light.     |
 
 > **Note**: Effects are additive. World 5 includes all previous effects: breathing + accelerating growth + wave + color shift.
 
