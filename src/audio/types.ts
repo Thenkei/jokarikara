@@ -20,6 +20,11 @@ export interface IAudioService {
   playFailSound(): void;
 
   /**
+   * Play a sound when clicking too early in Zen mode.
+   */
+  playEarlyClickSound(): void;
+
+  /**
    * Resume the audio context if suspended (required by browsers).
    */
   resume(): void;

@@ -125,6 +125,12 @@ export const LEVELS_PER_WORLD = 5;
 export const TIME_ATTACK_START_TIME = 60;
 export const PERFECT_STACK_TIME_BONUS = 5;
 
+/**
+ * Minimum size ratio required for a valid click in Zen mode.
+ * Prevents spam-clicking by requiring the active shape to reach 30% of the previous shape's size.
+ */
+export const ZEN_MIN_CLICK_RATIO = 0.3;
+
 export interface BossShapeConfig {
   type: ShapeType;
   growthSpeedMultiplier: number;

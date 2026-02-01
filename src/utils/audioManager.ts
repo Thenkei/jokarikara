@@ -10,8 +10,10 @@ class AudioManager implements IAudioService {
 
   init(): void {
     if (this.ctx) return;
-    this.ctx = new (window.AudioContext ||
-      (window as WindowWithWebkitAudioContext).webkitAudioContext!)();
+    this.ctx = new (
+      window.AudioContext ||
+      (window as WindowWithWebkitAudioContext).webkitAudioContext!
+    )();
     this.masterGain = this.ctx.createGain();
     this.masterGain.connect(this.ctx.destination);
     this.masterGain.gain.value = 0.3;
@@ -32,7 +34,7 @@ class AudioManager implements IAudioService {
     osc.frequency.setValueAtTime(freq, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(
       freq * 1.5,
-      ctx.currentTime + 0.1
+      ctx.currentTime + 0.1,
     );
 
     gain.gain.setValueAtTime(0.5, ctx.currentTime);
@@ -64,6 +66,28 @@ class AudioManager implements IAudioService {
 
     osc.start();
     osc.stop(ctx.currentTime + 0.5);
+  }
+
+  playEarlyClickSound(): void {
+    if (!this.ctx || !this.masterGain) this.init();
+    const ctx = this.ctx!;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    // Quick, higher-pitched blip to indicate "too early"
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.15);
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
   }
 
   resume(): void {

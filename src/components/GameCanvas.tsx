@@ -17,7 +17,7 @@ import {
   restartActiveShape,
   undoLastStack,
 } from "../core/gameState";
-import { getWorldMechanics } from "../constants/game";
+import { getWorldMechanics, ZEN_MIN_CLICK_RATIO } from "../constants/game";
 import type { GameMode } from "../types";
 import { forwardRef, useImperativeHandle } from "react";
 import {
@@ -125,6 +125,18 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         !stateRef.current.activeShape
       )
         return;
+
+      const state = stateRef.current;
+      const lastShape = state.shapes[state.shapes.length - 1];
+
+      // Zen mode: require minimum size ratio to prevent spam-clicking
+      if (state.mode === "ZEN") {
+        const sizeRatio = state.activeShape!.size / lastShape.size;
+        if (sizeRatio < ZEN_MIN_CLICK_RATIO) {
+          audioService.playEarlyClickSound();
+          return;
+        }
+      }
 
       // Check if active shape is contained
       if (!checkContainment(stateRef.current)) {
