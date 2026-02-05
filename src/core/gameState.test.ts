@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   createInitialState,
   generateRandomSpeed,
@@ -13,9 +13,15 @@ import {
   updateTimer,
   handleMiss,
   restartActiveShape,
+  undoLastStack,
 } from "./gameState";
 
-import { MIN_GROWTH_SPEED, MAX_GROWTH_SPEED } from "../constants/game";
+import {
+  MIN_GROWTH_SPEED,
+  MAX_GROWTH_SPEED,
+  PERFECT_STACK_TIME_BONUS,
+  TIME_ATTACK_START_TIME,
+} from "../constants/game";
 
 describe("gameState", () => {
   describe("createInitialState", () => {
@@ -139,6 +145,19 @@ describe("gameState", () => {
         state.activeShape!.rotation
       );
     });
+
+    it("should apply boss hue shift deterministically with mocked time", () => {
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1000);
+      let state = createInitialState(1000);
+      state.score = 4; // Boss at score 5
+      state = spawnActiveShape(state);
+      expect(state.isBossLevel).toBe(true);
+
+      const updated = updateActiveShape(state, 0.1);
+      expect(updated.activeShape!.color).toBe("hsl(100, 80%, 60%)");
+
+      nowSpy.mockRestore();
+    });
   });
 
   describe("checkContainment", () => {
@@ -203,6 +222,18 @@ describe("gameState", () => {
       const reset = restartActiveShape(state);
       expect(reset.activeShape?.size).toBeLessThan(1000);
       expect(reset.activeShape?.size).toBe(state.shapes[0].size * 0.05);
+    });
+
+    it("should reset size relative to last shape and update speed", () => {
+      let state = createInitialState(1000);
+      state = spawnActiveShape(state);
+      state.activeShape!.size = 999;
+      state.currentSpeed = MIN_GROWTH_SPEED;
+
+      const reset = restartActiveShape(state);
+      expect(reset.activeShape?.size).toBe(state.shapes[0].size * 0.05);
+      expect(reset.currentSpeed).toBeGreaterThanOrEqual(MIN_GROWTH_SPEED);
+      expect(reset.currentSpeed).toBeLessThanOrEqual(MAX_GROWTH_SPEED);
     });
   });
 
@@ -278,6 +309,37 @@ describe("gameState", () => {
       state = stackActiveShape(state).state; // Score 18
       expect(state.world).toBe(2);
       expect(state.level).toBe(2);
+    });
+
+    it("should grant time bonus on perfect stack in TIME_ATTACK", () => {
+      let state = createInitialState(1000, "TIME_ATTACK");
+      state = spawnActiveShape(state);
+      const lastShape = state.shapes[state.shapes.length - 1];
+      state.activeShape = {
+        ...state.activeShape!,
+        size: lastShape.size * 0.96,
+      };
+
+      const result = stackActiveShape(state);
+      expect(result.state.timeRemaining).toBe(
+        TIME_ATTACK_START_TIME + PERFECT_STACK_TIME_BONUS
+      );
+    });
+  });
+
+  describe("undoLastStack", () => {
+    it("should recalculate level/world after undo", () => {
+      let state = createInitialState(1000, "ZEN");
+      for (let i = 0; i < 15; i++) {
+        state = spawnActiveShape(state);
+        state = stackActiveShape(state).state;
+      }
+      expect(state.world).toBe(2);
+
+      state = undoLastStack(state);
+      expect(state.score).toBe(14);
+      expect(state.world).toBe(1);
+      expect(state.level).toBe(5);
     });
   });
 

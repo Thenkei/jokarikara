@@ -42,3 +42,11 @@ export interface ShapeCreationOptions {
   rotation?: number;
   opacity?: number;
 }
+
+declare global {
+  interface Window {
+    __GAME_TEST__?: import("./utils/testBridge").GameTestBridge;
+  }
+}
+
+export {};

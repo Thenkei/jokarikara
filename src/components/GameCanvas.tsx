@@ -10,7 +10,6 @@ import {
   updateShapeRotations,
   updateShapeOpacities,
   stackActiveShape,
-  setGameOver,
   checkContainment,
   updateTimer,
   handleMiss,
@@ -25,6 +24,7 @@ import {
   drawBackground,
   clearCanvas,
 } from "../rendering/shapeRenderer";
+import { installGameTestBridge } from "../utils/testBridge";
 
 interface GameCanvasProps {
   mode?: GameMode;
@@ -60,11 +60,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     ref,
   ) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
     const stateRef = useRef<GameState | null>(null);
     const lastTimeRef = useRef(0);
     const restartRequestedRef = useRef(false);
     const undoRequestedRef = useRef(false);
     const dimensionsRef = useRef({ width: 0, height: 0 });
+    const manualModeRef = useRef(false);
+    const loopRef = useRef<(time: number) => void>(undefined);
 
     // Initialize game state
     useEffect(() => {
@@ -88,16 +91,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       [],
     );
 
-    const endGame = useCallback(() => {
-      if (!stateRef.current) return;
-      stateRef.current = setGameOver(stateRef.current);
-      audioService.playFailSound();
-      onGameOver(
-        stateRef.current.score,
-        stateRef.current.world,
-        stateRef.current.level,
-      );
-    }, [onGameOver, audioService]);
+    const setManualMode = useCallback((manual: boolean) => {
+      manualModeRef.current = manual;
+      if (!manual && loopRef.current) {
+        lastTimeRef.current = 0;
+        requestAnimationFrame(loopRef.current);
+      }
+    }, []);
 
     const miss = useCallback(() => {
       if (!stateRef.current) return;
@@ -167,50 +167,51 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       stateRef.current = spawnActiveShape(stateRef.current);
     }, [onScore, onLevelUp, onWorldUp, miss, audioService]);
 
-    useEffect(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    const forceStack = useCallback(
+      (sizeRatio: number) => {
+        if (!stateRef.current || !stateRef.current.activeShape) return;
+        const lastShape = stateRef.current.shapes[
+          stateRef.current.shapes.length - 1
+        ];
+        stateRef.current = {
+          ...stateRef.current,
+          activeShape: {
+            ...stateRef.current.activeShape,
+            size: lastShape.size * sizeRatio,
+          },
+        };
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+        const result = stackActiveShape(stateRef.current);
+        stateRef.current = result.state;
+        onScore(result.state.score);
 
-      lastTimeRef.current = 0; // Reset time when loop starts/restarts
-
-      const resize = () => {
-        const dpr = window.devicePixelRatio || 1;
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
-        // Store logical dimensions
-        dimensionsRef.current = { width, height };
-
-        // Set display size (CSS)
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-
-        // Set actual size in memory (scaled for high-DPI)
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-
-        // Scale context to match DPR
-        ctx.scale(dpr, dpr);
-      };
-      window.addEventListener("resize", resize);
-      resize();
-
-      const loop = (time: number) => {
-        if (!stateRef.current || stateRef.current.isGameOver) return;
-
-        if (lastTimeRef.current === 0) {
-          lastTimeRef.current = time;
-          requestAnimationFrame(loop);
-          return;
+        if (result.leveledUp) {
+          if (result.worldUp) {
+            onWorldUp(result.state.world);
+          } else {
+            onLevelUp(result.newLevel);
+          }
         }
 
-        const dt = (time - lastTimeRef.current) / 1000;
-        lastTimeRef.current = time;
+        stateRef.current = spawnActiveShape(stateRef.current);
+      },
+      [onScore, onLevelUp, onWorldUp],
+    );
 
-        const pulse = (Math.sin(time / 500) + 1) / 2;
+    const tick = useCallback(
+      (timeMs: number, dtOverrideSeconds?: number) => {
+        if (!stateRef.current || stateRef.current.isGameOver) return;
+
+        const ctx = ctxRef.current;
+        if (!ctx) return;
+
+        const dt =
+          dtOverrideSeconds ??
+          (lastTimeRef.current === 0
+            ? 0
+            : (timeMs - lastTimeRef.current) / 1000);
+
+        const pulse = (Math.sin(timeMs / 500) + 1) / 2;
 
         // Update state
         let state = stateRef.current;
@@ -235,19 +236,21 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           audioService.playStackSound(state.score);
         }
 
-        state = updateActiveShape(state, dt);
-        state = updateZoom(state, dt);
-        state = updateShapeRotations(state);
-        state = updateShapeOpacities(state);
+        if (dt > 0) {
+          state = updateActiveShape(state, dt);
+          state = updateZoom(state, dt);
+          state = updateShapeRotations(state);
+          state = updateShapeOpacities(state);
 
-        if (state.mode === "TIME_ATTACK") {
-          state = updateTimer(state, dt);
-          onTimeUpdate?.(state.timeRemaining ?? 0);
-          if (state.isGameOver) {
-            stateRef.current = state;
-            audioService.playFailSound();
-            onGameOver(state.score, state.world, state.level);
-            return;
+          if (state.mode === "TIME_ATTACK") {
+            state = updateTimer(state, dt);
+            onTimeUpdate?.(state.timeRemaining ?? 0);
+            if (state.isGameOver) {
+              stateRef.current = state;
+              audioService.playFailSound();
+              onGameOver(state.score, state.world, state.level);
+              return;
+            }
           }
         }
 
@@ -256,10 +259,6 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         // Check auto-fail if shape starts poking out
         if (!checkContainment(state)) {
           miss();
-          // In Zen mode, we must continue the loop because miss() doesn't end the game
-          if (state.mode === "ZEN") {
-            requestAnimationFrame(loop);
-          }
           return;
         }
 
@@ -273,7 +272,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         // Get world mechanics for current world
         const mechanics = getWorldMechanics(state.world);
-        const timeInSeconds = time / 1000;
+        const timeInSeconds = timeMs / 1000;
 
         drawBackground(ctx, width, height, pulse, mechanics);
 
@@ -307,24 +306,94 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         }
 
         ctx.restore();
+      },
+      [
+        audioService,
+        miss,
+        onGameOver,
+        onLevelUp,
+        onScore,
+        onTimeUpdate,
+        onWorldUp,
+      ],
+    );
 
-        requestAnimationFrame(loop);
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctxRef.current = ctx;
+
+      lastTimeRef.current = 0; // Reset time when loop starts/restarts
+
+      const resize = () => {
+        const dpr = window.devicePixelRatio || 1;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // Store logical dimensions
+        dimensionsRef.current = { width, height };
+
+        // Set display size (CSS)
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+
+        // Set actual size in memory (scaled for high-DPI)
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+
+        // Scale context to match DPR
+        ctx.scale(dpr, dpr);
+      };
+      window.addEventListener("resize", resize);
+      resize();
+
+      const loop = (time: number) => {
+        loopRef.current = loop;
+        if (!stateRef.current || stateRef.current.isGameOver) return;
+
+        if (lastTimeRef.current === 0) {
+          lastTimeRef.current = time;
+          if (!manualModeRef.current) {
+            requestAnimationFrame(loop);
+          }
+          return;
+        }
+
+        const dt = (time - lastTimeRef.current) / 1000;
+        lastTimeRef.current = time;
+        tick(time, dt);
+
+        if (!manualModeRef.current) {
+          requestAnimationFrame(loop);
+        }
       };
 
       const animId = requestAnimationFrame(loop);
+      const cleanupBridge = installGameTestBridge({
+        stateRef,
+        handleTap,
+        tick,
+        setManualMode,
+        forceStack,
+      });
       return () => {
         cancelAnimationFrame(animId);
         window.removeEventListener("resize", resize);
+        cleanupBridge?.();
       };
     }, [
       audioService,
-      endGame,
       miss,
       onGameOver,
       onTimeUpdate,
       onScore,
       onLevelUp,
       onWorldUp,
+      setManualMode,
+      tick,
     ]);
     return (
       <canvas

@@ -1,9 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
+import { makeBridge, waitForBridge } from "./bridgeHelpers";
 
 test.describe("GameCanvas Rendering", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.click(".start-btn");
+    await waitForBridge(page);
   });
 
   test("canvas should fill the container", async ({ page }) => {
@@ -31,7 +33,9 @@ test.describe("GameCanvas Rendering", () => {
 
   test("canvas should not be blank after starting", async ({ page }) => {
     // Wait for at least one frame to render
-    await page.waitForTimeout(500);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    await bridge.step(0.016);
 
     const isBlank = await page.evaluate(() => {
       const canvas = document.querySelector("canvas");
@@ -66,12 +70,14 @@ test.describe("GameCanvas Rendering", () => {
 
   test("canvas should be animated", async ({ page }) => {
     const canvas = page.locator("canvas");
+    const bridge = makeBridge(page);
+    await bridge.pause();
 
     // Capture canvas content at two different times
     const data1 = await canvas.evaluate((node: HTMLCanvasElement) =>
       node.toDataURL()
     );
-    await page.waitForTimeout(500); // Wait for a few frames
+    await bridge.step(0.05);
     const data2 = await canvas.evaluate((node: HTMLCanvasElement) =>
       node.toDataURL()
     );
@@ -79,22 +85,15 @@ test.describe("GameCanvas Rendering", () => {
     expect(data1).not.toBe(data2);
   });
 
-  test("tapping canvas should trigger stack (visual check)", async ({
-    page,
-  }) => {
+  test("tapping canvas should trigger stack (visual check)", async ({ page }) => {
+    const bridge = makeBridge(page);
+    await bridge.pause();
     // We can't easily check 'stacking' logic visually without snapshots,
     // but we can check if the score changes in HUD.
     const initialScore = await page.locator(".score").textContent();
 
-    // Click center of canvas
-    const canvas = page.locator("canvas");
-    const box = await canvas.boundingBox();
-    if (box) {
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    }
-
-    // Wait a bit and check score or game over
-    await page.waitForTimeout(500);
+    await bridge.tap();
+    await bridge.step(0.016);
 
     const currentGameState = await page.evaluate(() => {
       return document.querySelector(".gameover-screen")
@@ -117,9 +116,12 @@ test.describe("GameCanvas Rendering", () => {
     // Take multiple snapshots to ensure it's not totally broken
     // Since it's animated, we might get slight variations, but basic layout should hold.
     const canvas = page.locator("canvas");
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    await bridge.step(0.016);
     await expect(canvas).toHaveScreenshot("canvas-initial.png", {
       mask: [page.locator(".hud")], // Mask Hudson to focus on canvas content
-      maxDiffPixelRatio: 0.1, // Allow some animation variation
+      maxDiffPixelRatio: 0.02, // Tighter diff since we control frames
     });
   });
 });
