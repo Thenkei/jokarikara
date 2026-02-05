@@ -9,11 +9,11 @@ import {
   getZoomForLevel,
   getWorldMechanics,
   type WorldMechanics,
-  LEVELS_PER_WORLD,
   TIME_ATTACK_START_TIME,
   PERFECT_STACK_TIME_BONUS,
-  BOSS_SHAPES,
   REFERENCE_INITIAL_SIZE,
+  getBossConfigForScore,
+  computeProgression,
 } from "../constants/game";
 import type { GameMode } from "../types";
 
@@ -61,12 +61,12 @@ export const spawnActiveShape = (state: GameState): GameState => {
   // Boss mechanics: Check if current level/score triggers a boss
   // We keep bosses in ZEN mode for visual variety and testing,
   // but they won't end the game on miss.
-  const isBossLevel = !!BOSS_SHAPES[state.score + 1];
+  const bossConfig = getBossConfigForScore(state.score + 1);
+  const isBossLevel = !!bossConfig;
 
   let activeShape = createActiveShape(state.level, lastShape);
 
-  if (isBossLevel) {
-    const bossConfig = BOSS_SHAPES[state.score + 1];
+  if (isBossLevel && bossConfig) {
     activeShape = {
       ...activeShape,
       type: bossConfig.type,
@@ -131,7 +131,7 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
   const time = Date.now() / 1000;
 
   if (state.isBossLevel) {
-    const bossConfig = BOSS_SHAPES[state.score + 1];
+    const bossConfig = getBossConfigForScore(state.score + 1);
     if (bossConfig) {
       bossMultiplier = bossConfig.growthSpeedMultiplier;
       bossRotationMultiplier = bossConfig.rotationSpeedMultiplier;
@@ -253,9 +253,7 @@ export const stackActiveShape = (
     newTimeRemaining += PERFECT_STACK_TIME_BONUS;
   }
 
-  const totalLevels = Math.floor(newScore / STACKS_PER_LEVEL);
-  const newWorld = Math.floor(totalLevels / LEVELS_PER_WORLD) + 1;
-  const newLevel = (totalLevels % LEVELS_PER_WORLD) + 1;
+  const { world: newWorld, level: newLevel } = computeProgression(newScore);
 
   const worldUp = newWorld > state.world;
   const leveledUp = worldUp || (newLevel > state.level && !worldUp);
@@ -355,9 +353,7 @@ export const undoLastStack = (state: GameState): GameState => {
   const newScore = Math.max(0, state.score - 1);
 
   // Recalculate level/world
-  const totalLevels = Math.floor(newScore / STACKS_PER_LEVEL);
-  const newWorld = Math.floor(totalLevels / LEVELS_PER_WORLD) + 1;
-  const newLevel = (totalLevels % LEVELS_PER_WORLD) + 1;
+  const { world: newWorld, level: newLevel } = computeProgression(newScore);
   const newTargetZoom = getZoomForLevel(newLevel);
 
   return {

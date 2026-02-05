@@ -80,3 +80,29 @@ The game features a procedural audio engine:
 ---
 
 _Master the rhythm, time your taps, and build the ultimate shape stack!_
+
+## Developer Notes: Extending Gameplay
+
+Gameplay configuration now lives in `src/gameplay/config.ts` and is built with
+`GameplayBuilder`. Add new worlds or levels by extending that builder chain.
+
+Example:
+
+```ts
+// src/gameplay/config.ts
+builder.world(7, (w) =>
+  w.name("New World").mechanics({
+    breathingEffect: true,
+    breathingAmplitude: 0.04,
+    breathingSpeed: 2.5,
+  }),
+);
+
+builder.level(6, { zoom: 16, unlocks: ["star"] });
+builder.boss(25, {
+  type: "star",
+  growthSpeedMultiplier: 2.8,
+  rotationSpeedMultiplier: 3.8,
+  hueShift: true,
+});
+```

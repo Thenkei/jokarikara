@@ -21,6 +21,7 @@ import {
   MAX_GROWTH_SPEED,
   PERFECT_STACK_TIME_BONUS,
   TIME_ATTACK_START_TIME,
+  computeProgression,
 } from "../constants/game";
 
 describe("gameState", () => {
@@ -311,6 +312,18 @@ describe("gameState", () => {
       expect(state.level).toBe(2);
     });
 
+    it("should match computed progression after stacking", () => {
+      let state = createInitialState(1000);
+      for (let i = 0; i < 8; i++) {
+        state = spawnActiveShape(state);
+        state = stackActiveShape(state).state;
+      }
+
+      const progression = computeProgression(state.score);
+      expect(state.world).toBe(progression.world);
+      expect(state.level).toBe(progression.level);
+    });
+
     it("should grant time bonus on perfect stack in TIME_ATTACK", () => {
       let state = createInitialState(1000, "TIME_ATTACK");
       state = spawnActiveShape(state);
@@ -340,6 +353,10 @@ describe("gameState", () => {
       expect(state.score).toBe(14);
       expect(state.world).toBe(1);
       expect(state.level).toBe(5);
+
+      const progression = computeProgression(state.score);
+      expect(state.world).toBe(progression.world);
+      expect(state.level).toBe(progression.level);
     });
   });
 
