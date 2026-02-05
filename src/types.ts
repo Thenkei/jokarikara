@@ -8,6 +8,7 @@ export type GameMode = "CLASSIC" | "ZEN" | "TIME_ATTACK";
 export interface GameState {
   shapes: Shape[];
   activeShape: Shape | null;
+  activeOffset?: { x: number; y: number };
   world: number;
   score: number;
   level: number;

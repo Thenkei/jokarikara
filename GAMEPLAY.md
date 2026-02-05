@@ -66,6 +66,8 @@ After completing level 5, you advance to **World 2**, resetting the level counte
 | **4** | 🌊 Wave                | Stacked shapes sway horizontally (active shape stays stable for fair gameplay) |
 | **5** | 🌈 Color Shift         | Stacked shapes cycle through rainbow hues                                      |
 | **6** | 🌑 The Eclipse         | Background turns black; the container shape is invisible and pulses light.     |
+| **7** | 🧲 Gravity Drift       | The active shape slowly drifts downward while growing.                         |
+| **8** | ↔️ Rotation Inversion  | Stack rotation direction flips by level and during boss levels.                |
 
 > **Note**: Effects are additive. World 5 includes all previous effects: breathing + accelerating growth + wave + color shift.
 

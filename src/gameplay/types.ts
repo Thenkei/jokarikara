@@ -21,6 +21,14 @@ export interface WorldMechanics {
   /** Eclipse: darker background and pulsing container visibility */
   eclipseEffect: boolean;
   eclipsePulseSpeed: number; // pulses per second (relative)
+
+  /** Gravity drift: active shape drifts downward over time */
+  gravityDrift: boolean;
+  gravityDriftSpeed: number; // units per second
+
+  /** Rotation inversion rules for stacked shapes */
+  rotationInvertByLevel: boolean;
+  rotationFlipOnBoss: boolean;
 }
 
 export interface BossConfig {

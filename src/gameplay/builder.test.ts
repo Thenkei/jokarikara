@@ -20,7 +20,8 @@ describe("gameplay config", () => {
 
   it("should fall back to the highest defined world", () => {
     const fallback = getWorldMechanics(99);
-    expect(fallback.eclipseEffect).toBe(true);
+    expect(fallback.gravityDrift).toBe(true);
+    expect(fallback.rotationInvertByLevel).toBe(true);
   });
 
   it("should expose level zooms and unlocks", () => {

@@ -63,6 +63,24 @@ export const gameplayConfig = new GameplayBuilder()
         eclipsePulseSpeed: 0.5,
       }),
   )
+  .world(7, (w) =>
+    w
+      .inheritFrom(6)
+      .name("Gravity Drift")
+      .mechanics({
+        gravityDrift: true,
+        gravityDriftSpeed: 12,
+      }),
+  )
+  .world(8, (w) =>
+    w
+      .inheritFrom(7)
+      .name("Rotation Inversion")
+      .mechanics({
+        rotationInvertByLevel: true,
+        rotationFlipOnBoss: true,
+      }),
+  )
   .boss(5, {
     type: "hexagon",
     growthSpeedMultiplier: 1.5,

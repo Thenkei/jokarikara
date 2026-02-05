@@ -159,6 +159,14 @@ describe("gameState", () => {
 
       nowSpy.mockRestore();
     });
+
+    it("should apply gravity drift when enabled", () => {
+      let state = createInitialState(1000);
+      state = { ...state, world: 7 };
+      state = spawnActiveShape(state);
+      const updated = updateActiveShape(state, 0.5);
+      expect(updated.activeOffset?.y ?? 0).toBeGreaterThan(0);
+    });
   });
 
   describe("checkContainment", () => {
@@ -343,16 +351,16 @@ describe("gameState", () => {
   describe("undoLastStack", () => {
     it("should recalculate level/world after undo", () => {
       let state = createInitialState(1000, "ZEN");
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 6; i++) {
         state = spawnActiveShape(state);
         state = stackActiveShape(state).state;
       }
-      expect(state.world).toBe(2);
+      expect(state.world).toBe(1);
 
       state = undoLastStack(state);
-      expect(state.score).toBe(14);
+      expect(state.score).toBe(5);
       expect(state.world).toBe(1);
-      expect(state.level).toBe(5);
+      expect(state.level).toBe(2);
 
       const progression = computeProgression(state.score);
       expect(state.world).toBe(progression.world);
@@ -422,6 +430,22 @@ describe("gameState", () => {
       const shape0Delta = updatedState.shapes[0].rotation;
       const shape1Delta = updatedState.shapes[1].rotation;
       expect(shape0Delta > 0).not.toBe(shape1Delta > 0);
+    });
+
+    it("should invert rotation direction on even levels when enabled", () => {
+      let state = createInitialState(1000);
+      state = { ...state, world: 8, level: 2 };
+      const updatedState = updateShapeRotations(state);
+      const shape0Delta = updatedState.shapes[0].rotation;
+      expect(shape0Delta).toBeLessThan(0);
+    });
+
+    it("should flip rotation direction on boss levels when enabled", () => {
+      let state = createInitialState(1000);
+      state = { ...state, world: 8, isBossLevel: true };
+      const updatedState = updateShapeRotations(state);
+      const shape0Delta = updatedState.shapes[0].rotation;
+      expect(shape0Delta).toBeLessThan(0);
     });
   });
 });

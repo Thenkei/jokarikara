@@ -170,9 +170,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     const forceStack = useCallback(
       (sizeRatio: number) => {
         if (!stateRef.current || !stateRef.current.activeShape) return;
-        const lastShape = stateRef.current.shapes[
-          stateRef.current.shapes.length - 1
-        ];
+        const lastShape =
+          stateRef.current.shapes[stateRef.current.shapes.length - 1];
         stateRef.current = {
           ...stateRef.current,
           activeShape: {
@@ -292,11 +291,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         });
 
         if (state.activeShape) {
+          const offsetX = state.activeOffset?.x ?? 0;
+          const offsetY = state.activeOffset?.y ?? 0;
           drawShape(
             ctx,
             state.activeShape,
-            centerX,
-            centerY,
+            centerX + offsetX,
+            centerY + offsetY,
             state.zoom,
             mechanics,
             timeInSeconds,
@@ -394,6 +395,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onWorldUp,
       setManualMode,
       tick,
+      handleTap,
+      forceStack,
     ]);
     return (
       <canvas

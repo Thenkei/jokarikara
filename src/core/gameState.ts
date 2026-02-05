@@ -1,7 +1,7 @@
 import type { GameState } from "../types";
 import type { Shape } from "../utils/geometry";
 import { createActiveShape, createInitialShape } from "../shapes";
-import { isContained } from "../utils/geometry";
+import { getVertices, isContained, isPointInShape } from "../utils/geometry";
 import {
   MIN_GROWTH_SPEED,
   MAX_GROWTH_SPEED,
@@ -29,6 +29,7 @@ export const createInitialState = (
   return {
     shapes: [initialShape],
     activeShape: null,
+    activeOffset: { x: 0, y: 0 },
     world: 1,
     score: 0,
     level: 1,
@@ -81,6 +82,7 @@ export const spawnActiveShape = (state: GameState): GameState => {
     activeShape,
     currentSpeed,
     isBossLevel,
+    activeOffset: { x: 0, y: 0 },
   };
 };
 
@@ -197,9 +199,16 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
     size: baseSize + pulseOffset * 5 * dt, // Scale pulseOffset to be a speed change
   };
 
+  let activeOffset = state.activeOffset ?? { x: 0, y: 0 };
+  if (mechanics.gravityDrift) {
+    const drift = mechanics.gravityDriftSpeed * sizeNormalization * dt;
+    activeOffset = { x: activeOffset.x, y: activeOffset.y + drift };
+  }
+
   return {
     ...state,
     activeShape: updatedShapeWithPulse,
+    activeOffset,
   };
 };
 
@@ -209,7 +218,14 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
 export const checkContainment = (state: GameState): boolean => {
   if (!state.activeShape) return true;
   const lastShape = state.shapes[state.shapes.length - 1];
-  return isContained(state.activeShape, lastShape);
+  const offset = state.activeOffset;
+  if (!offset || (offset.x === 0 && offset.y === 0)) {
+    return isContained(state.activeShape, lastShape);
+  }
+  const childVertices = getVertices(state.activeShape);
+  return childVertices.every((v) =>
+    isPointInShape({ x: v.x + offset.x, y: v.y + offset.y }, lastShape)
+  );
 };
 
 /**
@@ -273,6 +289,7 @@ export const stackActiveShape = (
       ...state,
       shapes: finalShapes,
       activeShape: null,
+      activeOffset: { x: 0, y: 0 },
       world: newWorld,
       score: newScore,
       level: newLevel,
@@ -299,6 +316,7 @@ export const handleMiss = (state: GameState): GameState => {
         ...state.activeShape,
         size: state.shapes[state.shapes.length - 1].size * 0.05, // Restart at initial size
       },
+      activeOffset: { x: 0, y: 0 },
     };
   }
   return setGameOver(state);
@@ -337,6 +355,7 @@ export const restartActiveShape = (state: GameState): GameState => {
     ...state,
     activeShape: newActiveShape,
     currentSpeed,
+    activeOffset: { x: 0, y: 0 },
   };
 };
 
@@ -415,10 +434,18 @@ export const updateShapeOpacities = (state: GameState): GameState => {
  * Apply subtle rotation drift to stacked shapes.
  */
 export const updateShapeRotations = (state: GameState): GameState => {
-  const updatedShapes = state.shapes.map((shape, index) => ({
-    ...shape,
-    rotation: shape.rotation + 0.005 * (index % 2 === 0 ? 1 : -1),
-  }));
+  const mechanics = getWorldMechanics(state.world);
+  const invertByLevel = mechanics.rotationInvertByLevel && state.level % 2 === 0;
+  const invertForBoss = mechanics.rotationFlipOnBoss && state.isBossLevel;
+  const inversion = (invertByLevel ? -1 : 1) * (invertForBoss ? -1 : 1);
+
+  const updatedShapes = state.shapes.map((shape, index) => {
+    const direction = (index % 2 === 0 ? 1 : -1) * inversion;
+    return {
+      ...shape,
+      rotation: shape.rotation + 0.005 * direction,
+    };
+  });
 
   return { ...state, shapes: updatedShapes };
 };

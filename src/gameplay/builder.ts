@@ -18,11 +18,17 @@ export const DEFAULT_MECHANICS: WorldMechanics = {
   colorShiftSpeed: 0,
   eclipseEffect: false,
   eclipsePulseSpeed: 0,
+  gravityDrift: false,
+  gravityDriftSpeed: 0,
+  rotationInvertByLevel: false,
+  rotationFlipOnBoss: false,
 };
 
 export class WorldBuilder {
   private config: WorldConfig;
-  private getWorldMechanics?: (worldNumber: number) => WorldMechanics | undefined;
+  private getWorldMechanics?: (
+    worldNumber: number,
+  ) => WorldMechanics | undefined;
 
   constructor(
     baseMechanics: WorldMechanics,
@@ -92,7 +98,7 @@ type LevelConfigInput = LevelConfig | ((builder: LevelBuilder) => void);
 export class GameplayBuilder {
   private progressionConfig?: GameplayConfig["progression"];
   private growthConfig?: GameplayConfig["growth"];
-  private modesConfig?: GameplayConfig["modes"];
+  private modesConfig?: Partial<GameplayConfig["modes"]>;
   private colorsConfig?: GameplayConfig["colors"];
   private levelsConfig: GameplayConfig["levels"] = {};
   private worldsConfig: GameplayConfig["worlds"] = {};
@@ -191,7 +197,7 @@ export class GameplayBuilder {
     return {
       progression: this.progressionConfig,
       growth: this.growthConfig,
-      modes: this.modesConfig,
+      modes: this.modesConfig as GameplayConfig["modes"],
       colors: this.colorsConfig,
       levels: this.levelsConfig,
       worlds: this.worldsConfig,
