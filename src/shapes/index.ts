@@ -1,6 +1,7 @@
 import type { Shape, ShapeType } from "../utils/geometry";
 import type { ShapeCreationOptions } from "../types";
 import { COLORS, getUnlockedShapes } from "../constants/game";
+import { getWorldPalette } from "../visual/theme";
 
 /**
  * Shape factory following Open/Closed Principle.
@@ -15,6 +16,25 @@ export const getNextColor = (lastColor: string | null): string => {
   if (nextColor === lastColor) {
     const idx = COLORS.indexOf(nextColor);
     nextColor = COLORS[(idx + 1) % COLORS.length];
+  }
+  return nextColor;
+};
+
+/**
+ * Get a random color from the provided palette, avoiding immediate repetition.
+ */
+export const getNextColorFromPalette = (
+  palette: string[],
+  lastColor: string | null,
+): string => {
+  if (palette.length === 0) {
+    return getNextColor(lastColor);
+  }
+
+  let nextColor = palette[Math.floor(Math.random() * palette.length)];
+  if (nextColor === lastColor) {
+    const idx = palette.indexOf(nextColor);
+    nextColor = palette[(idx + 1) % palette.length];
   }
   return nextColor;
 };
@@ -56,17 +76,39 @@ export const createInitialShape = (viewportSize: number): Shape => {
 };
 
 /**
+ * Create initial shape using the world-generated palette.
+ */
+export const createInitialShapeForWorld = (
+  viewportSize: number,
+  world: number,
+  runSeed: number,
+  reducedFx: boolean,
+): Shape => {
+  const palette = getWorldPalette(world, runSeed, reducedFx);
+  return createShape({
+    type: "circle",
+    size: viewportSize * 0.45,
+    color: palette[0] ?? COLORS[0],
+    opacity: 1,
+  });
+};
+
+/**
  * Create a new active shape based on game state.
  * @param level - Current game level (determines available shapes)
  * @param lastShape - The previous shape (to avoid color repetition)
  */
 export const createActiveShape = (
   level: number,
-  lastShape: Shape | null
+  lastShape: Shape | null,
+  world: number = 1,
+  runSeed: number = 0,
+  reducedFx: boolean = false,
 ): Shape => {
   const type = getRandomShapeType(level);
   const lastColor = lastShape?.color ?? null;
-  const color = getNextColor(lastColor);
+  const palette = getWorldPalette(world, runSeed, reducedFx);
+  const color = getNextColorFromPalette(palette, lastColor);
 
   // Start at a fraction of the last shape's size
   const startSize = lastShape ? lastShape.size * 0.05 : 10;

@@ -8,6 +8,7 @@ import type { IAudioService } from "../audio/types";
 const mockAudioService: IAudioService = {
   playStackSound: vi.fn(),
   playFailSound: vi.fn(),
+  playEarlyClickSound: vi.fn(),
   init: vi.fn(),
   resume: vi.fn(),
 };

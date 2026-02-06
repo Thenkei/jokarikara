@@ -31,6 +31,25 @@ export interface WorldMechanics {
   rotationFlipOnBoss: boolean;
 }
 
+export interface WorldVisualProfile {
+  /** Base hue center for this world (0-359) */
+  hueCenter: number;
+  /** Random spread around hueCenter */
+  hueSpread: number;
+  /** Saturation bounds (%) */
+  saturationMin: number;
+  saturationMax: number;
+  /** Lightness bounds (%) */
+  lightnessMin: number;
+  lightnessMax: number;
+  /** Extra neon intensity for world look (0-1) */
+  neonBias: number;
+  /** Baseline glow intensity for rendering (0-1) */
+  glowIntensity: number;
+  /** Minimum color/background contrast ratio */
+  contrastFloor: number;
+}
+
 export interface BossConfig {
   type: ShapeType;
   growthSpeedMultiplier: number;
@@ -43,6 +62,7 @@ export interface BossConfig {
 export interface WorldConfig {
   mechanics: WorldMechanics;
   name?: string;
+  visualProfile?: Partial<WorldVisualProfile>;
 }
 
 export interface LevelConfig {

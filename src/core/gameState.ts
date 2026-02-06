@@ -1,6 +1,6 @@
-import type { GameState } from "../types";
+import type { GameState, StackQuality } from "../types";
 import type { Shape } from "../utils/geometry";
-import { createActiveShape, createInitialShape } from "../shapes";
+import { createActiveShape, createInitialShapeForWorld } from "../shapes";
 import { getVertices, isContained, isPointInShape } from "../utils/geometry";
 import {
   MIN_GROWTH_SPEED,
@@ -17,15 +17,36 @@ import {
 } from "../constants/game";
 import type { GameMode } from "../types";
 
+const STYLE_SCORE_BY_QUALITY: Record<StackQuality, number> = {
+  PERFECT: 140,
+  GREAT: 90,
+  GOOD: 50,
+  OK: 25,
+};
+
+export const getStackQuality = (sizeRatio: number): StackQuality => {
+  if (sizeRatio >= 0.97) return "PERFECT";
+  if (sizeRatio >= 0.92) return "GREAT";
+  if (sizeRatio >= 0.82) return "GOOD";
+  return "OK";
+};
+
 /**
  * Create the initial game state.
  * @param viewportSize - The smaller of viewport width/height
  */
 export const createInitialState = (
   viewportSize: number,
-  mode: GameMode = "CLASSIC"
+  mode: GameMode = "CLASSIC",
+  runSeed: number = 0,
+  reducedFx: boolean = false,
 ): GameState => {
-  const initialShape = createInitialShape(viewportSize);
+  const initialShape = createInitialShapeForWorld(
+    viewportSize,
+    1,
+    runSeed,
+    reducedFx,
+  );
   return {
     shapes: [initialShape],
     activeShape: null,
@@ -41,6 +62,11 @@ export const createInitialState = (
     mode,
     timeRemaining: mode === "TIME_ATTACK" ? TIME_ATTACK_START_TIME : undefined,
     isBossLevel: false,
+    runSeed,
+    styleScore: 0,
+    streak: 0,
+    bestStreak: 0,
+    lastStackQuality: null,
   };
 };
 
@@ -56,7 +82,10 @@ export const generateRandomSpeed = (): number => {
 /**
  * Create a new active shape and update the state.
  */
-export const spawnActiveShape = (state: GameState): GameState => {
+export const spawnActiveShape = (
+  state: GameState,
+  reducedFx: boolean = false,
+): GameState => {
   const lastShape = state.shapes[state.shapes.length - 1] ?? null;
 
   // Boss mechanics: Check if current level/score triggers a boss
@@ -65,7 +94,13 @@ export const spawnActiveShape = (state: GameState): GameState => {
   const bossConfig = getBossConfigForScore(state.score + 1);
   const isBossLevel = !!bossConfig;
 
-  let activeShape = createActiveShape(state.level, lastShape);
+  let activeShape = createActiveShape(
+    state.level,
+    lastShape,
+    state.world,
+    state.runSeed,
+    reducedFx,
+  );
 
   if (isBossLevel && bossConfig) {
     activeShape = {
@@ -240,6 +275,7 @@ export const stackActiveShape = (
   newLevel: number;
   worldUp: boolean;
   isPerfect: boolean;
+  quality: StackQuality;
 } => {
   if (!state.activeShape) {
     return {
@@ -248,13 +284,14 @@ export const stackActiveShape = (
       newLevel: state.level,
       worldUp: false,
       isPerfect: false,
+      quality: "OK",
     };
   }
 
   const lastShape = state.shapes[state.shapes.length - 1];
   const sizeRatio = state.activeShape.size / lastShape.size;
-  // A perfect stack is within 95% of the last shape's size
-  const isPerfect = sizeRatio > 0.95;
+  const quality = getStackQuality(sizeRatio);
+  const isPerfect = quality === "PERFECT";
 
   const newShapes = [...state.shapes, { ...state.activeShape, opacity: 1 }];
   const newScore = state.score + 1;
@@ -283,6 +320,12 @@ export const stackActiveShape = (
   }
 
   const newTargetZoom = getZoomForLevel(newLevel);
+  const styleEnabled = state.mode !== "ZEN";
+  const streak = styleEnabled ? state.streak + 1 : state.streak;
+  const styleIncrement = styleEnabled
+    ? STYLE_SCORE_BY_QUALITY[quality] + streak * 5
+    : 0;
+  const bestStreak = styleEnabled ? Math.max(state.bestStreak, streak) : 0;
 
   return {
     state: {
@@ -295,11 +338,16 @@ export const stackActiveShape = (
       level: newLevel,
       targetZoom: newTargetZoom,
       timeRemaining: newTimeRemaining,
+      styleScore: styleEnabled ? state.styleScore + styleIncrement : state.styleScore,
+      streak,
+      bestStreak,
+      lastStackQuality: styleEnabled ? quality : null,
     },
     leveledUp,
     newLevel,
     worldUp,
     isPerfect,
+    quality,
   };
 };
 
@@ -319,7 +367,11 @@ export const handleMiss = (state: GameState): GameState => {
       activeOffset: { x: 0, y: 0 },
     };
   }
-  return setGameOver(state);
+  return setGameOver({
+    ...state,
+    streak: 0,
+    lastStackQuality: null,
+  });
 };
 
 /**
@@ -342,13 +394,22 @@ export const updateTimer = (state: GameState, dt: number): GameState => {
 /**
  * Restart the current active shape in Zen Mode (reset its size).
  */
-export const restartActiveShape = (state: GameState): GameState => {
+export const restartActiveShape = (
+  state: GameState,
+  reducedFx: boolean = false,
+): GameState => {
   if (!state.activeShape) {
     return state;
   }
 
   const lastShape = state.shapes[state.shapes.length - 1] ?? null;
-  const newActiveShape = createActiveShape(state.level, lastShape);
+  const newActiveShape = createActiveShape(
+    state.level,
+    lastShape,
+    state.world,
+    state.runSeed,
+    reducedFx,
+  );
   const currentSpeed = generateRandomSpeed();
 
   return {

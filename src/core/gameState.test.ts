@@ -14,6 +14,7 @@ import {
   handleMiss,
   restartActiveShape,
   undoLastStack,
+  getStackQuality,
 } from "./gameState";
 
 import {
@@ -38,6 +39,10 @@ describe("gameState", () => {
       expect(state.score).toBe(0);
       expect(state.level).toBe(1);
       expect(state.isGameOver).toBe(false);
+      expect(state.styleScore).toBe(0);
+      expect(state.streak).toBe(0);
+      expect(state.bestStreak).toBe(0);
+      expect(state.lastStackQuality).toBeNull();
     });
 
     it("should initialize zoom to 1", () => {
@@ -187,8 +192,11 @@ describe("gameState", () => {
     it("should end game in CLASSIC mode", () => {
       let state = createInitialState(1000, "CLASSIC");
       state = spawnActiveShape(state);
+      state.streak = 5;
       const newState = handleMiss(state);
       expect(newState.isGameOver).toBe(true);
+      expect(newState.streak).toBe(0);
+      expect(newState.lastStackQuality).toBeNull();
     });
 
     it("should not end game in ZEN mode, but reset active shape", () => {
@@ -338,13 +346,58 @@ describe("gameState", () => {
       const lastShape = state.shapes[state.shapes.length - 1];
       state.activeShape = {
         ...state.activeShape!,
-        size: lastShape.size * 0.96,
+        size: lastShape.size * 0.98,
       };
 
       const result = stackActiveShape(state);
       expect(result.state.timeRemaining).toBe(
         TIME_ATTACK_START_TIME + PERFECT_STACK_TIME_BONUS
       );
+    });
+
+    it("should grade stack quality from size ratio", () => {
+      expect(getStackQuality(0.98)).toBe("PERFECT");
+      expect(getStackQuality(0.93)).toBe("GREAT");
+      expect(getStackQuality(0.85)).toBe("GOOD");
+      expect(getStackQuality(0.7)).toBe("OK");
+    });
+
+    it("should increment streak and style score in classic mode", () => {
+      let state = createInitialState(1000, "CLASSIC");
+      state = spawnActiveShape(state);
+      const lastShape = state.shapes[state.shapes.length - 1];
+      state.activeShape = {
+        ...state.activeShape!,
+        size: lastShape.size * 0.96,
+      };
+
+      const first = stackActiveShape(state).state;
+      expect(first.streak).toBe(1);
+      expect(first.styleScore).toBeGreaterThan(0);
+      expect(first.lastStackQuality).toBe("GREAT");
+
+      state = spawnActiveShape(first);
+      const nextLast = state.shapes[state.shapes.length - 1];
+      state.activeShape = {
+        ...state.activeShape!,
+        size: nextLast.size * 0.98,
+      };
+      const second = stackActiveShape(state).state;
+      expect(second.streak).toBe(2);
+      expect(second.bestStreak).toBe(2);
+      expect(second.styleScore).toBeGreaterThan(first.styleScore);
+      expect(second.lastStackQuality).toBe("PERFECT");
+    });
+
+    it("should keep style score disabled in zen mode", () => {
+      let state = createInitialState(1000, "ZEN");
+      state = spawnActiveShape(state);
+      const result = stackActiveShape(state).state;
+
+      expect(result.styleScore).toBe(0);
+      expect(result.streak).toBe(0);
+      expect(result.bestStreak).toBe(0);
+      expect(result.lastStackQuality).toBeNull();
     });
   });
 

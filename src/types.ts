@@ -1,6 +1,14 @@
 import type { Shape, ShapeType } from "./utils/geometry";
 
 export type GameMode = "CLASSIC" | "ZEN" | "TIME_ATTACK";
+export type StackQuality = "PERFECT" | "GREAT" | "GOOD" | "OK";
+
+export interface StyleUpdate {
+  styleScore: number;
+  streak: number;
+  bestStreak: number;
+  lastStackQuality: StackQuality | null;
+}
 
 /**
  * Game state representing all mutable game data.
@@ -21,6 +29,11 @@ export interface GameState {
   timeRemaining?: number; // For Time Attack
   undoStack?: Shape[][]; // For Zen Mode - stores previous stacks of shapes
   isBossLevel?: boolean; // For Boss Mechanics
+  runSeed: number;
+  styleScore: number;
+  streak: number;
+  bestStreak: number;
+  lastStackQuality: StackQuality | null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from "react";
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
-import type { GameState } from "../types";
+import type { GameState, StyleUpdate } from "../types";
 import {
   createInitialState,
   spawnActiveShape,
@@ -25,14 +25,18 @@ import {
   clearCanvas,
 } from "../rendering/shapeRenderer";
 import { installGameTestBridge } from "../utils/testBridge";
+import { getWorldTheme } from "../visual/theme";
 
 interface GameCanvasProps {
   mode?: GameMode;
+  runSeed?: number;
+  reducedFx?: boolean;
   onScore: (score: number) => void;
   onGameOver: (finalScore: number, world: number, level: number) => void;
   onLevelUp: (level: number) => void;
   onWorldUp: (world: number) => void;
   onTimeUpdate?: (time: number) => void;
+  onStyleUpdate?: (style: StyleUpdate) => void;
   /** Optional audio service for dependency injection (testing) */
   audioService?: IAudioService;
 }
@@ -50,11 +54,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
   (
     {
       mode = "CLASSIC",
+      runSeed = 0,
+      reducedFx = false,
       onScore,
       onGameOver,
       onLevelUp,
       onWorldUp,
       onTimeUpdate,
+      onStyleUpdate,
       audioService = defaultAudioManager,
     },
     ref,
@@ -72,9 +79,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     // Initialize game state
     useEffect(() => {
       const viewportSize = Math.min(window.innerWidth, window.innerHeight);
-      const initialState = createInitialState(viewportSize, mode);
-      stateRef.current = spawnActiveShape(initialState);
-    }, [mode]);
+      const initialState = createInitialState(
+        viewportSize,
+        mode,
+        runSeed,
+        reducedFx,
+      );
+      stateRef.current = spawnActiveShape(initialState, reducedFx);
+    }, [mode, runSeed]);
 
     useImperativeHandle(
       ref,
@@ -104,6 +116,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
       const wasGameOver = stateRef.current.isGameOver;
       stateRef.current = handleMiss(stateRef.current);
+      onStyleUpdate?.({
+        styleScore: stateRef.current.styleScore,
+        streak: stateRef.current.streak,
+        bestStreak: stateRef.current.bestStreak,
+        lastStackQuality: stateRef.current.lastStackQuality,
+      });
 
       if (stateRef.current.isGameOver && !wasGameOver) {
         audioService.playFailSound();
@@ -116,7 +134,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         // Just reset shape in Zen
         audioService.playFailSound(); // Or a less "fail" sound?
       }
-    }, [onGameOver, audioService]);
+    }, [onGameOver, onStyleUpdate, audioService]);
 
     const handleTap = useCallback(() => {
       if (
@@ -149,6 +167,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       stateRef.current = result.state;
 
       onScore(result.state.score);
+      onStyleUpdate?.({
+        styleScore: result.state.styleScore,
+        streak: result.state.streak,
+        bestStreak: result.state.bestStreak,
+        lastStackQuality: result.state.lastStackQuality,
+      });
       audioService.playStackSound(result.state.score);
 
       // Check for level up
@@ -164,8 +188,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       }
 
       // Spawn next active shape
-      stateRef.current = spawnActiveShape(stateRef.current);
-    }, [onScore, onLevelUp, onWorldUp, miss, audioService]);
+      stateRef.current = spawnActiveShape(stateRef.current, reducedFx);
+    }, [
+      onScore,
+      onLevelUp,
+      onWorldUp,
+      onStyleUpdate,
+      miss,
+      reducedFx,
+      audioService,
+    ]);
 
     const forceStack = useCallback(
       (sizeRatio: number) => {
@@ -183,6 +215,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const result = stackActiveShape(stateRef.current);
         stateRef.current = result.state;
         onScore(result.state.score);
+        onStyleUpdate?.({
+          styleScore: result.state.styleScore,
+          streak: result.state.streak,
+          bestStreak: result.state.bestStreak,
+          lastStackQuality: result.state.lastStackQuality,
+        });
 
         if (result.leveledUp) {
           if (result.worldUp) {
@@ -192,9 +230,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           }
         }
 
-        stateRef.current = spawnActiveShape(stateRef.current);
+        stateRef.current = spawnActiveShape(stateRef.current, reducedFx);
       },
-      [onScore, onLevelUp, onWorldUp],
+      [onScore, onLevelUp, onWorldUp, onStyleUpdate, reducedFx],
     );
 
     const tick = useCallback(
@@ -217,7 +255,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         // Process restart request within the loop context
         if (restartRequestedRef.current) {
-          state = restartActiveShape(state);
+          state = restartActiveShape(state, reducedFx);
           restartRequestedRef.current = false;
           audioService.playStackSound(0);
         }
@@ -227,7 +265,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           undoRequestedRef.current = false;
           // If undo resulted in no active shape, spawn one
           if (!state.activeShape) {
-            state = spawnActiveShape(state);
+            state = spawnActiveShape(state, reducedFx);
           }
           onScore(state.score);
           onLevelUp(state.level);
@@ -271,9 +309,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         // Get world mechanics for current world
         const mechanics = getWorldMechanics(state.world);
+        const theme = getWorldTheme(state.world, state.runSeed, reducedFx);
         const timeInSeconds = timeMs / 1000;
 
-        drawBackground(ctx, width, height, pulse, mechanics);
+        drawBackground(ctx, width, height, pulse, mechanics, theme);
 
         state.shapes.forEach((shape, index) => {
           drawShape(
@@ -287,6 +326,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             true, // isStacked
             index, // stackIndex
             index === state.shapes.length - 1, // isContainer
+            theme,
           );
         });
 
@@ -303,6 +343,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             timeInSeconds,
             false, // NOT stacked (active)
             state.shapes.length, // stackIndex for phase offset
+            false,
+            theme,
           );
         }
 
@@ -316,6 +358,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         onScore,
         onTimeUpdate,
         onWorldUp,
+        onStyleUpdate,
+        reducedFx,
       ],
     );
 
@@ -379,6 +423,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         tick,
         setManualMode,
         forceStack,
+        getTheme: () =>
+          stateRef.current
+            ? getWorldTheme(
+                stateRef.current.world,
+                stateRef.current.runSeed,
+                reducedFx,
+              )
+            : null,
       });
       return () => {
         cancelAnimationFrame(animId);
@@ -393,10 +445,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onScore,
       onLevelUp,
       onWorldUp,
+      onStyleUpdate,
       setManualMode,
       tick,
       handleTap,
       forceStack,
+      reducedFx,
     ]);
     return (
       <canvas

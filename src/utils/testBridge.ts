@@ -1,5 +1,6 @@
 import type { MutableRefObject } from "react";
 import type { GameState } from "../types";
+import type { WorldTheme } from "../visual/theme";
 
 export type GameTestBridgeState = {
   score: number;
@@ -11,6 +12,12 @@ export type GameTestBridgeState = {
   activeSize?: number;
   lastSize?: number;
   isBossLevel?: boolean;
+  styleScore: number;
+  streak: number;
+  bestStreak: number;
+  lastStackQuality: GameState["lastStackQuality"];
+  themeId?: string;
+  themePrimary?: string;
 };
 
 export type GameTestBridge = {
@@ -32,6 +39,7 @@ type InstallArgs = {
   tick: (timeMs: number, dtOverrideSeconds?: number) => void;
   setManualMode: (manual: boolean) => void;
   forceStack: (sizeRatio: number) => void;
+  getTheme: () => WorldTheme | null;
 };
 
 const isE2eMode = (): boolean =>
@@ -93,6 +101,11 @@ const updateDiagnosticsPanel = (
     `active: ${state.activeSize?.toFixed(2) ?? "-"}`,
     `last: ${state.lastSize?.toFixed(2) ?? "-"}`,
     `boss: ${state.isBossLevel ? "yes" : "no"}`,
+    `style: ${state.styleScore}`,
+    `streak: ${state.streak}`,
+    `best: ${state.bestStreak}`,
+    `quality: ${state.lastStackQuality ?? "-"}`,
+    `theme: ${state.themeId ?? "-"}`,
   ].join("\n");
 };
 
@@ -102,6 +115,7 @@ export const installGameTestBridge = ({
   tick,
   setManualMode,
   forceStack,
+  getTheme,
 }: InstallArgs): (() => void) | undefined => {
   if (!isE2eMode()) return undefined;
 
@@ -112,6 +126,7 @@ export const installGameTestBridge = ({
     getState: () => {
       const state = stateRef.current;
       const lastShape = state?.shapes[state.shapes.length - 1];
+      const theme = getTheme();
       return {
         score: state?.score ?? 0,
         level: state?.level ?? 1,
@@ -122,6 +137,12 @@ export const installGameTestBridge = ({
         activeSize: state?.activeShape?.size,
         lastSize: lastShape?.size,
         isBossLevel: state?.isBossLevel,
+        styleScore: state?.styleScore ?? 0,
+        streak: state?.streak ?? 0,
+        bestStreak: state?.bestStreak ?? 0,
+        lastStackQuality: state?.lastStackQuality ?? null,
+        themeId: theme?.id,
+        themePrimary: theme?.hud.primary,
       };
     },
     setActiveSize: (size: number) => {

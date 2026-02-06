@@ -1,12 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   getNextColor,
+  getNextColorFromPalette,
   getRandomShapeType,
   createShape,
   createInitialShape,
   createActiveShape,
 } from "./index";
 import { COLORS } from "../constants/game";
+import { getWorldPalette } from "../visual/theme";
 
 // Mock Math.random for predictable tests
 describe("shapes factory", () => {
@@ -31,6 +33,22 @@ describe("shapes factory", () => {
       vi.spyOn(Math, "random").mockReturnValue(0); // Pick first color
       const color = getNextColor(COLORS[0]);
       expect(color).toBe(COLORS[1]); // Should advance to next
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe("getNextColorFromPalette", () => {
+    it("should choose a color from the supplied palette", () => {
+      const palette = ["#111111", "#222222", "#333333"];
+      const color = getNextColorFromPalette(palette, null);
+      expect(palette).toContain(color);
+    });
+
+    it("should avoid immediate repeats within the supplied palette", () => {
+      const palette = ["#111111", "#222222", "#333333"];
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const color = getNextColorFromPalette(palette, "#111111");
+      expect(color).toBe("#222222");
       vi.restoreAllMocks();
     });
   });
@@ -119,12 +137,20 @@ describe("shapes factory", () => {
       expect(active.opacity).toBe(0.8);
     });
 
-    it("should avoid same color as last shape", () => {
-      const lastShape = createShape({ color: COLORS[0] });
-      for (let i = 0; i < 10; i++) {
-        const active = createActiveShape(1, lastShape);
-        expect(active.color).not.toBe(COLORS[0]);
-      }
+    it("should use deterministic world palette for the same world/seed", () => {
+      const palette = getWorldPalette(3, 99, false);
+      const active = createActiveShape(3, null, 3, 99, false);
+      expect(active.color).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(palette).toContain(active.color);
+    });
+
+    it("should avoid same color as last shape in world palette", () => {
+      const palette = getWorldPalette(2, 42, false);
+      const lastShape = createShape({ color: palette[0] });
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const active = createActiveShape(2, lastShape, 2, 42, false);
+      expect(active.color).not.toBe(lastShape.color);
+      vi.restoreAllMocks();
     });
   });
 });

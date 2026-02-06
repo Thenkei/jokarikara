@@ -4,6 +4,7 @@ import type {
   LevelConfig,
   WorldConfig,
   WorldMechanics,
+  WorldVisualProfile,
 } from "./types";
 
 export const DEFAULT_MECHANICS: WorldMechanics = {
@@ -60,10 +61,21 @@ export class WorldBuilder {
     return this;
   }
 
+  visualProfile(profile: Partial<WorldVisualProfile>): this {
+    this.config.visualProfile = {
+      ...(this.config.visualProfile ?? {}),
+      ...profile,
+    };
+    return this;
+  }
+
   build(): WorldConfig {
     return {
       ...this.config,
       mechanics: { ...this.config.mechanics },
+      visualProfile: this.config.visualProfile
+        ? { ...this.config.visualProfile }
+        : undefined,
     };
   }
 }

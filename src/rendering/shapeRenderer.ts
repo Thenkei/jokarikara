@@ -1,6 +1,7 @@
 import type { Shape } from "../utils/geometry";
 import { getStarVertices } from "../utils/geometry";
 import type { WorldMechanics } from "../constants/game";
+import type { WorldTheme } from "../visual/theme";
 
 /**
  * ShapeRenderer - Separates drawing logic from game loop (SRP).
@@ -151,15 +152,18 @@ export const drawShape = (
   isStacked: boolean = false,
   stackIndex: number = 0,
   isContainer: boolean = false,
+  theme?: WorldTheme,
 ): void => {
   ctx.save();
   ctx.translate(x, y);
 
   // Wave effect: horizontal displacement (stacked shapes only)
   if (mechanics.waveEffect && isStacked) {
+    const waveMultiplier = theme?.fx.waveMultiplier ?? 1;
     const wave =
       Math.sin(time * mechanics.waveSpeed + stackIndex * 0.5) *
-      mechanics.waveAmplitude;
+      mechanics.waveAmplitude *
+      waveMultiplier;
     ctx.translate(wave, 0);
   }
 
@@ -175,7 +179,9 @@ export const drawShape = (
   // Color shift effect (stacked shapes only)
   let fillColor = shape.color;
   if (mechanics.colorShift && isStacked) {
-    const hueShift = time * mechanics.colorShiftSpeed + stackIndex * 30;
+    const hueShiftMultiplier = theme?.fx.hueShiftMultiplier ?? 1;
+    const hueShift =
+      time * mechanics.colorShiftSpeed * hueShiftMultiplier + stackIndex * 30;
     fillColor = shiftHue(shape.color, hueShift);
   }
   ctx.fillStyle = fillColor;
@@ -183,10 +189,12 @@ export const drawShape = (
   // Calculate size with breathing effect (stacked shapes only)
   let sizeMultiplier = 1;
   if (mechanics.breathingEffect && isStacked) {
+    const breathingMultiplier = theme?.fx.breathingMultiplier ?? 1;
     sizeMultiplier =
       1 +
       Math.sin(time * mechanics.breathingSpeed + stackIndex * 0.3) *
-        mechanics.breathingAmplitude;
+        mechanics.breathingAmplitude *
+        breathingMultiplier;
   }
 
   const size = shape.size * zoom * sizeMultiplier;
@@ -223,23 +231,23 @@ export const drawShape = (
 
   ctx.fill();
 
-  let strokeStyle = "rgba(255, 255, 255, 0.4)";
-  let lineWidth = 3;
+  let strokeStyle = theme?.shape.stroke ?? "rgba(255, 255, 255, 0.4)";
+  let lineWidth = theme?.shape.lineWidth ?? 3;
 
   if (mechanics.eclipseEffect && isContainer) {
     // Pulse the outline of the container shape
     const pulse =
       (Math.sin(time * Math.PI * 2 * mechanics.eclipsePulseSpeed) + 1) / 2;
-    strokeStyle = `rgba(255, 255, 255, ${0.1 + pulse * 0.5})`;
+    const flash = theme?.fx.flashMultiplier ?? 1;
+    strokeStyle = `rgba(255, 255, 255, ${0.1 + pulse * 0.5 * flash})`;
     lineWidth = 4;
   }
 
+  ctx.shadowBlur = theme?.shape.glowBlur ?? 15;
+  ctx.shadowColor = theme?.shape.glow ?? "rgba(0, 0, 0, 0.5)";
   ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
-
-  ctx.shadowBlur = 15;
-  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
 
   ctx.restore();
 };
@@ -253,13 +261,14 @@ export const drawBackground = (
   height: number,
   pulse: number,
   mechanics?: WorldMechanics,
+  theme?: WorldTheme,
 ): void => {
   const centerX = width / 2;
   const centerY = height / 2;
 
   if (mechanics?.eclipseEffect) {
     // Pitch black background for Eclipse
-    ctx.fillStyle = "#100e0eff";
+    ctx.fillStyle = theme?.background.base ?? "#100e0eff";
     ctx.fillRect(0, 0, width, height);
 
     // Very subtle center glow
@@ -271,14 +280,16 @@ export const drawBackground = (
       centerY,
       width * 0.5,
     );
-    grad.addColorStop(0, `rgba(255, 255, 255, ${0.01 + pulse * 0.005})`);
-    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    grad.addColorStop(0, theme?.background.innerGlow ?? `rgba(255, 255, 255, ${0.01 + pulse * 0.005})`);
+    grad.addColorStop(1, theme?.background.vignette ?? "rgba(0, 0, 0, 0)");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
     return;
   }
 
-  ctx.beginPath();
+  ctx.fillStyle = theme?.background.base ?? "#0c0c0e";
+  ctx.fillRect(0, 0, width, height);
+
   const grad = ctx.createRadialGradient(
     centerX,
     centerY,
@@ -287,8 +298,11 @@ export const drawBackground = (
     centerY,
     width * 0.8,
   );
-  grad.addColorStop(0, `rgba(255, 255, 255, ${0.03 + pulse * 0.02})`);
-  grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+  grad.addColorStop(
+    0,
+    theme?.background.innerGlow ?? `rgba(255, 255, 255, ${0.03 + pulse * 0.02})`,
+  );
+  grad.addColorStop(1, theme?.background.outerGlow ?? "rgba(0, 0, 0, 0)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 };
@@ -304,9 +318,22 @@ export const drawShapeStack = (
   zoom: number,
   mechanics: WorldMechanics,
   time: number,
+  theme?: WorldTheme,
 ): void => {
   shapes.forEach((shape, index) => {
-    drawShape(ctx, shape, centerX, centerY, zoom, mechanics, time, true, index);
+    drawShape(
+      ctx,
+      shape,
+      centerX,
+      centerY,
+      zoom,
+      mechanics,
+      time,
+      true,
+      index,
+      false,
+      theme,
+    );
   });
 };
 

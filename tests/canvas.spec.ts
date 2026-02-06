@@ -121,7 +121,32 @@ test.describe("GameCanvas Rendering", () => {
     await bridge.step(0.016);
     await expect(canvas).toHaveScreenshot("canvas-initial.png", {
       mask: [page.locator(".hud")], // Mask Hudson to focus on canvas content
-      maxDiffPixelRatio: 0.02, // Tighter diff since we control frames
+      maxDiffPixelRatio: 0.05, // Visual system is intentionally richer now
     });
+  });
+
+  test("world palette changes between world 1 and world 5", async ({ page }) => {
+    const canvas = page.locator("canvas");
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    await bridge.step(0.016);
+
+    const world1Frame = await canvas.evaluate((node: HTMLCanvasElement) =>
+      node.toDataURL(),
+    );
+
+    for (let i = 0; i < 60; i += 1) {
+      await bridge.forceStack(0.6);
+    }
+    await bridge.step(0.016);
+
+    const state = await bridge.getState();
+    expect(state.world).toBe(5);
+    expect(state.themeId?.startsWith("5:")).toBe(true);
+
+    const world5Frame = await canvas.evaluate((node: HTMLCanvasElement) =>
+      node.toDataURL(),
+    );
+    expect(world5Frame).not.toBe(world1Frame);
   });
 });

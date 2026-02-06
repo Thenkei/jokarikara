@@ -25,6 +25,8 @@ test.describe("Responsive Layout", () => {
     // Check HUD elements
     await expect(page.locator(".hud")).toBeVisible();
     await expect(page.locator(".score")).toBeVisible();
+    await expect(page.locator(".style-badge")).toBeVisible();
+    await expect(page.locator(".fx-toggle-btn")).toBeVisible();
 
     // Check if canvas is rendered
     const canvas = page.locator("canvas");

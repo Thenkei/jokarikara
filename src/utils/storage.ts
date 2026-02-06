@@ -4,6 +4,15 @@ export interface HighScore {
 }
 
 const STORAGE_KEY = "shape-stack-high-scores";
+const SETTINGS_STORAGE_KEY = "shape-stack-settings";
+
+export interface GameSettings {
+  reducedFx: boolean;
+}
+
+const DEFAULT_SETTINGS: GameSettings = {
+  reducedFx: false,
+};
 
 export const getHighScores = (): HighScore[] => {
   try {
@@ -32,5 +41,33 @@ export const saveHighScore = (score: number) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(topScores));
   } catch (e) {
     console.error("Failed to save high score", e);
+  }
+};
+
+export const getSettings = (): GameSettings => {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_SETTINGS;
+    }
+    const parsed = JSON.parse(raw) as Partial<GameSettings>;
+    return {
+      reducedFx:
+        typeof parsed.reducedFx === "boolean"
+          ? parsed.reducedFx
+          : DEFAULT_SETTINGS.reducedFx,
+    };
+  } catch (e) {
+    console.error("Failed to load settings", e);
+    return DEFAULT_SETTINGS;
+  }
+};
+
+export const saveSettings = (partial: Partial<GameSettings>): void => {
+  try {
+    const next = { ...getSettings(), ...partial };
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));
+  } catch (e) {
+    console.error("Failed to save settings", e);
   }
 };
