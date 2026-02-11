@@ -15,7 +15,7 @@ The heartbeat of the game will evolve from simple procedural tones to a full rhy
 
 New ways to play that challenge different skills.
 
-- **Zen Mode**: Pure relaxation. No fail state—if you miss, the shape just resets without ending the game. Endless undo button available. Focus on creating beautiful, impossible towers.
+- **Zen Mode**: Pure relaxation with a light fail condition. You have 10 lives per run; each out-of-bounds miss consumes one life, and the run ends at zero. Undo and restart stay available so you can still focus on building beautiful, impossible towers.
 - **Time Attack**: A race against the clock. You have 60 seconds to stack as many shapes as possible. Perfect placements add time to the clock. High risk, high reward.
 - **Boss Mechanics**: Every 10 levels, encounter a "Boss Shape". These are unique challenges—giant shapes, erratically moving blocks, or shape-shifting geometry that requires observation and specific timing to conquer.
 

@@ -12,6 +12,7 @@ import {
   TIME_ATTACK_START_TIME,
   PERFECT_STACK_TIME_BONUS,
   REFERENCE_INITIAL_SIZE,
+  ZEN_MAX_LIVES,
   getBossConfigForScore,
   computeProgression,
 } from "../constants/game";
@@ -61,6 +62,7 @@ export const createInitialState = (
     isGameOver: false,
     mode,
     timeRemaining: mode === "TIME_ATTACK" ? TIME_ATTACK_START_TIME : undefined,
+    zenLivesRemaining: mode === "ZEN" ? ZEN_MAX_LIVES : undefined,
     isBossLevel: false,
     runSeed,
     styleScore: 0,
@@ -356,16 +358,24 @@ export const stackActiveShape = (
  */
 export const handleMiss = (state: GameState): GameState => {
   if (state.mode === "ZEN") {
-    // In Zen mode, just reset the active shape size
     if (!state.activeShape) return state;
-    return {
+    const nextLives = Math.max(
+      0,
+      (state.zenLivesRemaining ?? ZEN_MAX_LIVES) - 1,
+    );
+    const nextState: GameState = {
       ...state,
+      zenLivesRemaining: nextLives,
       activeShape: {
         ...state.activeShape,
         size: state.shapes[state.shapes.length - 1].size * 0.05, // Restart at initial size
       },
       activeOffset: { x: 0, y: 0 },
     };
+    if (nextLives <= 0) {
+      return setGameOver(nextState);
+    }
+    return nextState;
   }
   return setGameOver({
     ...state,

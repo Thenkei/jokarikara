@@ -4,7 +4,7 @@ export const gameplayConfig = new GameplayBuilder()
   .progression({ stacksPerLevel: 3, levelsPerWorld: 5 })
   .growth({ minSpeed: 35, maxSpeed: 80, referenceInitialSize: 360 })
   .modeTimeAttack({ startTime: 60, perfectStackBonus: 5 })
-  .modeZen({ minClickRatio: 0.3 })
+  .modeZen({ minClickRatio: 0.3, maxLives: 10 })
   .colors([
     "#3b82f6", // blue
     "#10b981", // emerald

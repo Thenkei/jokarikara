@@ -126,4 +126,26 @@ describe("GameCanvas", () => {
     // In a test, we might not see the state change immediately without flushing the animation frame,
     // but we've verified the methods are exposed.
   });
+
+  it("reports Zen lives on init", async () => {
+    const onZenLivesChange = vi.fn();
+
+    render(
+      <GameCanvas
+        mode="ZEN"
+        onScore={vi.fn()}
+        onGameOver={vi.fn()}
+        onLevelUp={vi.fn()}
+        onWorldUp={vi.fn()}
+        onZenLivesChange={onZenLivesChange}
+        audioService={mockAudioService}
+      />
+    );
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onZenLivesChange).toHaveBeenNthCalledWith(1, 10);
+  });
 });

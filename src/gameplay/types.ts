@@ -87,6 +87,7 @@ export interface GameplayConfig {
     };
     zen: {
       minClickRatio: number;
+      maxLives: number;
     };
   };
   colors: string[];

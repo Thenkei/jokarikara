@@ -16,6 +16,7 @@ export const TIME_ATTACK_START_TIME = config.modes.timeAttack.startTime;
 export const PERFECT_STACK_TIME_BONUS =
   config.modes.timeAttack.perfectStackBonus;
 export const ZEN_MIN_CLICK_RATIO = config.modes.zen.minClickRatio;
+export const ZEN_MAX_LIVES = config.modes.zen.maxLives;
 export const COLORS = config.colors;
 
 export const WORLD_MECHANICS: Record<number, WorldMechanics> = Object.keys(

@@ -27,6 +27,7 @@ export interface GameState {
   isGameOver: boolean;
   mode: GameMode;
   timeRemaining?: number; // For Time Attack
+  zenLivesRemaining?: number; // For Zen Mode - decremented on misses
   undoStack?: Shape[][]; // For Zen Mode - stores previous stacks of shapes
   isBossLevel?: boolean; // For Boss Mechanics
   runSeed: number;

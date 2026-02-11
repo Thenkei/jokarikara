@@ -39,6 +39,7 @@ describe("gameState", () => {
       expect(state.score).toBe(0);
       expect(state.level).toBe(1);
       expect(state.isGameOver).toBe(false);
+      expect(state.zenLivesRemaining).toBeUndefined();
       expect(state.styleScore).toBe(0);
       expect(state.streak).toBe(0);
       expect(state.bestStreak).toBe(0);
@@ -54,6 +55,7 @@ describe("gameState", () => {
     it("should initialize Zen Mode", () => {
       const state = createInitialState(1000, "ZEN");
       expect(state.mode).toBe("ZEN");
+      expect(state.zenLivesRemaining).toBe(10);
     });
 
     it("should initialize Time Attack with timer", () => {
@@ -208,8 +210,20 @@ describe("gameState", () => {
 
       const newState = handleMiss(state);
       expect(newState.isGameOver).toBe(false);
+      expect(newState.zenLivesRemaining).toBe(9);
       expect(newState.activeShape?.size).toBeLessThan(initialSize);
       expect(newState.activeShape?.size).toBe(state.shapes[0].size * 0.05);
+    });
+
+    it("should end Zen run when lives reach zero", () => {
+      let state = createInitialState(1000, "ZEN");
+      state = spawnActiveShape(state);
+      state.zenLivesRemaining = 1;
+      state.activeShape!.size = state.shapes[0].size * 2;
+
+      const newState = handleMiss(state);
+      expect(newState.zenLivesRemaining).toBe(0);
+      expect(newState.isGameOver).toBe(true);
     });
   });
 

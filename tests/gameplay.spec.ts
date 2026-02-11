@@ -120,13 +120,56 @@ test.describe("Gameplay Deterministic", () => {
     await bridge.pause();
 
     const state = requireState(await bridge.getState());
+    expect(state.zenLivesRemaining).toBe(10);
     await bridge.setActiveSize((state.lastSize ?? 1) * 1.2);
     await bridge.tap();
     await bridge.step(0.016);
 
     const nextState = requireState(await bridge.getState());
     expect(nextState.isGameOver).toBe(false);
+    expect(nextState.zenLivesRemaining).toBe(9);
     expect(nextState.activeSize ?? 0).toBeLessThan((state.lastSize ?? 1) * 0.1);
+  });
+
+  test("zen: early tap does not consume lives", async ({ page }) => {
+    await page.goto("/");
+    await page.click('button:has-text("ZEN")');
+    await page.click(".start-btn");
+    await waitForBridge(page);
+
+    const bridge = makeBridge(page);
+    await bridge.pause();
+
+    const state = requireState(await bridge.getState());
+    expect(state.zenLivesRemaining).toBe(10);
+    await bridge.setActiveSize((state.lastSize ?? 1) * 0.1);
+    await bridge.tap();
+    await bridge.step(0.016);
+
+    const nextState = requireState(await bridge.getState());
+    expect(nextState.isGameOver).toBe(false);
+    expect(nextState.score).toBe(0);
+    expect(nextState.zenLivesRemaining).toBe(10);
+  });
+
+  test("zen: run ends after 10 misses", async ({ page }) => {
+    await page.goto("/");
+    await page.click('button:has-text("ZEN")');
+    await page.click(".start-btn");
+    await waitForBridge(page);
+
+    const bridge = makeBridge(page);
+    await bridge.pause();
+
+    for (let lives = 10; lives > 0; lives -= 1) {
+      const state = requireState(await bridge.getState());
+      expect(state.zenLivesRemaining).toBe(lives);
+      await bridge.setActiveSize((state.lastSize ?? 1) * 1.2);
+      await bridge.tap();
+      await bridge.step(0.016);
+    }
+
+    await expect(page.locator(".gameover-screen")).toBeVisible();
   });
 
   test("classic: style streak increases with consecutive stacks", async ({

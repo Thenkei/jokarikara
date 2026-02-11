@@ -37,6 +37,7 @@ interface GameCanvasProps {
   onWorldUp: (world: number) => void;
   onTimeUpdate?: (time: number) => void;
   onStyleUpdate?: (style: StyleUpdate) => void;
+  onZenLivesChange?: (lives: number | null) => void;
   /** Optional audio service for dependency injection (testing) */
   audioService?: IAudioService;
 }
@@ -62,6 +63,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onWorldUp,
       onTimeUpdate,
       onStyleUpdate,
+      onZenLivesChange,
       audioService = defaultAudioManager,
     },
     ref,
@@ -75,6 +77,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     const dimensionsRef = useRef({ width: 0, height: 0 });
     const manualModeRef = useRef(false);
     const loopRef = useRef<(time: number) => void>(undefined);
+    const reducedFxRef = useRef(reducedFx);
+
+    useEffect(() => {
+      reducedFxRef.current = reducedFx;
+    }, [reducedFx]);
 
     // Initialize game state
     useEffect(() => {
@@ -83,10 +90,15 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         viewportSize,
         mode,
         runSeed,
-        reducedFx,
+        reducedFxRef.current,
       );
-      stateRef.current = spawnActiveShape(initialState, reducedFx);
-    }, [mode, runSeed]);
+      stateRef.current = spawnActiveShape(initialState, reducedFxRef.current);
+      onZenLivesChange?.(
+        stateRef.current.mode === "ZEN"
+          ? (stateRef.current.zenLivesRemaining ?? null)
+          : null,
+      );
+    }, [mode, runSeed, onZenLivesChange]);
 
     useImperativeHandle(
       ref,
@@ -122,6 +134,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         bestStreak: stateRef.current.bestStreak,
         lastStackQuality: stateRef.current.lastStackQuality,
       });
+      onZenLivesChange?.(
+        stateRef.current.mode === "ZEN"
+          ? (stateRef.current.zenLivesRemaining ?? null)
+          : null,
+      );
 
       if (stateRef.current.isGameOver && !wasGameOver) {
         audioService.playFailSound();
@@ -134,7 +151,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         // Just reset shape in Zen
         audioService.playFailSound(); // Or a less "fail" sound?
       }
-    }, [onGameOver, onStyleUpdate, audioService]);
+    }, [onGameOver, onStyleUpdate, onZenLivesChange, audioService]);
 
     const handleTap = useCallback(() => {
       if (
@@ -358,7 +375,6 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         onScore,
         onTimeUpdate,
         onWorldUp,
-        onStyleUpdate,
         reducedFx,
       ],
     );

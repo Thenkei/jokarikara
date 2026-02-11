@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { makeBridge, waitForBridge } from "./bridgeHelpers";
 
 test.describe("Responsive Layout", () => {
   test("should display start screen on desktop", async ({ page }) => {
@@ -21,15 +22,34 @@ test.describe("Responsive Layout", () => {
   test("should maintain layout after starting game", async ({ page }) => {
     await page.goto("/");
     await page.click(".start-btn");
+    await waitForBridge(page);
 
     // Check HUD elements
     await expect(page.locator(".hud")).toBeVisible();
+    await expect(page.locator(".hud-primary")).toBeVisible();
+    await expect(page.locator(".hud-secondary")).toHaveClass(/hidden/);
     await expect(page.locator(".score")).toBeVisible();
-    await expect(page.locator(".style-badge")).toBeVisible();
-    await expect(page.locator(".fx-toggle-btn")).toBeVisible();
 
     // Check if canvas is rendered
     const canvas = page.locator("canvas");
     await expect(canvas).toBeVisible();
+  });
+
+  test("should reveal and auto-hide secondary HUD on gameplay events", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.click(".start-btn");
+    await waitForBridge(page);
+
+    const secondaryHud = page.locator(".hud-secondary");
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    await bridge.forceStack(0.7);
+    await bridge.step(0.016);
+
+    await expect(secondaryHud).toHaveClass(/revealed/);
+    await page.waitForTimeout(2200);
+    await expect(secondaryHud).toHaveClass(/hidden/);
   });
 });

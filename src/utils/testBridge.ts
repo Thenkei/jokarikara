@@ -15,6 +15,7 @@ export type GameTestBridgeState = {
   styleScore: number;
   streak: number;
   bestStreak: number;
+  zenLivesRemaining?: number;
   lastStackQuality: GameState["lastStackQuality"];
   themeId?: string;
   themePrimary?: string;
@@ -104,6 +105,7 @@ const updateDiagnosticsPanel = (
     `style: ${state.styleScore}`,
     `streak: ${state.streak}`,
     `best: ${state.bestStreak}`,
+    `lives: ${state.zenLivesRemaining ?? "-"}`,
     `quality: ${state.lastStackQuality ?? "-"}`,
     `theme: ${state.themeId ?? "-"}`,
   ].join("\n");
@@ -140,6 +142,7 @@ export const installGameTestBridge = ({
         styleScore: state?.styleScore ?? 0,
         streak: state?.streak ?? 0,
         bestStreak: state?.bestStreak ?? 0,
+        zenLivesRemaining: state?.zenLivesRemaining,
         lastStackQuality: state?.lastStackQuality ?? null,
         themeId: theme?.id,
         themePrimary: theme?.hud.primary,

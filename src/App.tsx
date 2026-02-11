@@ -1,4 +1,11 @@
-import { useState, useCallback, useMemo, useRef, type CSSProperties } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  type CSSProperties,
+} from "react";
 import { GameCanvas, type GameCanvasHandle } from "./components/GameCanvas";
 import { audioManager } from "./utils/audioManager";
 import {
@@ -10,6 +17,7 @@ import {
 import type { HighScore } from "./utils/storage";
 import type { GameMode, StyleUpdate, StackQuality } from "./types";
 import { getWorldTheme } from "./visual/theme";
+import { ZEN_MAX_LIVES } from "./constants/game";
 import "./App.css";
 
 const isE2eMode = (): boolean =>
@@ -29,6 +37,8 @@ const createRunSeed = (): number => {
   return Math.floor(Math.random() * 0xffffffff);
 };
 
+const HUD_REVEAL_DURATION_MS = 2000;
+
 function App() {
   const [gameState, setGameState] = useState<"START" | "PLAYING" | "GAMEOVER">(
     "START"
@@ -46,13 +56,39 @@ function App() {
   const [styleScore, setStyleScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [zenLives, setZenLives] = useState<number | null>(null);
+  const [showSecondaryHud, setShowSecondaryHud] = useState(false);
   const [lastQuality, setLastQuality] = useState<StackQuality | null>(null);
   const [qualityPulseId, setQualityPulseId] = useState(0);
   const canvasRef = useRef<GameCanvasHandle>(null);
+  const secondaryHudTimeoutRef = useRef<number | null>(null);
+  const previousZenLivesRef = useRef<number | null>(null);
   const worldTheme = useMemo(
     () => getWorldTheme(world, runSeed, reducedFx),
     [world, runSeed, reducedFx]
   );
+
+  const clearSecondaryHudTimeout = useCallback(() => {
+    if (secondaryHudTimeoutRef.current !== null) {
+      window.clearTimeout(secondaryHudTimeoutRef.current);
+      secondaryHudTimeoutRef.current = null;
+    }
+  }, []);
+
+  const revealSecondaryHud = useCallback(() => {
+    setShowSecondaryHud(true);
+    clearSecondaryHudTimeout();
+    secondaryHudTimeoutRef.current = window.setTimeout(() => {
+      setShowSecondaryHud(false);
+      secondaryHudTimeoutRef.current = null;
+    }, HUD_REVEAL_DURATION_MS);
+  }, [clearSecondaryHudTimeout]);
+
+  useEffect(() => {
+    return () => {
+      clearSecondaryHudTimeout();
+    };
+  }, [clearSecondaryHudTimeout]);
 
   const gameplayThemeVars = useMemo(
     () =>
@@ -67,6 +103,8 @@ function App() {
   );
 
   const startGame = (selectedMode: GameMode = mode) => {
+    const initialZenLives = selectedMode === "ZEN" ? ZEN_MAX_LIVES : null;
+
     setMode(selectedMode);
     audioManager.init();
     audioManager.resume();
@@ -75,12 +113,15 @@ function App() {
     setStyleScore(0);
     setStreak(0);
     setBestStreak(0);
+    setZenLives(initialZenLives);
+    previousZenLivesRef.current = initialZenLives;
     setLastQuality(null);
     setQualityPulseId(0);
     setLevel(1);
     setWorld(1);
     setTimeRemaining(null);
     setGameState("PLAYING");
+    revealSecondaryHud();
   };
 
   const handleGameOver = useCallback(
@@ -92,27 +133,32 @@ function App() {
       setScore(finalScore);
       setWorld(finalWorld);
       setLevel(finalLevel);
+      clearSecondaryHudTimeout();
+      setShowSecondaryHud(false);
       setGameState("GAMEOVER");
     },
-    []
+    [clearSecondaryHudTimeout]
   );
 
   const handleScore = useCallback((newScore: number) => {
     setScore(newScore);
-  }, []);
+    revealSecondaryHud();
+  }, [revealSecondaryHud]);
 
   const handleLevelUp = useCallback((newLevel: number) => {
     setLevel(newLevel);
     setShowLevelUp(true);
-    setTimeout(() => setShowLevelUp(false), 1500);
-  }, []);
+    setTimeout(() => setShowLevelUp(false), 1100);
+    revealSecondaryHud();
+  }, [revealSecondaryHud]);
 
   const handleWorldUp = useCallback((newWorld: number) => {
     setWorld(newWorld);
     setLevel(1);
     setShowWorldUp(true);
-    setTimeout(() => setShowWorldUp(false), 2000);
-  }, []);
+    setTimeout(() => setShowWorldUp(false), 1400);
+    revealSecondaryHud();
+  }, [revealSecondaryHud]);
 
   const handleTimeUpdate = useCallback((time: number) => {
     setTimeRemaining(time);
@@ -128,12 +174,25 @@ function App() {
     }
   }, []);
 
+  const handleZenLivesChange = useCallback(
+    (lives: number | null) => {
+      setZenLives(lives);
+      if (lives !== previousZenLivesRef.current) {
+        revealSecondaryHud();
+      }
+      previousZenLivesRef.current = lives;
+    },
+    [revealSecondaryHud]
+  );
+
   const handleRestartShape = () => {
     canvasRef.current?.restartShape();
+    revealSecondaryHud();
   };
 
   const handleUndo = () => {
     canvasRef.current?.undo();
+    revealSecondaryHud();
   };
 
   const handleToggleReducedFx = () => {
@@ -142,6 +201,17 @@ function App() {
       saveSettings({ reducedFx: next });
       return next;
     });
+    revealSecondaryHud();
+  };
+
+  const handleMainMenu = () => {
+    clearSecondaryHudTimeout();
+    setShowSecondaryHud(false);
+    setZenLives(null);
+    previousZenLivesRef.current = null;
+    setShowLevelUp(false);
+    setShowWorldUp(false);
+    setGameState("START");
   };
 
   return (
@@ -195,27 +265,39 @@ function App() {
               onWorldUp={handleWorldUp}
               onTimeUpdate={handleTimeUpdate}
               onStyleUpdate={handleStyleUpdate}
+              onZenLivesChange={handleZenLivesChange}
             />
           </div>
 
           <div className="hud">
-            <div className="hud-row">
-              <span className="world-badge">WORLD {world}</span>
-              <span className="level-badge">LVL {level}</span>
-              <span className="style-badge">STYLE {styleScore}</span>
+            <div className="hud-row hud-primary">
+              <span className="score score-readout">{score}</span>
+              <span className="world-badge">W {world}</span>
+              <span className="level-badge">L {level}</span>
               {mode === "TIME_ATTACK" && timeRemaining !== null && (
                 <span className="timer-badge">{Math.ceil(timeRemaining)}s</span>
               )}
-              <button className="fx-toggle-btn" onClick={handleToggleReducedFx}>
-                {reducedFx ? "FX: LOW" : "FX: FULL"}
-              </button>
+              {mode === "ZEN" && (
+                <span
+                  className={`lives-badge ${(zenLives ?? 0) <= 3 ? "critical" : ""}`}
+                >
+                  LIVES {zenLives ?? 0}
+                </span>
+              )}
             </div>
-            <div className="hud-row main-hud">
-              <span className="score">{score}</span>
-              <span className={`streak-badge ${streak > 1 ? "active" : ""}`}>
-                COMBO x{streak}
-              </span>
-              <span className="best-streak-badge">BEST x{bestStreak}</span>
+            <div
+              className={`hud-row hud-secondary ${showSecondaryHud ? "revealed" : "hidden"}`}
+              aria-hidden={!showSecondaryHud}
+            >
+              {mode !== "ZEN" && (
+                <>
+                  <span className="style-badge">STYLE {styleScore}</span>
+                  <span className={`streak-badge ${streak > 1 ? "active" : ""}`}>
+                    COMBO x{streak}
+                  </span>
+                  <span className="best-streak-badge">BEST x{bestStreak}</span>
+                </>
+              )}
               {mode === "ZEN" && (
                 <div className="zen-controls">
                   <button className="restart-btn" onClick={handleRestartShape}>
@@ -226,6 +308,9 @@ function App() {
                   </button>
                 </div>
               )}
+              <button className="fx-toggle-btn" onClick={handleToggleReducedFx}>
+                {reducedFx ? "FX: LOW" : "FX: FULL"}
+              </button>
             </div>
           </div>
 
@@ -283,7 +368,7 @@ function App() {
           <button className="retry-btn" onClick={() => startGame(mode)}>
             RETRY
           </button>
-          <button className="menu-btn" onClick={() => setGameState("START")}>
+          <button className="menu-btn" onClick={handleMainMenu}>
             MAIN MENU
           </button>
         </div>
