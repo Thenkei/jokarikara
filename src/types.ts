@@ -19,6 +19,8 @@ export interface GameState {
   activeOffset?: { x: number; y: number };
   world: number;
   score: number;
+  stackCount: number;
+  scoreHistory: number[];
   level: number;
   zoom: number;
   targetZoom: number;

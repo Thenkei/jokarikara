@@ -3,7 +3,7 @@ export interface HighScore {
   date: string;
 }
 
-const STORAGE_KEY = "shape-stack-high-scores";
+const STORAGE_KEY = "shape-stack-high-scores-v2";
 const SETTINGS_STORAGE_KEY = "shape-stack-settings";
 
 export interface GameSettings {

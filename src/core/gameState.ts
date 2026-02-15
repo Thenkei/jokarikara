@@ -69,6 +69,8 @@ export const createInitialState = (
     activeOffset: { x: 0, y: 0 },
     world: 1,
     score: 0,
+    stackCount: 0,
+    scoreHistory: [],
     level: 1,
     zoom: getZoomForLevel(1),
     targetZoom: getZoomForLevel(1),
@@ -106,10 +108,10 @@ export const spawnActiveShape = (
   let nextState = state;
   const lastShape = nextState.shapes[nextState.shapes.length - 1] ?? null;
 
-  // Boss mechanics: Check if current level/score triggers a boss
+  // Boss mechanics: Check if the upcoming stack count triggers a boss
   // We keep bosses in ZEN mode for visual variety and testing,
   // but they won't end the game on miss.
-  const bossConfig = getBossConfigForScore(nextState.score + 1);
+  const bossConfig = getBossConfigForScore(nextState.stackCount + 1);
   const isBossLevel = !!bossConfig;
 
   const shapeRandom = consumeRandom(nextState);
@@ -182,7 +184,7 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
 
   // Get world mechanics for growth pattern
   const mechanics = getWorldMechanics(state.world);
-  const stackPositionInLevel = state.score % STACKS_PER_LEVEL;
+  const stackPositionInLevel = state.stackCount % STACKS_PER_LEVEL;
   const growthPatternMultiplier = getGrowthMultiplier(
     mechanics.growthPattern,
     stackPositionInLevel
@@ -196,25 +198,26 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
   const time = Date.now() / 1000;
 
   if (state.isBossLevel) {
-    const bossConfig = getBossConfigForScore(state.score + 1);
+    const bossConfig = getBossConfigForScore(state.stackCount + 1);
     if (bossConfig) {
       bossMultiplier = bossConfig.growthSpeedMultiplier;
       bossRotationMultiplier = bossConfig.rotationSpeedMultiplier;
 
       if (bossConfig.pulseEnabled) {
         // Pulsing: adds a sinusoidal oscillation to the size
-        // Speed and amplitude scale with score/difficulty
-        const pulseSpeed = 4 + state.score * 0.1;
-        const pulseAmplitude = 5 + state.score * 0.2;
+        // Speed and amplitude scale with stack count/difficulty
+        const pulseSpeed = 4 + state.stackCount * 0.1;
+        const pulseAmplitude = 5 + state.stackCount * 0.2;
         pulseOffset = Math.sin(time * pulseSpeed) * pulseAmplitude;
       }
 
       const baseRotationSpeed =
-        (0.5 + Math.min(state.score * 0.05, 1.5)) * bossRotationMultiplier;
+        (0.5 + Math.min(state.stackCount * 0.05, 1.5)) *
+        bossRotationMultiplier;
 
       if (bossConfig.erraticRotationEnabled) {
         // Erratic rotation: varies the rotation speed over time
-        const erraticFreq = 2 + state.score * 0.05;
+        const erraticFreq = 2 + state.stackCount * 0.05;
         finalRotationSpeed =
           baseRotationSpeed * (1 + Math.sin(time * erraticFreq) * 0.5);
       } else {
@@ -222,10 +225,10 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
       }
     }
   } else {
-    finalRotationSpeed = 0.5 + Math.min(state.score * 0.05, 1.5);
+    finalRotationSpeed = 0.5 + Math.min(state.stackCount * 0.05, 1.5);
   }
 
-  const difficultyMultiplier = 1 + state.score * 0.05;
+  const difficultyMultiplier = 1 + state.stackCount * 0.05;
   // Normalize growth speed by initial shape size so gameplay feels consistent across screen sizes
   const sizeNormalization = state.initialSize / REFERENCE_INITIAL_SIZE;
   const growthIncrement =
@@ -320,9 +323,12 @@ export const stackActiveShape = (
   const sizeRatio = state.activeShape.size / lastShape.size;
   const quality = getStackQuality(sizeRatio);
   const isPerfect = quality === "PERFECT";
+  const awardedScore = STYLE_SCORE_BY_QUALITY[quality];
 
   const newShapes = [...state.shapes, { ...state.activeShape, opacity: 1 }];
-  const newScore = state.score + 1;
+  const newScore = state.score + awardedScore;
+  const newStackCount = state.stackCount + 1;
+  const newScoreHistory = [...state.scoreHistory, awardedScore];
 
   // Time Attack: Bonus for perfect stack
   let newTimeRemaining = state.timeRemaining;
@@ -334,7 +340,7 @@ export const stackActiveShape = (
     newTimeRemaining += PERFECT_STACK_TIME_BONUS;
   }
 
-  const { world: newWorld, level: newLevel } = computeProgression(newScore);
+  const { world: newWorld, level: newLevel } = computeProgression(newStackCount);
 
   const worldUp = newWorld > state.world;
   const leveledUp = worldUp || (newLevel > state.level && !worldUp);
@@ -363,6 +369,8 @@ export const stackActiveShape = (
       activeOffset: { x: 0, y: 0 },
       world: newWorld,
       score: newScore,
+      stackCount: newStackCount,
+      scoreHistory: newScoreHistory,
       level: newLevel,
       targetZoom: newTargetZoom,
       timeRemaining: newTimeRemaining,
@@ -477,16 +485,21 @@ export const undoLastStack = (state: GameState): GameState => {
 
   // Remove the last shape
   const newShapes = state.shapes.slice(0, -1);
-  const newScore = Math.max(0, state.score - 1);
+  const lastAwarded = state.scoreHistory.at(-1) ?? 0;
+  const newScore = Math.max(0, state.score - lastAwarded);
+  const newStackCount = Math.max(0, state.stackCount - 1);
+  const newScoreHistory = state.scoreHistory.slice(0, -1);
 
   // Recalculate level/world
-  const { world: newWorld, level: newLevel } = computeProgression(newScore);
+  const { world: newWorld, level: newLevel } = computeProgression(newStackCount);
   const newTargetZoom = getZoomForLevel(newLevel);
 
   return {
     ...state,
     shapes: newShapes,
     score: newScore,
+    stackCount: newStackCount,
+    scoreHistory: newScoreHistory,
     world: newWorld,
     level: newLevel,
     targetZoom: newTargetZoom,

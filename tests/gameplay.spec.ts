@@ -28,7 +28,7 @@ const requireState = (
 };
 
 test.describe("Gameplay Deterministic", () => {
-  test("classic: stacking increments score", async ({ page }) => {
+  test("classic: stacking awards score and increments stack count", async ({ page }) => {
     await page.goto("/");
     await page.click(".start-btn");
     await waitForBridge(page);
@@ -38,7 +38,8 @@ test.describe("Gameplay Deterministic", () => {
     await stackOnce(bridge);
 
     const state = requireState(await bridge.getState());
-    expect(state.score).toBe(1);
+    expect(state.score).toBe(25);
+    expect(state.stackCount).toBe(1);
     expect(state.level).toBe(1);
     expect(state.styleScore).toBeGreaterThan(0);
     expect(state.streak).toBe(1);
@@ -57,7 +58,8 @@ test.describe("Gameplay Deterministic", () => {
     }
 
     const state = requireState(await bridge.getState());
-    expect(state.score).toBe(3);
+    expect(state.score).toBe(75);
+    expect(state.stackCount).toBe(3);
     expect(state.level).toBe(2);
     expect(state.world).toBe(1);
   });
@@ -75,7 +77,8 @@ test.describe("Gameplay Deterministic", () => {
     }
 
     const state = requireState(await bridge.getState());
-    expect(state.score).toBe(15);
+    expect(state.score).toBe(375);
+    expect(state.stackCount).toBe(15);
     expect(state.world).toBe(2);
     expect(state.level).toBe(1);
   });
@@ -149,6 +152,7 @@ test.describe("Gameplay Deterministic", () => {
     const nextState = requireState(await bridge.getState());
     expect(nextState.isGameOver).toBe(false);
     expect(nextState.score).toBe(0);
+    expect(nextState.stackCount).toBe(0);
     expect(nextState.zenLivesRemaining).toBe(10);
   });
 
@@ -183,10 +187,11 @@ test.describe("Gameplay Deterministic", () => {
     await bridge.pause();
 
     await stackOnce(bridge, 0.95);
-    await stackOnce(bridge, 0.97);
+    await stackOnce(bridge, 0.98);
 
     const state = requireState(await bridge.getState());
-    expect(state.score).toBe(2);
+    expect(state.score).toBe(230);
+    expect(state.stackCount).toBe(2);
     expect(state.streak).toBe(2);
     expect(state.styleScore).toBeGreaterThan(0);
     expect(state.lastStackQuality).not.toBeNull();

@@ -128,8 +128,7 @@ function App() {
 
   const handleGameOver = useCallback(
     (finalScore: number, finalWorld: number, finalLevel: number) => {
-      const progressionScore = getProgressionScore(finalWorld, finalLevel);
-      saveHighScore(progressionScore);
+      saveHighScore(finalScore);
       setHighScores(getHighScores());
       setScore(finalScore);
       setWorld(finalWorld);

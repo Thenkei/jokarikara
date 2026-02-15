@@ -190,17 +190,17 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         bestStreak: result.state.bestStreak,
         lastStackQuality: result.state.lastStackQuality,
       });
-      audioService.playStackSound(result.state.score);
+      audioService.playStackSound(result.state.stackCount);
 
       // Check for level up
       if (result.leveledUp) {
         if (result.worldUp) {
           onWorldUp(result.state.world);
           // Maybe a special sound?
-          audioService.playStackSound(result.state.score * 3);
+          audioService.playStackSound(result.state.stackCount * 3);
         } else {
           onLevelUp(result.newLevel);
-          audioService.playStackSound(result.state.score * 2); // Double pitch for level up
+          audioService.playStackSound(result.state.stackCount * 2); // Double pitch for level up
         }
       }
 
@@ -287,7 +287,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           onScore(state.score);
           onLevelUp(state.level);
           onWorldUp(state.world);
-          audioService.playStackSound(state.score);
+          audioService.playStackSound(state.stackCount);
         }
 
         if (dt > 0) {

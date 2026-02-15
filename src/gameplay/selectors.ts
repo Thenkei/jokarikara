@@ -44,10 +44,12 @@ export const getBossConfigForScore = (
 };
 
 export const computeProgression = (
-  score: number,
+  stackCount: number,
   config: GameplayConfig = getGameplayConfig(),
 ) => {
-  const totalLevels = Math.floor(score / config.progression.stacksPerLevel);
+  const totalLevels = Math.floor(
+    stackCount / config.progression.stacksPerLevel,
+  );
   const world = Math.floor(totalLevels / config.progression.levelsPerWorld) + 1;
   const level = (totalLevels % config.progression.levelsPerWorld) + 1;
   return { world, level, totalLevels };

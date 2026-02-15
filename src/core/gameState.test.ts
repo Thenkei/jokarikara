@@ -22,6 +22,7 @@ import {
   MAX_GROWTH_SPEED,
   PERFECT_STACK_TIME_BONUS,
   TIME_ATTACK_START_TIME,
+  STYLE_QUALITY_POINTS,
   computeProgression,
 } from "../constants/game";
 
@@ -37,6 +38,8 @@ describe("gameState", () => {
     it("should initialize score and level to starting values", () => {
       const state = createInitialState(1000);
       expect(state.score).toBe(0);
+      expect(state.stackCount).toBe(0);
+      expect(state.scoreHistory).toEqual([]);
       expect(state.level).toBe(1);
       expect(state.isGameOver).toBe(false);
       expect(state.zenLivesRemaining).toBeUndefined();
@@ -91,7 +94,7 @@ describe("gameState", () => {
 
     it("should handle boss spawning at level 5 threshold", () => {
       const state = createInitialState(1000);
-      state.score = 4; // next is 5
+      state.stackCount = 4; // next is 5
       const newState = spawnActiveShape(state);
       expect(newState.isBossLevel).toBe(true);
       expect(newState.activeShape?.type).toBe("hexagon");
@@ -125,7 +128,7 @@ describe("gameState", () => {
 
     it("should apply pulsing size variation on boss levels with pulseEnabled", () => {
       let state = createInitialState(1000);
-      state.score = 4; // Boss at score 5 (score+1=5)
+      state.stackCount = 4; // Boss at stack 5 (stackCount+1=5)
       state = spawnActiveShape(state);
       expect(state.isBossLevel).toBe(true);
 
@@ -144,7 +147,7 @@ describe("gameState", () => {
 
     it("should apply erratic rotation on boss levels with erraticRotationEnabled", () => {
       let state = createInitialState(1000);
-      state.score = 9; // Boss at score 10
+      state.stackCount = 9; // Boss at stack 10
       state = spawnActiveShape(state);
       expect(state.isBossLevel).toBe(true);
 
@@ -157,7 +160,7 @@ describe("gameState", () => {
     it("should apply boss hue shift deterministically with mocked time", () => {
       const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1000);
       let state = createInitialState(1000);
-      state.score = 4; // Boss at score 5
+      state.stackCount = 4; // Boss at stack 5
       state = spawnActiveShape(state);
       expect(state.isBossLevel).toBe(true);
 
@@ -278,12 +281,14 @@ describe("gameState", () => {
       expect(newState.activeShape).toBeNull();
     });
 
-    it("should increment score", () => {
+    it("should award quality-based score and increment stack count", () => {
       let state = createInitialState(1000);
       state = spawnActiveShape(state);
 
       const { state: newState } = stackActiveShape(state);
-      expect(newState.score).toBe(1);
+      expect(newState.score).toBe(STYLE_QUALITY_POINTS.ok);
+      expect(newState.stackCount).toBe(1);
+      expect(newState.scoreHistory).toEqual([STYLE_QUALITY_POINTS.ok]);
     });
 
     it("should level up after STACKS_PER_LEVEL", () => {
@@ -333,11 +338,11 @@ describe("gameState", () => {
       state = stackActiveShape(state).state;
       expect(state.world).toBe(2); // Should STILL be world 2
 
-      // Stack until level 2 of world 2 (score 18)
+      // Stack until level 2 of world 2 (stackCount 18)
       state = spawnActiveShape(state);
-      state = stackActiveShape(state).state; // Score 17
+      state = stackActiveShape(state).state; // stackCount 17
       state = spawnActiveShape(state);
-      state = stackActiveShape(state).state; // Score 18
+      state = stackActiveShape(state).state; // stackCount 18
       expect(state.world).toBe(2);
       expect(state.level).toBe(2);
     });
@@ -349,7 +354,7 @@ describe("gameState", () => {
         state = stackActiveShape(state).state;
       }
 
-      const progression = computeProgression(state.score);
+      const progression = computeProgression(state.stackCount);
       expect(state.world).toBe(progression.world);
       expect(state.level).toBe(progression.level);
     });
@@ -376,6 +381,55 @@ describe("gameState", () => {
       expect(getStackQuality(0.7)).toBe("OK");
     });
 
+    it("should map each quality to configured score points", () => {
+      const scenarios = [
+        { ratio: 0.98, expected: STYLE_QUALITY_POINTS.perfect },
+        { ratio: 0.93, expected: STYLE_QUALITY_POINTS.great },
+        { ratio: 0.85, expected: STYLE_QUALITY_POINTS.good },
+        { ratio: 0.7, expected: STYLE_QUALITY_POINTS.ok },
+      ];
+
+      for (const scenario of scenarios) {
+        let state = createInitialState(1000, "CLASSIC");
+        state = spawnActiveShape(state);
+        const lastShape = state.shapes[state.shapes.length - 1];
+        state.activeShape = {
+          ...state.activeShape!,
+          size: lastShape.size * scenario.ratio,
+        };
+        const result = stackActiveShape(state).state;
+        expect(result.score).toBe(scenario.expected);
+      }
+    });
+
+    it("should keep progression identical for different score totals with same stack count", () => {
+      let lowQualityState = createInitialState(1000, "CLASSIC");
+      let highQualityState = createInitialState(1000, "CLASSIC");
+
+      for (let i = 0; i < 8; i += 1) {
+        lowQualityState = spawnActiveShape(lowQualityState);
+        const lowLast = lowQualityState.shapes[lowQualityState.shapes.length - 1];
+        lowQualityState.activeShape = {
+          ...lowQualityState.activeShape!,
+          size: lowLast.size * 0.7,
+        };
+        lowQualityState = stackActiveShape(lowQualityState).state;
+
+        highQualityState = spawnActiveShape(highQualityState);
+        const highLast = highQualityState.shapes[highQualityState.shapes.length - 1];
+        highQualityState.activeShape = {
+          ...highQualityState.activeShape!,
+          size: highLast.size * 0.98,
+        };
+        highQualityState = stackActiveShape(highQualityState).state;
+      }
+
+      expect(lowQualityState.stackCount).toBe(highQualityState.stackCount);
+      expect(lowQualityState.score).toBeLessThan(highQualityState.score);
+      expect(lowQualityState.world).toBe(highQualityState.world);
+      expect(lowQualityState.level).toBe(highQualityState.level);
+    });
+
     it("should increment streak and style score in classic mode", () => {
       let state = createInitialState(1000, "CLASSIC");
       state = spawnActiveShape(state);
@@ -389,6 +443,7 @@ describe("gameState", () => {
       expect(first.streak).toBe(1);
       expect(first.styleScore).toBeGreaterThan(0);
       expect(first.lastStackQuality).toBe("GREAT");
+      expect(first.score).toBe(STYLE_QUALITY_POINTS.great);
 
       state = spawnActiveShape(first);
       const nextLast = state.shapes[state.shapes.length - 1];
@@ -401,6 +456,9 @@ describe("gameState", () => {
       expect(second.bestStreak).toBe(2);
       expect(second.styleScore).toBeGreaterThan(first.styleScore);
       expect(second.lastStackQuality).toBe("PERFECT");
+      expect(second.score).toBe(
+        STYLE_QUALITY_POINTS.great + STYLE_QUALITY_POINTS.perfect
+      );
     });
 
     it("should keep style score disabled in zen mode", () => {
@@ -408,6 +466,8 @@ describe("gameState", () => {
       state = spawnActiveShape(state);
       const result = stackActiveShape(state).state;
 
+      expect(result.score).toBe(STYLE_QUALITY_POINTS.ok);
+      expect(result.stackCount).toBe(1);
       expect(result.styleScore).toBe(0);
       expect(result.streak).toBe(0);
       expect(result.bestStreak).toBe(0);
@@ -425,13 +485,43 @@ describe("gameState", () => {
       expect(state.world).toBe(1);
 
       state = undoLastStack(state);
-      expect(state.score).toBe(5);
+      expect(state.score).toBe(5 * STYLE_QUALITY_POINTS.ok);
+      expect(state.stackCount).toBe(5);
       expect(state.world).toBe(1);
       expect(state.level).toBe(2);
 
-      const progression = computeProgression(state.score);
+      const progression = computeProgression(state.stackCount);
       expect(state.world).toBe(progression.world);
       expect(state.level).toBe(progression.level);
+    });
+
+    it("should subtract exact last-awarded score on undo", () => {
+      let state = createInitialState(1000, "ZEN");
+      state = spawnActiveShape(state);
+      let lastShape = state.shapes[state.shapes.length - 1];
+      state.activeShape = {
+        ...state.activeShape!,
+        size: lastShape.size * 0.98,
+      };
+      state = stackActiveShape(state).state; // PERFECT
+
+      state = spawnActiveShape(state);
+      lastShape = state.shapes[state.shapes.length - 1];
+      state.activeShape = {
+        ...state.activeShape!,
+        size: lastShape.size * 0.85,
+      };
+      state = stackActiveShape(state).state; // GOOD
+
+      expect(state.score).toBe(
+        STYLE_QUALITY_POINTS.perfect + STYLE_QUALITY_POINTS.good
+      );
+      expect(state.stackCount).toBe(2);
+
+      const undone = undoLastStack(state);
+      expect(undone.score).toBe(STYLE_QUALITY_POINTS.perfect);
+      expect(undone.stackCount).toBe(1);
+      expect(undone.scoreHistory).toEqual([STYLE_QUALITY_POINTS.perfect]);
     });
   });
 

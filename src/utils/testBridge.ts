@@ -4,6 +4,7 @@ import type { WorldTheme } from "../visual/theme";
 
 export type GameTestBridgeState = {
   score: number;
+  stackCount: number;
   level: number;
   world: number;
   mode: GameState["mode"];
@@ -95,6 +96,7 @@ const updateDiagnosticsPanel = (
   panel.textContent = [
     `mode: ${state.mode}`,
     `score: ${state.score}`,
+    `stacks: ${state.stackCount}`,
     `world: ${state.world}`,
     `level: ${state.level}`,
     `gameOver: ${state.isGameOver}`,
@@ -131,6 +133,7 @@ export const installGameTestBridge = ({
       const theme = getTheme();
       return {
         score: state?.score ?? 0,
+        stackCount: state?.stackCount ?? 0,
         level: state?.level ?? 1,
         world: state?.world ?? 1,
         mode: state?.mode ?? "CLASSIC",
