@@ -17,7 +17,7 @@ import {
 import type { HighScore } from "./utils/storage";
 import type { GameMode, StyleUpdate, StackQuality } from "./types";
 import { getWorldTheme } from "./visual/theme";
-import { ZEN_MAX_LIVES } from "./constants/game";
+import { LEVELS_PER_WORLD, ZEN_MAX_LIVES } from "./constants/game";
 import "./App.css";
 
 const isE2eMode = (): boolean =>
@@ -38,6 +38,8 @@ const createRunSeed = (): number => {
 };
 
 const HUD_REVEAL_DURATION_MS = 2000;
+const getProgressionScore = (world: number, level: number): number =>
+  (world - 1) * LEVELS_PER_WORLD + level;
 
 function App() {
   const [gameState, setGameState] = useState<"START" | "PLAYING" | "GAMEOVER">(
@@ -126,8 +128,7 @@ function App() {
 
   const handleGameOver = useCallback(
     (finalScore: number, finalWorld: number, finalLevel: number) => {
-      // Calculated score = world * 5 + level
-      const progressionScore = finalWorld * 5 + finalLevel;
+      const progressionScore = getProgressionScore(finalWorld, finalLevel);
       saveHighScore(progressionScore);
       setHighScores(getHighScores());
       setScore(finalScore);
@@ -346,7 +347,7 @@ function App() {
             </p>
             <p className="score-display">Total Score: {score}</p>
             <p className="progression-score">
-              Progression: {world * 5 + level}
+              Progression: {getProgressionScore(world, level)}
             </p>
           </div>
           <div className="leaderboard">

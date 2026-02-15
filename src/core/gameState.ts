@@ -12,24 +12,39 @@ import {
   TIME_ATTACK_START_TIME,
   PERFECT_STACK_TIME_BONUS,
   REFERENCE_INITIAL_SIZE,
+  STYLE_QUALITY_THRESHOLDS,
+  STYLE_QUALITY_POINTS,
+  STYLE_STREAK_BONUS_PER_STACK,
   ZEN_MAX_LIVES,
   getBossConfigForScore,
   computeProgression,
 } from "../constants/game";
 import type { GameMode } from "../types";
+import { nextRandomUnit, seedRng } from "../utils/random";
 
 const STYLE_SCORE_BY_QUALITY: Record<StackQuality, number> = {
-  PERFECT: 140,
-  GREAT: 90,
-  GOOD: 50,
-  OK: 25,
+  PERFECT: STYLE_QUALITY_POINTS.perfect,
+  GREAT: STYLE_QUALITY_POINTS.great,
+  GOOD: STYLE_QUALITY_POINTS.good,
+  OK: STYLE_QUALITY_POINTS.ok,
 };
 
 export const getStackQuality = (sizeRatio: number): StackQuality => {
-  if (sizeRatio >= 0.97) return "PERFECT";
-  if (sizeRatio >= 0.92) return "GREAT";
-  if (sizeRatio >= 0.82) return "GOOD";
+  if (sizeRatio >= STYLE_QUALITY_THRESHOLDS.perfectMinRatio) return "PERFECT";
+  if (sizeRatio >= STYLE_QUALITY_THRESHOLDS.greatMinRatio) return "GREAT";
+  if (sizeRatio >= STYLE_QUALITY_THRESHOLDS.goodMinRatio) return "GOOD";
   return "OK";
+};
+
+const consumeRandom = (state: GameState): { state: GameState; value: number } => {
+  const next = nextRandomUnit(state.rngState);
+  return {
+    state: {
+      ...state,
+      rngState: next.nextState,
+    },
+    value: next.value,
+  };
 };
 
 /**
@@ -65,6 +80,7 @@ export const createInitialState = (
     zenLivesRemaining: mode === "ZEN" ? ZEN_MAX_LIVES : undefined,
     isBossLevel: false,
     runSeed,
+    rngState: seedRng(runSeed),
     styleScore: 0,
     streak: 0,
     bestStreak: 0,
@@ -75,10 +91,9 @@ export const createInitialState = (
 /**
  * Generate a random growth speed for the active shape.
  */
-export const generateRandomSpeed = (): number => {
-  return (
-    MIN_GROWTH_SPEED + Math.random() * (MAX_GROWTH_SPEED - MIN_GROWTH_SPEED)
-  );
+export const generateRandomSpeed = (randomValue: number = Math.random()): number => {
+  const clamped = Math.min(0.999999999, Math.max(0, randomValue));
+  return MIN_GROWTH_SPEED + clamped * (MAX_GROWTH_SPEED - MIN_GROWTH_SPEED);
 };
 
 /**
@@ -88,20 +103,29 @@ export const spawnActiveShape = (
   state: GameState,
   reducedFx: boolean = false,
 ): GameState => {
-  const lastShape = state.shapes[state.shapes.length - 1] ?? null;
+  let nextState = state;
+  const lastShape = nextState.shapes[nextState.shapes.length - 1] ?? null;
 
   // Boss mechanics: Check if current level/score triggers a boss
   // We keep bosses in ZEN mode for visual variety and testing,
   // but they won't end the game on miss.
-  const bossConfig = getBossConfigForScore(state.score + 1);
+  const bossConfig = getBossConfigForScore(nextState.score + 1);
   const isBossLevel = !!bossConfig;
 
+  const shapeRandom = consumeRandom(nextState);
+  nextState = shapeRandom.state;
+  const colorRandom = consumeRandom(nextState);
+  nextState = colorRandom.state;
   let activeShape = createActiveShape(
-    state.level,
+    nextState.level,
     lastShape,
-    state.world,
-    state.runSeed,
+    nextState.world,
+    nextState.runSeed,
     reducedFx,
+    {
+      shapeRoll: shapeRandom.value,
+      colorRoll: colorRandom.value,
+    },
   );
 
   if (isBossLevel && bossConfig) {
@@ -112,10 +136,12 @@ export const spawnActiveShape = (
     };
   }
 
-  const currentSpeed = generateRandomSpeed();
+  const speedRandom = consumeRandom(nextState);
+  nextState = speedRandom.state;
+  const currentSpeed = generateRandomSpeed(speedRandom.value);
 
   return {
-    ...state,
+    ...nextState,
     activeShape,
     currentSpeed,
     isBossLevel,
@@ -325,7 +351,7 @@ export const stackActiveShape = (
   const styleEnabled = state.mode !== "ZEN";
   const streak = styleEnabled ? state.streak + 1 : state.streak;
   const styleIncrement = styleEnabled
-    ? STYLE_SCORE_BY_QUALITY[quality] + streak * 5
+    ? STYLE_SCORE_BY_QUALITY[quality] + streak * STYLE_STREAK_BONUS_PER_STACK
     : 0;
   const bestStreak = styleEnabled ? Math.max(state.bestStreak, streak) : 0;
 
@@ -413,17 +439,28 @@ export const restartActiveShape = (
   }
 
   const lastShape = state.shapes[state.shapes.length - 1] ?? null;
+  let nextState = state;
+  const shapeRandom = consumeRandom(nextState);
+  nextState = shapeRandom.state;
+  const colorRandom = consumeRandom(nextState);
+  nextState = colorRandom.state;
   const newActiveShape = createActiveShape(
-    state.level,
+    nextState.level,
     lastShape,
-    state.world,
-    state.runSeed,
+    nextState.world,
+    nextState.runSeed,
     reducedFx,
+    {
+      shapeRoll: shapeRandom.value,
+      colorRoll: colorRandom.value,
+    },
   );
-  const currentSpeed = generateRandomSpeed();
+  const speedRandom = consumeRandom(nextState);
+  nextState = speedRandom.state;
+  const currentSpeed = generateRandomSpeed(speedRandom.value);
 
   return {
-    ...state,
+    ...nextState,
     activeShape: newActiveShape,
     currentSpeed,
     activeOffset: { x: 0, y: 0 },

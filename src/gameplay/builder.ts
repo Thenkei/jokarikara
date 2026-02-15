@@ -110,6 +110,7 @@ type LevelConfigInput = LevelConfig | ((builder: LevelBuilder) => void);
 export class GameplayBuilder {
   private progressionConfig?: GameplayConfig["progression"];
   private growthConfig?: GameplayConfig["growth"];
+  private scoringConfig?: GameplayConfig["scoring"];
   private modesConfig?: Partial<GameplayConfig["modes"]>;
   private colorsConfig?: GameplayConfig["colors"];
   private levelsConfig: GameplayConfig["levels"] = {};
@@ -128,6 +129,11 @@ export class GameplayBuilder {
 
   growth(config: GameplayConfig["growth"]): this {
     this.growthConfig = config;
+    return this;
+  }
+
+  scoring(config: GameplayConfig["scoring"]): this {
+    this.scoringConfig = config;
     return this;
   }
 
@@ -190,6 +196,9 @@ export class GameplayBuilder {
     if (!this.modesConfig?.timeAttack || !this.modesConfig?.zen) {
       throw new Error("Mode configs for timeAttack and zen are required.");
     }
+    if (!this.scoringConfig) {
+      throw new Error("Scoring config is required.");
+    }
     if (!this.colorsConfig || this.colorsConfig.length === 0) {
       throw new Error("At least one color is required.");
     }
@@ -209,6 +218,7 @@ export class GameplayBuilder {
     return {
       progression: this.progressionConfig,
       growth: this.growthConfig,
+      scoring: this.scoringConfig,
       modes: this.modesConfig as GameplayConfig["modes"],
       colors: this.colorsConfig,
       levels: this.levelsConfig,

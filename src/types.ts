@@ -31,6 +31,7 @@ export interface GameState {
   undoStack?: Shape[][]; // For Zen Mode - stores previous stacks of shapes
   isBossLevel?: boolean; // For Boss Mechanics
   runSeed: number;
+  rngState: number;
   styleScore: number;
   streak: number;
   bestStreak: number;

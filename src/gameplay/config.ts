@@ -3,6 +3,20 @@ import { DEFAULT_MECHANICS, GameplayBuilder } from "./builder";
 export const gameplayConfig = new GameplayBuilder()
   .progression({ stacksPerLevel: 3, levelsPerWorld: 5 })
   .growth({ minSpeed: 35, maxSpeed: 80, referenceInitialSize: 360 })
+  .scoring({
+    qualityThresholds: {
+      perfectMinRatio: 0.97,
+      greatMinRatio: 0.92,
+      goodMinRatio: 0.82,
+    },
+    qualityPoints: {
+      perfect: 140,
+      great: 90,
+      good: 50,
+      ok: 25,
+    },
+    streakBonusPerStack: 5,
+  })
   .modeTimeAttack({ startTime: 60, perfectStackBonus: 5 })
   .modeZen({ minClickRatio: 0.3, maxLives: 10 })
   .colors([

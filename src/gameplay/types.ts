@@ -70,6 +70,21 @@ export interface LevelConfig {
   unlocks?: ShapeType[];
 }
 
+export interface StyleScoringConfig {
+  qualityThresholds: {
+    perfectMinRatio: number;
+    greatMinRatio: number;
+    goodMinRatio: number;
+  };
+  qualityPoints: {
+    perfect: number;
+    great: number;
+    good: number;
+    ok: number;
+  };
+  streakBonusPerStack: number;
+}
+
 export interface GameplayConfig {
   progression: {
     stacksPerLevel: number;
@@ -90,6 +105,7 @@ export interface GameplayConfig {
       maxLives: number;
     };
   };
+  scoring: StyleScoringConfig;
   colors: string[];
   levels: Record<number, LevelConfig>;
   worlds: Record<number, WorldConfig>;

@@ -12,7 +12,18 @@ import { getWorldPalette } from "../visual/theme";
  * Get a random color different from the last used color.
  */
 export const getNextColor = (lastColor: string | null): string => {
-  let nextColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+  return getNextColorWithRoll(lastColor, Math.random());
+};
+
+/**
+ * Deterministic color picker using an injected random roll.
+ */
+export const getNextColorWithRoll = (
+  lastColor: string | null,
+  randomValue: number,
+): string => {
+  const clamped = Math.min(0.999999999, Math.max(0, randomValue));
+  let nextColor = COLORS[Math.floor(clamped * COLORS.length)];
   if (nextColor === lastColor) {
     const idx = COLORS.indexOf(nextColor);
     nextColor = COLORS[(idx + 1) % COLORS.length];
@@ -26,12 +37,14 @@ export const getNextColor = (lastColor: string | null): string => {
 export const getNextColorFromPalette = (
   palette: string[],
   lastColor: string | null,
+  randomValue: number = Math.random(),
 ): string => {
   if (palette.length === 0) {
-    return getNextColor(lastColor);
+    return getNextColorWithRoll(lastColor, randomValue);
   }
 
-  let nextColor = palette[Math.floor(Math.random() * palette.length)];
+  const clamped = Math.min(0.999999999, Math.max(0, randomValue));
+  let nextColor = palette[Math.floor(clamped * palette.length)];
   if (nextColor === lastColor) {
     const idx = palette.indexOf(nextColor);
     nextColor = palette[(idx + 1) % palette.length];
@@ -42,9 +55,13 @@ export const getNextColorFromPalette = (
 /**
  * Get a random shape type from the unlocked shapes at the given level.
  */
-export const getRandomShapeType = (level: number): ShapeType => {
+export const getRandomShapeType = (
+  level: number,
+  randomValue: number = Math.random(),
+): ShapeType => {
   const unlockedShapes = getUnlockedShapes(level);
-  return unlockedShapes[Math.floor(Math.random() * unlockedShapes.length)];
+  const clamped = Math.min(0.999999999, Math.max(0, randomValue));
+  return unlockedShapes[Math.floor(clamped * unlockedShapes.length)];
 };
 
 /**
@@ -104,11 +121,15 @@ export const createActiveShape = (
   world: number = 1,
   runSeed: number = 0,
   reducedFx: boolean = false,
+  randoms?: {
+    shapeRoll?: number;
+    colorRoll?: number;
+  },
 ): Shape => {
-  const type = getRandomShapeType(level);
+  const type = getRandomShapeType(level, randoms?.shapeRoll);
   const lastColor = lastShape?.color ?? null;
   const palette = getWorldPalette(world, runSeed, reducedFx);
-  const color = getNextColorFromPalette(palette, lastColor);
+  const color = getNextColorFromPalette(palette, lastColor, randoms?.colorRoll);
 
   // Start at a fraction of the last shape's size
   const startSize = lastShape ? lastShape.size * 0.05 : 10;

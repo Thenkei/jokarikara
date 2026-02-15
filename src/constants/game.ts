@@ -9,6 +9,9 @@ const config = getGameplayConfig();
 export const MIN_GROWTH_SPEED = config.growth.minSpeed;
 export const MAX_GROWTH_SPEED = config.growth.maxSpeed;
 export const REFERENCE_INITIAL_SIZE = config.growth.referenceInitialSize;
+export const STYLE_QUALITY_THRESHOLDS = config.scoring.qualityThresholds;
+export const STYLE_QUALITY_POINTS = config.scoring.qualityPoints;
+export const STYLE_STREAK_BONUS_PER_STACK = config.scoring.streakBonusPerStack;
 
 export const STACKS_PER_LEVEL = config.progression.stacksPerLevel;
 export const LEVELS_PER_WORLD = config.progression.levelsPerWorld;
