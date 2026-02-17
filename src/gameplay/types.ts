@@ -29,6 +29,14 @@ export interface WorldMechanics {
   /** Rotation inversion rules for stacked shapes */
   rotationInvertByLevel: boolean;
   rotationFlipOnBoss: boolean;
+
+  /** Fracture windows: rotating unsafe sectors near container boundary */
+  fractureWindows: boolean;
+  fractureSectorCount: number;
+  fractureSectorWidthDeg: number;
+  fractureBaseRotationSpeed: number; // radians/sec
+  fractureBandMinRatio: number; // active/container size ratio threshold
+  fractureDisableOnBoss: boolean;
 }
 
 export interface WorldVisualProfile {

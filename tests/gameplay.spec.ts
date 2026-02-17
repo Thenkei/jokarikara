@@ -27,6 +27,22 @@ const requireState = (
   return state;
 };
 
+const waitForFractureHazard = async (
+  bridge: ReturnType<typeof makeBridge>,
+  maxSteps: number = 180,
+  stepSeconds: number = 0.016,
+) => {
+  for (let step = 0; step < maxSteps; step += 1) {
+    const state = requireState(await bridge.getState());
+    if (state.fractureWillMissOnTap) {
+      return;
+    }
+    await bridge.setActiveSize((state.lastSize ?? 1) * 0.8);
+    await bridge.step(stepSeconds);
+  }
+  throw new Error("Timed out waiting for an active fracture hazard window.");
+};
+
 test.describe("Gameplay Deterministic", () => {
   test("classic: stacking awards score and increments stack count", async ({ page }) => {
     await page.goto("/");
@@ -99,6 +115,31 @@ test.describe("Gameplay Deterministic", () => {
     await expect(page.locator(".gameover-screen")).toBeVisible();
   });
 
+  test("classic: fracture hazard tap triggers game over in world 3", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.click(".start-btn");
+    await waitForBridge(page);
+
+    const bridge = makeBridge(page);
+    await bridge.pause();
+
+    for (let i = 0; i < 30; i += 1) {
+      await stackOnce(bridge);
+    }
+
+    const state = requireState(await bridge.getState());
+    expect(state.world).toBe(3);
+    expect(state.fractureActive).toBe(true);
+
+    await waitForFractureHazard(bridge);
+    await bridge.tap();
+    await bridge.step(0.016);
+
+    await expect(page.locator(".gameover-screen")).toBeVisible();
+  });
+
   test("time attack: timer reaching zero ends game", async ({ page }) => {
     await page.goto("/");
     await page.click('button:has-text("TIME")');
@@ -109,6 +150,32 @@ test.describe("Gameplay Deterministic", () => {
     await bridge.pause();
     await bridge.setTimeRemaining(0.01);
     await bridge.step(0.02);
+
+    await expect(page.locator(".gameover-screen")).toBeVisible();
+  });
+
+  test("time attack: fracture hazard tap triggers game over in world 3", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.click('button:has-text("TIME")');
+    await page.click(".start-btn");
+    await waitForBridge(page);
+
+    const bridge = makeBridge(page);
+    await bridge.pause();
+
+    for (let i = 0; i < 30; i += 1) {
+      await stackOnce(bridge);
+    }
+
+    const state = requireState(await bridge.getState());
+    expect(state.world).toBe(3);
+    expect(state.fractureActive).toBe(true);
+
+    await waitForFractureHazard(bridge);
+    await bridge.tap();
+    await bridge.step(0.016);
 
     await expect(page.locator(".gameover-screen")).toBeVisible();
   });

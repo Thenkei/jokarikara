@@ -1,4 +1,6 @@
 import type { MutableRefObject } from "react";
+import { getWorldMechanics } from "../constants/game";
+import { isFractureActive, isTapBlockedByFracture } from "../gameplay/fracture";
 import type { GameState } from "../types";
 import type { WorldTheme } from "../visual/theme";
 
@@ -20,6 +22,9 @@ export type GameTestBridgeState = {
   lastStackQuality: GameState["lastStackQuality"];
   themeId?: string;
   themePrimary?: string;
+  fractureActive?: boolean;
+  fractureWillMissOnTap?: boolean;
+  fractureSectorWidthDeg?: number;
 };
 
 export type GameTestBridge = {
@@ -110,6 +115,8 @@ const updateDiagnosticsPanel = (
     `lives: ${state.zenLivesRemaining ?? "-"}`,
     `quality: ${state.lastStackQuality ?? "-"}`,
     `theme: ${state.themeId ?? "-"}`,
+    `fracture: ${state.fractureActive ? "on" : "off"}`,
+    `fractureMiss: ${state.fractureWillMissOnTap ? "yes" : "no"}`,
   ].join("\n");
 };
 
@@ -131,6 +138,13 @@ export const installGameTestBridge = ({
       const state = stateRef.current;
       const lastShape = state?.shapes[state.shapes.length - 1];
       const theme = getTheme();
+      const fractureActive = state ? isFractureActive(state) : undefined;
+      const fractureWillMissOnTap = state
+        ? isTapBlockedByFracture(state, Date.now() / 1000)
+        : undefined;
+      const fractureSectorWidthDeg = state
+        ? getWorldMechanics(state.world).fractureSectorWidthDeg
+        : undefined;
       return {
         score: state?.score ?? 0,
         stackCount: state?.stackCount ?? 0,
@@ -149,6 +163,9 @@ export const installGameTestBridge = ({
         lastStackQuality: state?.lastStackQuality ?? null,
         themeId: theme?.id,
         themePrimary: theme?.hud.primary,
+        fractureActive,
+        fractureWillMissOnTap,
+        fractureSectorWidthDeg,
       };
     },
     setActiveSize: (size: number) => {

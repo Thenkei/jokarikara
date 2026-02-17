@@ -138,6 +138,69 @@ describe("shapeRenderer", () => {
 
       expect(ctx.rect).toHaveBeenCalledWith(-50, -50, 100, 100);
     });
+
+    it("should draw fracture sectors for container shape when overlay is provided", () => {
+      const ctx = createMockContext();
+      const shape: Shape = {
+        type: "circle",
+        size: 100,
+        rotation: 0,
+        color: "#ff0000",
+        opacity: 1,
+      };
+
+      drawShape(
+        ctx,
+        shape,
+        0,
+        0,
+        1,
+        defaultMechanics,
+        0,
+        true,
+        0,
+        true,
+        undefined,
+        {
+          centers: [0, Math.PI],
+          widthRad: Math.PI / 4,
+        },
+      );
+
+      // One arc for shape path + two arcs for fracture sectors.
+      expect(ctx.arc).toHaveBeenCalledTimes(3);
+    });
+
+    it("should not draw fracture sectors for non-container shapes", () => {
+      const ctx = createMockContext();
+      const shape: Shape = {
+        type: "circle",
+        size: 100,
+        rotation: 0,
+        color: "#ff0000",
+        opacity: 1,
+      };
+
+      drawShape(
+        ctx,
+        shape,
+        0,
+        0,
+        1,
+        defaultMechanics,
+        0,
+        true,
+        0,
+        false,
+        undefined,
+        {
+          centers: [0, Math.PI],
+          widthRad: Math.PI / 4,
+        },
+      );
+
+      expect(ctx.arc).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("clearCanvas", () => {

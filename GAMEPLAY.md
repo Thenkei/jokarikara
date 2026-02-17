@@ -62,7 +62,7 @@ After completing level 5, you advance to **World 2**, resetting the level counte
 | ----- | ---------------------- | ------------------------------------------------------------------------------ |
 | **1** | Baseline               | No special effects                                                             |
 | **2** | 🫁 Breathing           | Stacked shapes subtly pulse in size                                            |
-| **3** | 🚀 Accelerating Growth | Active shape grows faster with each stack in a level (1x → 1.25x → 1.5x)       |
+| **3** | 🚀 Growth + 🧨 Fractures | Active shape grows faster per stack, and rotating unsafe boundary sectors appear in Classic/Time modes. |
 | **4** | 🌊 Wave                | Stacked shapes sway horizontally (active shape stays stable for fair gameplay) |
 | **5** | 🌈 Color Shift         | Stacked shapes cycle through rainbow hues                                      |
 | **6** | 🌑 The Eclipse         | Background turns black; the container shape is invisible and pulses light.     |
@@ -70,6 +70,7 @@ After completing level 5, you advance to **World 2**, resetting the level counte
 | **8** | ↔️ Rotation Inversion  | Stack rotation direction flips by level and during boss levels.                |
 
 > **Note**: Effects are additive. World 5 includes all previous effects: breathing + accelerating growth + wave + color shift.
+> **Fracture Windows**: Fractures are checked only at tap time, are disabled during boss stacks, and do not change score multipliers.
 
 ## 🎵 Dynamic Audio
 

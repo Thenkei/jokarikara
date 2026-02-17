@@ -25,10 +25,22 @@ describe("gameplay config selectors", () => {
     expect(getWorldMechanics(6).eclipseEffect).toBe(true);
   });
 
+  it("introduces fracture windows in world 3", () => {
+    const world3 = getWorldMechanics(3);
+    expect(world3.fractureWindows).toBe(true);
+    expect(world3.fractureSectorCount).toBe(2);
+    expect(world3.fractureSectorWidthDeg).toBe(56);
+    expect(world3.fractureBaseRotationSpeed).toBe(0.9);
+    expect(world3.fractureBandMinRatio).toBe(0.78);
+    expect(world3.fractureDisableOnBoss).toBe(true);
+  });
+
   it("falls back to the highest defined world for out-of-range world numbers", () => {
     const fallback = getWorldMechanics(99);
     expect(fallback.gravityDrift).toBe(true);
     expect(fallback.rotationInvertByLevel).toBe(true);
+    expect(fallback.fractureWindows).toBe(true);
+    expect(fallback.fractureSectorCount).toBe(2);
   });
 
   it("exposes level zooms and shape unlocks", () => {
