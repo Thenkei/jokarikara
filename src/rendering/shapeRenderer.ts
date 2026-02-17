@@ -1,6 +1,7 @@
 import type { Shape } from "../utils/geometry";
 import { getStarVertices } from "../utils/geometry";
 import type { WorldMechanics } from "../constants/game";
+import type { FractureOverlay } from "../gameplay/fracture";
 import type { WorldTheme } from "../visual/theme";
 
 /**
@@ -129,6 +130,40 @@ const shiftHue = (hexColor: string, hueShift: number): string => {
   return `hsl(${h}, ${s * 100}%, ${l * 100}%)`;
 };
 
+const drawFractureOverlay = (
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  shapeRotation: number,
+  overlay: FractureOverlay,
+  reducedFx: boolean,
+): void => {
+  const radius = size / 2;
+  const halfWidth = overlay.widthRad / 2;
+
+  ctx.save();
+  ctx.strokeStyle = reducedFx
+    ? "rgba(255, 130, 130, 0.36)"
+    : "rgba(255, 108, 108, 0.78)";
+  ctx.lineWidth = reducedFx ? Math.max(4, size * 0.03) : Math.max(6, size * 0.045);
+  ctx.shadowBlur = reducedFx ? 0 : Math.max(10, size * 0.07);
+  ctx.shadowColor = reducedFx ? "rgba(0, 0, 0, 0)" : "rgba(255, 90, 90, 0.82)";
+
+  for (const center of overlay.centers) {
+    const correctedCenter = center - shapeRotation;
+    ctx.beginPath();
+    ctx.arc(
+      0,
+      0,
+      radius,
+      correctedCenter - halfWidth,
+      correctedCenter + halfWidth,
+    );
+    ctx.stroke();
+  }
+
+  ctx.restore();
+};
+
 /**
  * Draw a shape at the specified position with zoom.
  * @param ctx - Canvas context
@@ -153,6 +188,7 @@ export const drawShape = (
   stackIndex: number = 0,
   isContainer: boolean = false,
   theme?: WorldTheme,
+  fractureOverlay?: FractureOverlay,
 ): void => {
   ctx.save();
   ctx.translate(x, y);
@@ -248,6 +284,16 @@ export const drawShape = (
   ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
+
+  if (isContainer && fractureOverlay) {
+    drawFractureOverlay(
+      ctx,
+      size,
+      shape.rotation,
+      fractureOverlay,
+      theme?.reducedFx ?? false,
+    );
+  }
 
   ctx.restore();
 };

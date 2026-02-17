@@ -81,7 +81,15 @@ export const gameplayConfig = new GameplayBuilder()
         neonBias: 0.3,
         glowIntensity: 0.38,
       })
-      .mechanics({ growthPattern: "accelerating" }),
+      .mechanics({
+        growthPattern: "accelerating",
+        fractureWindows: true,
+        fractureSectorCount: 2,
+        fractureSectorWidthDeg: 56,
+        fractureBaseRotationSpeed: 0.9,
+        fractureBandMinRatio: 0.78,
+        fractureDisableOnBoss: true,
+      }),
   )
   .world(4, (w) =>
     w

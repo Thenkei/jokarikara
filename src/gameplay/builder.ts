@@ -23,6 +23,12 @@ export const DEFAULT_MECHANICS: WorldMechanics = {
   gravityDriftSpeed: 0,
   rotationInvertByLevel: false,
   rotationFlipOnBoss: false,
+  fractureWindows: false,
+  fractureSectorCount: 0,
+  fractureSectorWidthDeg: 0,
+  fractureBaseRotationSpeed: 0,
+  fractureBandMinRatio: 1,
+  fractureDisableOnBoss: true,
 };
 
 export class WorldBuilder {

@@ -10,6 +10,16 @@ export const makeBridge = (page: Page) => ({
     page.evaluate(
       () => window.__GAME_TEST__?.getState() as GameTestBridgeState | undefined,
     ),
+  isFractureActive: () =>
+    page.evaluate(() => {
+      const state = window.__GAME_TEST__?.getState();
+      return state?.fractureActive ?? false;
+    }),
+  willFractureMissOnTap: () =>
+    page.evaluate(() => {
+      const state = window.__GAME_TEST__?.getState();
+      return state?.fractureWillMissOnTap ?? false;
+    }),
   tap: () => page.evaluate(() => window.__GAME_TEST__?.tap()),
   pause: () => page.evaluate(() => window.__GAME_TEST__?.pause()),
   resume: () => page.evaluate(() => window.__GAME_TEST__?.resume()),

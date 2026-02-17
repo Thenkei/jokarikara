@@ -24,6 +24,7 @@ import {
   drawBackground,
   clearCanvas,
 } from "../rendering/shapeRenderer";
+import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture";
 import { installGameTestBridge } from "../utils/testBridge";
 import { getWorldTheme } from "../visual/theme";
 
@@ -179,6 +180,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         return;
       }
 
+      const tapTimeSec = Date.now() / 1000;
+      if (isTapBlockedByFracture(state, tapTimeSec)) {
+        miss();
+        return;
+      }
+
       // Stack the shape
       const result = stackActiveShape(stateRef.current);
       stateRef.current = result.state;
@@ -328,10 +335,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const mechanics = getWorldMechanics(state.world);
         const theme = getWorldTheme(state.world, state.runSeed, reducedFx);
         const timeInSeconds = timeMs / 1000;
+        const fractureOverlay = getFractureOverlay(state, Date.now() / 1000);
 
         drawBackground(ctx, width, height, pulse, mechanics, theme);
 
         state.shapes.forEach((shape, index) => {
+          const isContainer = index === state.shapes.length - 1;
           drawShape(
             ctx,
             shape,
@@ -342,8 +351,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             timeInSeconds,
             true, // isStacked
             index, // stackIndex
-            index === state.shapes.length - 1, // isContainer
+            isContainer,
             theme,
+            isContainer ? (fractureOverlay ?? undefined) : undefined,
           );
         });
 
