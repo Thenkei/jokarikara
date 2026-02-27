@@ -148,4 +148,95 @@ describe("GameCanvas", () => {
 
     expect(onZenLivesChange).toHaveBeenNthCalledWith(1, 10);
   });
+
+  it("plays the early-click sound in ZEN mode when the active shape is too small to stack", async () => {
+    // The active shape starts at 5 % of the container shape's size, which is
+    // well below ZEN_MIN_CLICK_RATIO (30 %), so clicking immediately should
+    // trigger the early-click feedback instead of a stack attempt.
+    const { container } = render(
+      <GameCanvas
+        mode="ZEN"
+        onScore={vi.fn()}
+        onGameOver={vi.fn()}
+        onLevelUp={vi.fn()}
+        onWorldUp={vi.fn()}
+        audioService={mockAudioService}
+      />
+    );
+
+    const canvas = container.querySelector("canvas");
+    if (!canvas) throw new Error("Canvas not found");
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    fireEvent.click(canvas);
+
+    expect(mockAudioService.playEarlyClickSound).toHaveBeenCalled();
+    expect(mockAudioService.playStackSound).not.toHaveBeenCalled();
+  });
+
+  it("fires onStyleUpdate with style data after a successful stack", async () => {
+    const onStyleUpdate = vi.fn();
+
+    const { container } = render(
+      <GameCanvas
+        onScore={vi.fn()}
+        onGameOver={vi.fn()}
+        onLevelUp={vi.fn()}
+        onWorldUp={vi.fn()}
+        onStyleUpdate={onStyleUpdate}
+        audioService={mockAudioService}
+      />
+    );
+
+    const canvas = container.querySelector("canvas");
+    if (!canvas) throw new Error("Canvas not found");
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    fireEvent.click(canvas);
+
+    expect(onStyleUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        styleScore: expect.any(Number),
+        streak: expect.any(Number),
+        bestStreak: expect.any(Number),
+        lastStackQuality: expect.any(String),
+      })
+    );
+  });
+
+  it("updates the canvas CSS dimensions when the window is resized", () => {
+    const { container } = render(
+      <GameCanvas
+        onScore={vi.fn()}
+        onGameOver={vi.fn()}
+        onLevelUp={vi.fn()}
+        onWorldUp={vi.fn()}
+        audioService={mockAudioService}
+      />
+    );
+
+    const canvas = container.querySelector("canvas");
+    if (!canvas) throw new Error("Canvas not found");
+
+    // Baseline: initial dimensions match window mock (1000 × 1000)
+    expect(canvas.style.width).toBe("1000px");
+    expect(canvas.style.height).toBe("1000px");
+
+    // Simulate a viewport resize
+    Object.defineProperty(window, "innerWidth", { value: 480, writable: true });
+    Object.defineProperty(window, "innerHeight", { value: 800, writable: true });
+
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    expect(canvas.style.width).toBe("480px");
+    expect(canvas.style.height).toBe("800px");
+  });
 });
