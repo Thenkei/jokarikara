@@ -180,6 +180,24 @@ export const gameplayConfig = new GameplayBuilder()
         rotationFlipOnBoss: true,
       }),
   )
+  .world(9, (w) =>
+    w
+      .inheritFrom(8)
+      .name("Reverse Stack")
+      .visualProfile({
+        hueCenter: 60,
+        hueSpread: 200,
+        saturationMin: 80,
+        saturationMax: 100,
+        lightnessMin: 46,
+        lightnessMax: 64,
+        neonBias: 0.95,
+        glowIntensity: 0.88,
+      })
+      .mechanics({
+        reverseStacking: true,
+      }),
+  )
   .boss(5, {
     type: "hexagon",
     growthSpeedMultiplier: 1.5,

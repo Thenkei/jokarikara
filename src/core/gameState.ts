@@ -75,6 +75,7 @@ export const createInitialState = (
     zoom: getZoomForLevel(1),
     targetZoom: getZoomForLevel(1),
     initialSize: initialShape.size,
+    viewportSize,
     currentSpeed: MIN_GROWTH_SPEED,
     isGameOver: false,
     mode,
@@ -279,12 +280,41 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
 };
 
 /**
+ * Check if the active shape exceeds the screen boundary.
+ * Returns true if the shape is within bounds.
+ */
+export const checkScreenBounds = (state: GameState): boolean => {
+  if (!state.activeShape) return true;
+  const maxRadius = state.viewportSize / (2 * state.zoom);
+  const vertices = getVertices(state.activeShape);
+  const offset = state.activeOffset ?? { x: 0, y: 0 };
+  return vertices.every((v) => {
+    const vx = v.x + offset.x;
+    const vy = v.y + offset.y;
+    return Math.abs(vx) <= maxRadius && Math.abs(vy) <= maxRadius;
+  });
+};
+
+/**
  * Check if the active shape is still contained within the last stacked shape.
+ * In reverse stacking mode, checks that the active shape contains the last shape
+ * and hasn't exceeded the screen boundary.
  */
 export const checkContainment = (state: GameState): boolean => {
   if (!state.activeShape) return true;
+  const mechanics = getWorldMechanics(state.world);
   const lastShape = state.shapes[state.shapes.length - 1];
   const offset = state.activeOffset;
+
+  if (mechanics.reverseStacking) {
+    // Reverse: fail if active shape exceeds screen boundary
+    if (!checkScreenBounds(state)) return false;
+    // Don't auto-fail while active is still smaller than last shape (still growing)
+    if (state.activeShape.size < lastShape.size) return true;
+    return true;
+  }
+
+  // Normal: active shape must be inside last stacked shape
   if (!offset || (offset.x === 0 && offset.y === 0)) {
     return isContained(state.activeShape, lastShape);
   }
@@ -319,8 +349,13 @@ export const stackActiveShape = (
     };
   }
 
+  const mechanics = getWorldMechanics(state.world);
   const lastShape = state.shapes[state.shapes.length - 1];
-  const sizeRatio = state.activeShape.size / lastShape.size;
+
+  // In reverse mode, quality is based on how tightly active contains previous
+  const sizeRatio = mechanics.reverseStacking
+    ? lastShape.size / state.activeShape.size
+    : state.activeShape.size / lastShape.size;
   const quality = getStackQuality(sizeRatio);
   const isPerfect = quality === "PERFECT";
   const awardedScore = STYLE_SCORE_BY_QUALITY[quality];
@@ -348,12 +383,27 @@ export const stackActiveShape = (
   let finalShapes = newShapes;
 
   if (worldUp) {
-    // Reset stack but keep the first shape as base
-    const firstShape = newShapes[0];
-    finalShapes = [{ ...firstShape, opacity: 1 }];
+    const newWorldMech = getWorldMechanics(newWorld);
+    if (newWorldMech.reverseStacking) {
+      // Reverse stacking world: start with a small central shape
+      const smallShape: Shape = {
+        ...newShapes[newShapes.length - 1],
+        size: state.viewportSize * 0.08,
+        opacity: 1,
+      };
+      finalShapes = [smallShape];
+    } else {
+      // Reset stack but keep the first shape as base
+      const firstShape = newShapes[0];
+      finalShapes = [{ ...firstShape, opacity: 1 }];
+    }
   }
 
-  const newTargetZoom = getZoomForLevel(newLevel);
+  // In reverse stacking worlds, keep zoom at 1.0
+  const newWorldMechanics = getWorldMechanics(newWorld);
+  const newTargetZoom = newWorldMechanics.reverseStacking
+    ? 1.0
+    : getZoomForLevel(newLevel);
   const styleEnabled = state.mode !== "ZEN";
   const streak = styleEnabled ? state.streak + 1 : state.streak;
   const styleIncrement = styleEnabled

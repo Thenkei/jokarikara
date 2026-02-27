@@ -25,6 +25,7 @@ export interface GameState {
   zoom: number;
   targetZoom: number;
   initialSize: number;
+  viewportSize: number;
   currentSpeed: number;
   isGameOver: boolean;
   mode: GameMode;

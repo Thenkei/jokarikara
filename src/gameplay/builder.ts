@@ -23,6 +23,7 @@ export const DEFAULT_MECHANICS: WorldMechanics = {
   gravityDriftSpeed: 0,
   rotationInvertByLevel: false,
   rotationFlipOnBoss: false,
+  reverseStacking: false,
 };
 
 export class WorldBuilder {
