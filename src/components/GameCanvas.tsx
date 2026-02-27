@@ -17,6 +17,7 @@ import {
   undoLastStack,
 } from "../core/gameState";
 import { getWorldMechanics, ZEN_MIN_CLICK_RATIO } from "../constants/game";
+import { isContained } from "../utils/geometry";
 import type { GameMode } from "../types";
 import { forwardRef, useImperativeHandle } from "react";
 import {
@@ -163,20 +164,29 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
       const state = stateRef.current;
       const lastShape = state.shapes[state.shapes.length - 1];
+      const mechanics = getWorldMechanics(state.world);
 
-      // Zen mode: require minimum size ratio to prevent spam-clicking
-      if (state.mode === "ZEN") {
-        const sizeRatio = state.activeShape!.size / lastShape.size;
-        if (sizeRatio < ZEN_MIN_CLICK_RATIO) {
-          audioService.playEarlyClickSound();
+      if (mechanics.reverseStacking) {
+        // Reverse mode: active must contain the last stacked shape
+        if (!isContained(lastShape, state.activeShape!)) {
+          miss();
           return;
         }
-      }
+      } else {
+        // Zen mode: require minimum size ratio to prevent spam-clicking
+        if (state.mode === "ZEN") {
+          const sizeRatio = state.activeShape!.size / lastShape.size;
+          if (sizeRatio < ZEN_MIN_CLICK_RATIO) {
+            audioService.playEarlyClickSound();
+            return;
+          }
+        }
 
-      // Check if active shape is contained
-      if (!checkContainment(stateRef.current)) {
-        miss();
-        return;
+        // Check if active shape is contained
+        if (!checkContainment(stateRef.current)) {
+          miss();
+          return;
+        }
       }
 
       // Stack the shape
@@ -331,38 +341,76 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         drawBackground(ctx, width, height, pulse, mechanics, theme);
 
-        state.shapes.forEach((shape, index) => {
-          drawShape(
-            ctx,
-            shape,
-            centerX,
-            centerY,
-            state.zoom,
-            mechanics,
-            timeInSeconds,
-            true, // isStacked
-            index, // stackIndex
-            index === state.shapes.length - 1, // isContainer
-            theme,
-          );
-        });
+        if (mechanics.reverseStacking) {
+          // Reverse stacking: draw active (biggest) first, then stacked from newest to oldest
+          if (state.activeShape) {
+            const offsetX = state.activeOffset?.x ?? 0;
+            const offsetY = state.activeOffset?.y ?? 0;
+            drawShape(
+              ctx,
+              state.activeShape,
+              centerX + offsetX,
+              centerY + offsetY,
+              state.zoom,
+              mechanics,
+              timeInSeconds,
+              false,
+              state.shapes.length,
+              false,
+              theme,
+            );
+          }
+          // Draw stacked shapes from newest (biggest) to oldest (smallest)
+          for (let i = state.shapes.length - 1; i >= 0; i--) {
+            drawShape(
+              ctx,
+              state.shapes[i],
+              centerX,
+              centerY,
+              state.zoom,
+              mechanics,
+              timeInSeconds,
+              true,
+              i,
+              i === 0, // In reverse, the innermost (first) shape is the "container" reference
+              theme,
+            );
+          }
+        } else {
+          // Normal: draw stacked oldest to newest, then active on top
+          state.shapes.forEach((shape, index) => {
+            drawShape(
+              ctx,
+              shape,
+              centerX,
+              centerY,
+              state.zoom,
+              mechanics,
+              timeInSeconds,
+              true,
+              index,
+              index === state.shapes.length - 1,
+              theme,
+            );
+          });
 
-        if (state.activeShape) {
-          const offsetX = state.activeOffset?.x ?? 0;
-          const offsetY = state.activeOffset?.y ?? 0;
-          drawShape(
-            ctx,
-            state.activeShape,
-            centerX + offsetX,
-            centerY + offsetY,
-            state.zoom,
-            mechanics,
-            timeInSeconds,
-            false, // NOT stacked (active)
-            state.shapes.length, // stackIndex for phase offset
-            false,
-            theme,
-          );
+          if (state.activeShape) {
+            const offsetX = state.activeOffset?.x ?? 0;
+            const offsetY = state.activeOffset?.y ?? 0;
+            drawShape(
+              ctx,
+              state.activeShape,
+              centerX + offsetX,
+              centerY + offsetY,
+              state.zoom,
+              mechanics,
+              timeInSeconds,
+              false,
+              state.shapes.length,
+              false,
+              theme,
+            );
+          }
         }
 
         ctx.restore();

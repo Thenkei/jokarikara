@@ -29,6 +29,9 @@ export interface WorldMechanics {
   /** Rotation inversion rules for stacked shapes */
   rotationInvertByLevel: boolean;
   rotationFlipOnBoss: boolean;
+
+  /** Reverse stacking: shapes expand outward, limit is the screen edge */
+  reverseStacking: boolean;
 }
 
 export interface WorldVisualProfile {
