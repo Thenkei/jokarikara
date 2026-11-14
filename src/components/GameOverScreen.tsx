@@ -6,6 +6,8 @@ import { QUALITY_ORDER } from "../modes/runInsights";
 import { formatDailyLabel } from "../modes/daily";
 import { LEVELS_PER_WORLD } from "../constants/game";
 import { getAchievement, type AchievementId } from "../progression/achievements";
+import type { DailyCountdown, DailyStreakLabel } from "../modes/dailyStreak";
+import { StreakChip } from "./StreakChip";
 
 export type ShareStatus = "idle" | "copied" | "shared" | "failed";
 
@@ -14,6 +16,14 @@ export interface DailyRunResult {
   best: number;
   attempts: number;
 }
+
+/**
+ * After a Daily: time left until the next one, or "ready" once the day the
+ * run was played has ended (RETRY then starts the new day's challenge).
+ */
+export type NextDailyStatus =
+  | { readonly kind: "countdown"; readonly countdown: DailyCountdown }
+  | { readonly kind: "ready" };
 
 /** What the game over screen knows about the run that just ended. */
 export interface GameOverRun {
@@ -43,6 +53,10 @@ interface GameOverScreenProps {
   endInsight: EndInsight | null;
   breakdown: QualityBreakdown;
   shareStatus: ShareStatus;
+  /** Daily runs only: current streak (null below two days). */
+  dailyStreak?: DailyStreakLabel | null;
+  /** Daily runs only: when the next challenge unlocks. */
+  nextDaily?: NextDailyStatus | null;
   onShare: () => void;
   onRetry: () => void;
   onMenu: () => void;
@@ -112,6 +126,8 @@ export function GameOverScreen({
   endInsight,
   breakdown,
   shareStatus,
+  dailyStreak = null,
+  nextDaily = null,
   onShare,
   onRetry,
   onMenu,
@@ -224,6 +240,25 @@ export function GameOverScreen({
                   BEST <strong>{run.daily.best}</strong> · {run.daily.attempts}{" "}
                   {run.daily.attempts === 1 ? "TRY" : "TRIES"}
                 </p>
+                {dailyStreak && (
+                  <p className="daily-summary-streak">
+                    <span className="visually-hidden">{dailyStreak.spoken}</span>
+                    <StreakChip label={dailyStreak} />
+                  </p>
+                )}
+                {nextDaily?.kind === "countdown" && (
+                  <p className="daily-next">
+                    <span aria-hidden="true">
+                      NEXT CHALLENGE IN <strong>{nextDaily.countdown.text}</strong>
+                    </span>
+                    <span className="visually-hidden">
+                      Next challenge in {nextDaily.countdown.spoken}.
+                    </span>
+                  </p>
+                )}
+                {nextDaily?.kind === "ready" && (
+                  <p className="daily-next daily-next--ready">NEXT CHALLENGE IS READY</p>
+                )}
               </div>
             ) : (
               <div className="leaderboard gameover-card">

@@ -58,6 +58,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/gameplay/timingCue.ts` - Opt-in timing cue (setting `timingCue`): pure reading/curve/stepper on the game clock, ticks via `playCue`; off in Heartbeat (its beat is the cue)
 - `src/gameplay/combo.ts` - Combo milestones (fanfare, banner, haptics)
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
+- `src/modes/dailyStreak.ts` - Daily habit loop: pure streak chip selection (≥2 days; kept vs at risk), next-local-midnight countdown (from date parts, DST-safe) and the Daily button view; `useWallClock.ts` ticks once a minute only while a countdown is shown (stops at midnight, then the button flips to the new day)
 - `src/modes/share.ts` - Share text for regular runs (mode, score, proportional emoji quality bar, game URL); reuses the Daily emoji legend
 - `src/modes/runInsights.ts` - Game over insights: why the run ended, stack quality breakdown
 - `src/modes/personalBest.ts` - "Chase your best": pure previous-best selection (mode top score; today's Daily best for a Daily; none for Zen/practice or a best of 0) and the one-shot crossing (strictly above); App keeps it in a ref, shows the HUD `BEST n` target, and on the crossing shows the banner, gold score pill, `playRecord` cue, `record` haptic and announcement once per run

@@ -1041,6 +1041,108 @@ button:focus-visible {
   font-size: 1.3rem;
 }
 
+/* Daily habit: streak chip + countdown to the next challenge */
+.daily-btn-extra {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.6rem;
+  margin-top: 0.15rem;
+}
+
+/*
+ * Phones: stack chip and countdown. (A wrapping row would still size the
+ * button to the unwrapped max-content width and stretch it edge to edge.)
+ */
+@media (max-width: 640px) {
+  .daily-btn-extra {
+    flex-direction: column;
+  }
+}
+
+.streak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.22rem 0.6rem 0.22rem 0.48rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 170, 60, 0.55);
+  background: rgba(255, 140, 30, 0.16);
+  color: #ffc163;
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.streak-flame {
+  width: 0.62rem;
+  height: 0.82rem;
+  flex: none;
+  color: #ff9a2e;
+}
+
+.streak-flame-core {
+  fill: #ffe08a;
+}
+
+/* Not extended today yet: an invitation, gently breathing (not a danger). */
+.streak-chip--at-risk {
+  border-style: dashed;
+  background: rgba(255, 140, 30, 0.08);
+  color: #ffd84d;
+  animation: streak-breathe 2.4s ease-in-out infinite;
+}
+
+.streak-chip--at-risk .streak-flame {
+  color: #d98a3a;
+}
+
+@keyframes streak-breathe {
+  0%,
+  100% {
+    border-color: rgba(255, 170, 60, 0.45);
+  }
+  50% {
+    border-color: rgba(255, 216, 77, 0.95);
+  }
+}
+
+.daily-next {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #b9b6c8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.daily-next strong {
+  color: #fff;
+  font-weight: 850;
+}
+
+.gameover-screen .daily-summary-streak,
+.gameover-screen .daily-next {
+  margin-top: 0.55rem;
+}
+
+.gameover-screen .daily-next {
+  font-size: 0.72rem;
+}
+
+.daily-next--ready {
+  color: #ffd84d;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streak-chip--at-risk {
+    animation: none;
+    border-color: rgba(255, 216, 77, 0.8);
+  }
+}
+
 .share-btn {
   padding: 0.75rem 1.8rem;
   font-size: 0.85rem;
