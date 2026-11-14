@@ -594,3 +594,146 @@ button:active {
     transform: translate(-50%, -54%) scale(1.04);
   }
 }
+
+/* Mode selection extras */
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mode-best {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #777;
+  font-variant-numeric: tabular-nums;
+}
+
+.mode-description {
+  min-height: 1.2em;
+  margin: 0;
+  font-size: 0.85rem;
+  color: #999;
+  letter-spacing: 0.04em;
+}
+
+/* Pause */
+.pause-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  padding: 0.38rem 0.72rem;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #d5dcea;
+  background: rgba(9, 13, 20, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.pause-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.pause-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  background: rgba(5, 7, 12, 0.78);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.pause-title {
+  font-size: clamp(2rem, 10vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.6rem;
+}
+
+.pause-overlay .menu-btn {
+  margin-top: 0;
+  min-width: 12rem;
+}
+
+.pause-resume-btn {
+  min-width: 12rem;
+  padding: 0.9rem 2rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  background: #fff;
+  color: #000;
+}
+
+/* Game over extras */
+.new-best-badge {
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #1a1200;
+  background: linear-gradient(90deg, #ffd34d, #ffb100);
+  box-shadow: 0 0 24px rgba(255, 190, 40, 0.45);
+  animation: fadeIn 0.4s ease-out;
+}
+
+.run-stats {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin: 0.8rem 0 0;
+}
+
+.run-stats dt {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: #777;
+}
+
+.run-stats dd {
+  margin: 0.2rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard li.current-best {
+  color: #ffd34d;
+  font-weight: 800;
+}
+
+/* Accessibility: keyboard focus ring */
+button:focus-visible {
+  outline: 2px solid #8cc2ff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .mode-selection {
+    gap: 0.5rem;
+  }
+
+  .mode-btn {
+    padding: 0.8rem 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .pause-overlay,
+  .new-best-badge {
+    animation: none;
+  }
+}
