@@ -1,5 +1,7 @@
 import type { StackQuality } from "../types";
 
+export type UiSoundKind = "select" | "confirm" | "back";
+
 /**
  * Soundtrack layers: 0 = drone only, 1 = + bass pulse, 2 = + arpeggio.
  */
@@ -62,6 +64,9 @@ export interface IAudioService {
 
   /** Heartbeat worlds: a soft thump on each beat of the growth pulse. */
   playHeartbeat(): void;
+
+  /** Short menu feedback: move/toggle, confirm/start, back/leave. */
+  playUi(kind: UiSoundKind): void;
 
   /** Combo milestone fanfare; `tier` 1..5 lengthens the run of notes. */
   playComboMilestone(tier: number, world: number): void;
