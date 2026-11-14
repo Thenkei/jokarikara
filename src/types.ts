@@ -3,6 +3,18 @@ import type { Shape, ShapeType } from "./utils/geometry";
 export type GameMode = "CLASSIC" | "ZEN" | "TIME_ATTACK";
 export type StackQuality = "PERFECT" | "GREAT" | "GOOD" | "OK";
 
+/** Why a stack attempt failed. */
+export type MissReason =
+  /** The growing shape crossed its limit (container edge or reverse arena). */
+  | "overflow"
+  /** A tap that did not fit (e.g. not yet wrapping in Reverse Stack). */
+  | "badTap"
+  /** A tap while a fracture sector crossed the growing shape. */
+  | "fracture";
+
+/** Why a run ended (shown on the game over screen). */
+export type EndReason = MissReason | "timeout" | "lives";
+
 export interface StyleUpdate {
   styleScore: number;
   streak: number;
@@ -41,6 +53,8 @@ export interface GameState {
    * gameplay.
    */
   elapsedTime: number;
+  /** Cause of the most recent miss (null until the first one). */
+  lastMissReason: MissReason | null;
   styleScore: number;
   streak: number;
   bestStreak: number;
@@ -74,6 +88,8 @@ export interface RunStats {
   bestStreak: number;
   /** Points awarded per stack, in order (drives the Daily share trail). */
   scoreHistory: readonly number[];
+  /** Why the run ended; null if it was left without a game over. */
+  endReason?: EndReason | null;
 }
 
 /**

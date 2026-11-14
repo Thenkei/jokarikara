@@ -23,6 +23,11 @@ import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
 import { getWorldPalette, getWorldTheme } from "./visual/theme";
 import { StartBackdrop } from "./components/StartBackdrop";
 import { getTimeBonus } from "./core/gameState";
+import {
+  getEndInsight,
+  getQualityBreakdown,
+  QUALITY_ORDER,
+} from "./modes/runInsights";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
   LEVELS_PER_WORLD,
@@ -663,6 +668,10 @@ function App() {
     </div>
   );
 
+  const endInsight = lastRun ? getEndInsight(lastRun.stats.endReason, world) : null;
+  const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
+  const breakdownTotal = QUALITY_ORDER.reduce((sum, q) => sum + breakdown[q], 0);
+
   return (
     <div className="game-container">
       {gameState === "START" && showAchievements && (
@@ -1006,6 +1015,34 @@ function App() {
               )}
             </dl>
           </div>
+          {endInsight && (
+            <div className="end-insight" role="status">
+              <p className="end-insight-title">{endInsight.title}</p>
+              <p className="end-insight-tip">{endInsight.tip}</p>
+            </div>
+          )}
+          {breakdownTotal > 0 && (
+            <div className="quality-breakdown" aria-label="Stack quality breakdown">
+              <div className="quality-breakdown-bar" aria-hidden="true">
+                {QUALITY_ORDER.map((q) =>
+                  breakdown[q] > 0 ? (
+                    <span
+                      key={q}
+                      className={`quality-segment quality-segment--${q.toLowerCase()}`}
+                      style={{ flexGrow: breakdown[q] }}
+                    />
+                  ) : null,
+                )}
+              </div>
+              <ul className="quality-breakdown-legend">
+                {QUALITY_ORDER.map((q) => (
+                  <li key={q} className={`quality-legend--${q.toLowerCase()}`}>
+                    {q} <strong>{breakdown[q]}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {lastRun && lastRun.achievements.length > 0 && (
             <div className="run-achievements">
               <h3>UNLOCKED THIS RUN</h3>

@@ -1411,3 +1411,76 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/* ---------- Game over insights ---------- */
+.end-insight {
+  max-width: 22rem;
+  margin-top: -0.5rem;
+}
+
+.end-insight-title {
+  color: #ffb3b3;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.end-insight-tip {
+  margin-top: 0.25rem;
+  color: #aab1be;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.quality-breakdown {
+  width: min(86vw, 20rem);
+}
+
+.quality-breakdown-bar {
+  display: flex;
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.quality-segment {
+  flex-basis: 0;
+  min-width: 4px;
+}
+
+.quality-segment--perfect,
+.quality-legend--perfect strong {
+  background: #ffe066;
+  color: #ffe066;
+}
+.quality-segment--great,
+.quality-legend--great strong {
+  background: #5ee6a8;
+  color: #5ee6a8;
+}
+.quality-segment--good,
+.quality-legend--good strong {
+  background: #6ea8ff;
+  color: #6ea8ff;
+}
+.quality-segment--ok,
+.quality-legend--ok strong {
+  background: #8b93a3;
+  color: #8b93a3;
+}
+
+.quality-breakdown-legend strong {
+  background: none;
+}
+
+.quality-breakdown-legend {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #8b93a3;
+}

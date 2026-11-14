@@ -1,4 +1,4 @@
-import type { GameState, StackQuality } from "../types";
+import type { EndReason, GameState, MissReason, StackQuality } from "../types";
 import type { Shape } from "../utils/geometry";
 import { createActiveShape, createInitialShapeForWorld } from "../shapes";
 import { getVertices, isContained, isPointInShape } from "../utils/geometry";
@@ -129,6 +129,7 @@ export const createInitialState = (
     runSeed,
     rngState: seedRng(runSeed),
     elapsedTime: 0,
+    lastMissReason: null,
     styleScore: 0,
     streak: 0,
     bestStreak: 0,
@@ -495,7 +496,29 @@ const resetActiveAfterMiss = (state: GameState): Shape | null =>
       }
     : null;
 
-export const handleMiss = (state: GameState): GameState => {
+export const handleMiss = (
+  state: GameState,
+  reason: MissReason = "overflow",
+): GameState => {
+  return handleMissInner({ ...state, lastMissReason: reason });
+};
+
+/**
+ * Why the run ended, from its final state. Mode-level causes (clock, lives)
+ * take precedence over the last miss that triggered them.
+ */
+export const getEndReason = (state: GameState): EndReason | null => {
+  if (!state.isGameOver) return null;
+  if (state.mode === "TIME_ATTACK" && (state.timeRemaining ?? 1) <= 0) {
+    return "timeout";
+  }
+  if (state.mode === "ZEN" && (state.zenLivesRemaining ?? 1) <= 0) {
+    return "lives";
+  }
+  return state.lastMissReason;
+};
+
+const handleMissInner = (state: GameState): GameState => {
   if (
     state.mode === "TIME_ATTACK" &&
     TIME_ATTACK_MISS_PENALTY !== undefined &&
