@@ -74,7 +74,26 @@ test("sound effects and music keep their mix relationships", async ({
       }
       return { peakDb: db(peak), rmsDb: db(Math.sqrt(best)), tailDb: db(Math.sqrt(tailMeanSquare)) };
     };
+    // Per-world palettes (src/audio/palette.ts): the gameplay feedback of
+    // every world, rendered the same way as world 1's reference above.
+    const worlds: {
+      world: number;
+      ok: Level;
+      perfect: Level;
+      levelUp: Level;
+      worldUp: Level;
+    }[] = [];
+    for (let world = 1; world <= 10; world += 1) {
+      worlds.push({
+        world,
+        ok: await measure(1.2, (a) => a.playStack("OK", 1, world)),
+        perfect: await measure(1.2, (a) => a.playStack("PERFECT", 1, world)),
+        levelUp: await measure(1.5, (a) => a.playLevelUp(world)),
+        worldUp: await measure(2.5, (a) => a.playWorldUp(world)),
+      });
+    }
     return {
+      worlds,
       ok: await measure(1.2, (a) => a.playStack("OK", 1, 1)),
       good: await measure(1.2, (a) => a.playStack("GOOD", 1, 1)),
       great: await measure(1.2, (a) => a.playStack("GREAT", 1, 1)),
@@ -105,7 +124,15 @@ test("sound effects and music keep their mix relationships", async ({
     };
   });
 
-  const all = Object.values(levels) as Level[];
+  const { worlds, ...effects } = levels;
+  await test.info().attach("per-world-levels.json", {
+    body: JSON.stringify(worlds, null, 2),
+    contentType: "application/json",
+  });
+  const all = [
+    ...(Object.values(effects) as Level[]),
+    ...worlds.flatMap((w) => [w.ok, w.perfect, w.levelUp, w.worldUp]),
+  ];
   // No clipping anywhere, including the worst simultaneous burst.
   for (const level of all) expect(level.peakDb).toBeLessThanOrEqual(-1);
 
@@ -154,4 +181,19 @@ test("sound effects and music keep their mix relationships", async ({
   expect(levels.perfect.tailDb).toBeGreaterThan(-60);
   expect(levels.uiSelect.tailDb).toBeLessThan(-55);
   expect(levels.perfect.tailDb).toBeGreaterThan(levels.uiSelect.tailDb + 5);
+
+  // Per-world palettes change the timbre, not the mix: every world's stack,
+  // level up and world up stays within ±2 dB of world 1, and a PERFECT still
+  // reads louder than an OK everywhere. World 1 is the unshaped baseline.
+  const [origin] = worlds;
+  expect(origin.ok.rmsDb).toBeCloseTo(levels.ok.rmsDb, 5);
+  expect(origin.perfect.rmsDb).toBeCloseTo(levels.perfect.rmsDb, 5);
+  expect(origin.levelUp.rmsDb).toBeCloseTo(levels.levelUp.rmsDb, 5);
+  for (const w of worlds) {
+    const where = `world ${w.world}`;
+    for (const key of ["ok", "perfect", "levelUp", "worldUp"] as const) {
+      expect(Math.abs(w[key].rmsDb - origin[key].rmsDb), `${where} ${key}`).toBeLessThanOrEqual(2);
+    }
+    expect(w.perfect.rmsDb, where).toBeGreaterThan(w.ok.rmsDb);
+  }
 });
