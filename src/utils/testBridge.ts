@@ -48,6 +48,8 @@ export type CueCall = { step: number; inWindow: boolean };
 /** E2E-only, read-only view of the audio service (outlives GameCanvas). */
 export type AudioTestBridge = {
   getMusicState: () => MusicState;
+  /** AudioContext state (`null` before the first sound/gesture creates it). */
+  getContextState: () => AudioContextState | null;
   /** Every `playCue` call the audio service received, oldest first. */
   getCueCalls: () => CueCall[];
   clearCueCalls: () => void;
@@ -257,6 +259,7 @@ export const installAudioTestBridge = (
   };
   window.__GAME_AUDIO__ = {
     getMusicState: () => audio.getMusicState(),
+    getContextState: () => audio.getContextState(),
     getCueCalls: () => cueCalls.slice(),
     clearCueCalls: () => {
       cueCalls.length = 0;

@@ -72,7 +72,18 @@ export const makeMockAudioContext = () => {
     sampleRate: 44100,
     state: "running" as AudioContextState,
     destination: {},
-    resume: vi.fn().mockResolvedValue(undefined),
+    // Like the real thing, `state` only changes once the promise settles
+    // (await a tick, e.g. `await Promise.resolve()`, to observe it).
+    resume: vi.fn(() =>
+      Promise.resolve().then(() => {
+        if (ctx.state !== "closed") ctx.state = "running";
+      }),
+    ),
+    suspend: vi.fn(() =>
+      Promise.resolve().then(() => {
+        if (ctx.state !== "closed") ctx.state = "suspended";
+      }),
+    ),
     createOscillator: vi.fn(() => {
       const osc: MockOscillator = track({
         kind: "oscillator",
