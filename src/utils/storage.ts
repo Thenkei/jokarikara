@@ -1,4 +1,11 @@
 import type { GameMode } from "../types";
+import {
+  EMPTY_LIFETIME_STATS,
+  MAX_TRACKED_DAILY_DATES,
+  isAchievementId,
+  type AchievementId,
+  type LifetimeStats,
+} from "../progression/achievements";
 
 export interface HighScore {
   score: number;
@@ -14,6 +21,7 @@ const LEGACY_STORAGE_KEY = "shape-stack-high-scores-v2";
 const STORAGE_KEY = "shape-stack-high-scores-v3";
 const SETTINGS_STORAGE_KEY = "shape-stack-settings";
 const DAILY_STORAGE_KEY = "shape-stack-daily-v1";
+const ACHIEVEMENTS_STORAGE_KEY = "shape-stack-achievements-v1";
 /** Daily records older than this many entries are pruned (oldest first). */
 export const MAX_DAILY_RECORDS = 30;
 export const MAX_HIGH_SCORES = 5;
@@ -210,4 +218,107 @@ export const saveDailyResult = (
     console.error("Failed to save daily result", e);
   }
   return { ...next, isNewBest: score > 0 && score > previous.best };
+};
+
+// ---------------------------------------------------------------------------
+// Achievements
+// ---------------------------------------------------------------------------
+
+export interface AchievementRecord {
+  /** Unlock time (epoch ms) per achievement; doubles as an audit trail. */
+  unlocked: Partial<Record<AchievementId, number>>;
+  lifetime: LifetimeStats;
+}
+
+export const createEmptyAchievementRecord = (): AchievementRecord => ({
+  unlocked: {},
+  lifetime: { ...EMPTY_LIFETIME_STATS, dailyDates: [] },
+});
+
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const toCount = (value: unknown): number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+
+const parseUnlocked = (value: unknown): AchievementRecord["unlocked"] => {
+  if (!isRecordObject(value)) return {};
+  const unlocked: AchievementRecord["unlocked"] = {};
+  for (const [id, at] of Object.entries(value)) {
+    // Unknown ids (catalogue shrank, tampered data) are dropped.
+    if (isAchievementId(id) && typeof at === "number" && Number.isFinite(at) && at >= 0) {
+      unlocked[id] = at;
+    }
+  }
+  return unlocked;
+};
+
+const parseDailyDates = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? [
+        ...new Set(
+          value.filter(
+            (d): d is string => typeof d === "string" && DATE_KEY_PATTERN.test(d),
+          ),
+        ),
+      ]
+        .sort()
+        .slice(-MAX_TRACKED_DAILY_DATES)
+    : [];
+
+const parseLifetime = (value: unknown): LifetimeStats => {
+  if (!isRecordObject(value)) return createEmptyAchievementRecord().lifetime;
+  return {
+    totalStacks: toCount(value.totalStacks),
+    totalPerfects: toCount(value.totalPerfects),
+    runsPlayed: toCount(value.runsPlayed),
+    bossStacksCleared: toCount(value.bossStacksCleared),
+    bestPerfectRun: toCount(value.bestPerfectRun),
+    bestCombo: toCount(value.bestCombo),
+    bestZenStacks: toCount(value.bestZenStacks),
+    bestTimeAttackScore: toCount(value.bestTimeAttackScore),
+    dailyDates: parseDailyDates(value.dailyDates),
+  };
+};
+
+/**
+ * Reads the achievement record. Validation is per field: a corrupted field
+ * falls back to its default without discarding the valid ones, and
+ * unparseable JSON (or a storage access failure) yields the empty record.
+ * Never throws.
+ */
+export const getAchievementRecord = (): AchievementRecord => {
+  try {
+    const raw = localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY);
+    if (!raw) return createEmptyAchievementRecord();
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecordObject(parsed)) return createEmptyAchievementRecord();
+    return {
+      unlocked: parseUnlocked(parsed.unlocked),
+      lifetime: parseLifetime(parsed.lifetime),
+    };
+  } catch (e) {
+    console.error("Failed to load achievements", e);
+    return createEmptyAchievementRecord();
+  }
+};
+
+/**
+ * Read-modify-write against the stored record (not a cached copy), so
+ * another tab's unlocks and lifetime increments are merged rather than
+ * clobbered. Returns the updated record even when persisting fails. Never
+ * throws.
+ */
+export const updateAchievementRecord = (
+  update: (current: AchievementRecord) => AchievementRecord,
+): AchievementRecord => {
+  const next = update(getAchievementRecord());
+  try {
+    localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(next));
+  } catch (e) {
+    console.error("Failed to save achievements", e);
+  }
+  return next;
 };

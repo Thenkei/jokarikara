@@ -52,7 +52,8 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/audio/soundtrack.ts` + `src/audio/musicEngine.ts` - Dynamic soundtrack: pure layer/tempo rules and the engine (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
 - `src/rendering/effects.ts` - Pure, dt-based canvas juice (rings, particles, shake, flash); never touches gameplay state
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
-- `src/utils/storage.ts` - localStorage: per-mode high scores, daily records, settings (all validated on read)
+- `src/utils/storage.ts` - localStorage: per-mode high scores, daily records, settings, achievements (all validated on read)
+- `src/progression/achievements.ts` - Achievement catalogue, named thresholds, pure `evaluate(run, lifetime)` and run/lifetime reducers; `useAchievements.ts` is the React glue (run state in refs, fed by `GameCanvas`'s `onStack`/`onMiss`, re-renders only on unlock)
 
 ### World Mechanics (src/gameplay/config.ts)
 Each world (1-8) introduces cumulative effects:

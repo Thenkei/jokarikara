@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent 
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
 import { getMusicIntensity } from "../audio/soundtrack";
-import type { GameState, RunStats, StyleUpdate } from "../types";
+import type { GameState, RunStats, StackEvent, StackQuality, StyleUpdate } from "../types";
 import {
   createInitialState,
   spawnActiveShape,
@@ -90,6 +90,10 @@ interface GameCanvasProps {
   onTimeUpdate?: (time: number) => void;
   onStyleUpdate?: (style: StyleUpdate) => void;
   onZenLivesChange?: (lives: number | null) => void;
+  /** After every successful stack (taps and the e2e bridge alike). */
+  onStack?: (event: StackEvent) => void;
+  /** After a miss; `terminal` is true when it ended the run. */
+  onMiss?: (terminal: boolean) => void;
   /** Optional audio service for dependency injection (testing) */
   audioService?: IAudioService;
 }
@@ -114,6 +118,22 @@ const toRunStats = (state: GameState): RunStats => ({
   scoreHistory: state.scoreHistory,
 });
 
+/** `wasBoss` must be read from the pre-stack state (spawn sets the flag). */
+const toStackEvent = (
+  stacked: GameState,
+  quality: StackQuality,
+  wasBoss: boolean,
+): StackEvent => ({
+  quality,
+  stackCount: stacked.stackCount,
+  perfectCount: stacked.perfectCount,
+  score: stacked.score,
+  world: stacked.world,
+  level: stacked.level,
+  streak: stacked.streak,
+  wasBoss,
+});
+
 /**
  * GameCanvas - Orchestrates the game loop and React lifecycle.
  * Delegates to extracted modules for state, rendering, and audio.
@@ -131,6 +151,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onTimeUpdate,
       onStyleUpdate,
       onZenLivesChange,
+      onStack,
+      onMiss,
       audioService = defaultAudioManager,
     },
     ref,
@@ -276,6 +298,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           : null,
       );
 
+      if (!wasGameOver) onMiss?.(stateRef.current.isGameOver);
+
       if (stateRef.current.isGameOver && !wasGameOver) {
         audioService.stopMusic();
         audioService.playFailSound();
@@ -299,7 +323,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           true,
         );
       }
-    }, [notifyGameOver, onStyleUpdate, onZenLivesChange, audioService, syncMusic]);
+    }, [
+      notifyGameOver,
+      onStyleUpdate,
+      onZenLivesChange,
+      onMiss,
+      audioService,
+      syncMusic,
+    ]);
 
     const handleTap = useCallback(() => {
       if (
@@ -344,6 +375,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         bestStreak: result.state.bestStreak,
         lastStackQuality: result.state.lastStackQuality,
       });
+      onStack?.(toStackEvent(result.state, result.quality, !!state.isBossLevel));
       // Zen has no combo streak; use the stack position so the melody still climbs.
       const melodyStep =
         result.state.mode === "ZEN"
@@ -394,6 +426,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onLevelUp,
       onWorldUp,
       onStyleUpdate,
+      onStack,
       miss,
       reducedFx,
       audioService,
@@ -409,6 +442,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         if (!stateRef.current || !stateRef.current.activeShape) return;
         const lastShape =
           stateRef.current.shapes[stateRef.current.shapes.length - 1];
+        const wasBoss = !!stateRef.current.isBossLevel;
         stateRef.current = {
           ...stateRef.current,
           activeShape: {
@@ -426,6 +460,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           bestStreak: result.state.bestStreak,
           lastStackQuality: result.state.lastStackQuality,
         });
+        onStack?.(toStackEvent(result.state, result.quality, wasBoss));
 
         if (result.leveledUp) {
           if (result.worldUp) {
@@ -441,7 +476,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         stateRef.current = spawnActiveShape(stateRef.current, reducedFx);
       },
-      [onScore, onLevelUp, onWorldUp, onStyleUpdate, reducedFx, syncMusic],
+      [onScore, onLevelUp, onWorldUp, onStyleUpdate, onStack, reducedFx, syncMusic],
     );
 
     const tick = useCallback(

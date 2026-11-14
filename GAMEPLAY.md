@@ -111,6 +111,25 @@ Effects are **cumulative**, and visual distortions only apply to stacked shapes,
   - `SOUND: ON/OFF`.
   - `FX: FULL/LOW`. LOW removes shake and particles and tones down glow. It defaults to LOW when your OS asks for reduced motion.
 
+## 🏆 Achievements
+
+Twelve achievements unlock as you play. Most unlock **live**, the moment you earn them, with a small `ACHIEVEMENT · Title` toast at the bottom of the screen (it never blocks taps). The rest are checked at game over. The game over screen lists everything unlocked during that run, and `ACHIEVEMENTS n/12` on the start screen opens the full list with progress counters.
+
+| Achievement | How to unlock |
+| --- | --- |
+| First Stack | Land your first shape. |
+| Perfect Alignment | 10 **PERFECT** stacks in a row (a lower grade, a Zen miss or an undo resets the count). |
+| Unbroken | Reach a x25 combo. |
+| New Horizons / Fault Lines / Prismatic | Reach World 2 / 3 / 5. |
+| Speed Demon | Reach level 5 in under 30 seconds of play (paused time does not count). |
+| Giant Slayer | Stack a boss shape. |
+| Zen Master | 30 stacks in a single Zen run. |
+| Time Lord | 3000 points in Time Attack. |
+| Daily Devotee | Play the Daily Challenge on 3 different days. |
+| Architect | 1000 stacks in total, across all modes. |
+
+Lifetime totals include runs you leave from the pause menu. Unlocks and lifetime totals are stored on the device.
+
 ---
 
 _Master the rhythm, time your taps, and build the ultimate shape stack!_

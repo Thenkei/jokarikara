@@ -33,6 +33,18 @@ import {
   getLocalDateKey,
   qualitiesFromScoreHistory,
 } from "./modes/daily";
+import {
+  ACHIEVEMENT_COUNT,
+  countUnlocked,
+  getAchievement,
+  type AchievementId,
+} from "./progression/achievements";
+import { useAchievements } from "./progression/useAchievements";
+import {
+  AchievementToaster,
+  type AchievementToasterHandle,
+} from "./components/AchievementToaster";
+import { AchievementsPanel } from "./components/AchievementsPanel";
 import "./App.css";
 
 const isE2eMode = (): boolean =>
@@ -86,6 +98,8 @@ interface LastRun {
   stats: RunStats;
   scores: HighScoresByMode[GameMode];
   daily: DailyRunResult | null;
+  /** Unlocked during this run (live and at game over). */
+  achievements: readonly AchievementId[];
 }
 
 type ShareStatus = "idle" | "copied" | "shared" | "failed";
@@ -166,9 +180,36 @@ function App() {
   const [showSecondaryHud, setShowSecondaryHud] = useState(false);
   const [lastQuality, setLastQuality] = useState<StackQuality | null>(null);
   const [qualityPulseId, setQualityPulseId] = useState(0);
+  const [showAchievements, setShowAchievements] = useState(false);
   const canvasRef = useRef<GameCanvasHandle>(null);
   const secondaryHudTimeoutRef = useRef<number | null>(null);
   const previousZenLivesRef = useRef<number | null>(null);
+  const toasterRef = useRef<AchievementToasterHandle>(null);
+  const worldRef = useRef(world);
+  const handleAchievementUnlock = useCallback(
+    (ids: readonly AchievementId[]) => toasterRef.current?.enqueue(ids),
+    []
+  );
+  const {
+    record: achievementRecord,
+    beginRun: beginAchievementRun,
+    recordStack: recordAchievementStack,
+    recordMiss: recordAchievementMiss,
+    recordUndo: recordAchievementUndo,
+    setPaused: setAchievementsPaused,
+    finishRun: finishAchievementRun,
+    abandonRun: abandonAchievementRun,
+  } = useAchievements({ onUnlock: handleAchievementUnlock });
+  const unlockedAchievementCount = countUnlocked(achievementRecord.unlocked);
+
+  useEffect(() => {
+    worldRef.current = world;
+  }, [world]);
+
+  // Reuse the level-up arpeggio (in the current world's key) as the cue.
+  const playAchievementCue = useCallback(() => {
+    audioManager.playLevelUp(worldRef.current);
+  }, []);
   const worldTheme = useMemo(
     () => getWorldTheme(world, runSeed, reducedFx),
     [world, runSeed, reducedFx]
@@ -222,6 +263,9 @@ function App() {
     const initialZenLives = runMode === "ZEN" ? ZEN_MAX_LIVES : null;
     const todayKey = daily ? getLocalDateKey() : null;
 
+    // Commits a run left from the pause menu (RESTART) before starting anew.
+    beginAchievementRun(runMode, todayKey);
+    setShowAchievements(false);
     setMode(runMode);
     setDailyKey(todayKey);
     setShareStatus("idle");
@@ -256,6 +300,12 @@ function App() {
       finalLevel: number,
       stats: RunStats = EMPTY_STATS
     ) => {
+      const achievements = finishAchievementRun({
+        score: finalScore,
+        world: finalWorld,
+        level: finalLevel,
+        stats,
+      });
       if (dailyKey) {
         // Daily runs have their own per-day record and stay out of the
         // Classic leaderboard (a known seed would skew it).
@@ -267,11 +317,12 @@ function App() {
           stats,
           scores: allScores[mode],
           daily: { dateKey: dailyKey, best: result.best, attempts: result.attempts },
+          achievements,
         });
       } else {
         const { scores, isNewBest } = saveHighScore(finalScore, mode);
         setAllScores((current) => ({ ...current, [mode]: scores }));
-        setLastRun({ mode, isNewBest, stats, scores, daily: null });
+        setLastRun({ mode, isNewBest, stats, scores, daily: null, achievements });
       }
       setPaused(false);
       setScore(finalScore);
@@ -281,7 +332,7 @@ function App() {
       setShowSecondaryHud(false);
       setGameState("GAMEOVER");
     },
-    [clearSecondaryHudTimeout, mode, dailyKey, allScores]
+    [clearSecondaryHudTimeout, mode, dailyKey, allScores, finishAchievementRun]
   );
 
   const handleScore = useCallback((newScore: number) => {
@@ -329,10 +380,15 @@ function App() {
     [revealSecondaryHud]
   );
 
-  const applyPaused = useCallback((next: boolean) => {
-    setPaused(next);
-    canvasRef.current?.setPaused(next);
-  }, []);
+  const applyPaused = useCallback(
+    (next: boolean) => {
+      setPaused(next);
+      canvasRef.current?.setPaused(next);
+      // Paused time does not count towards play-time achievements.
+      setAchievementsPaused(next);
+    },
+    [setAchievementsPaused]
+  );
 
   const handleRestartShape = () => {
     canvasRef.current?.restartShape();
@@ -341,6 +397,7 @@ function App() {
 
   const handleUndo = () => {
     canvasRef.current?.undo();
+    recordAchievementUndo();
     revealSecondaryHud();
   };
 
@@ -383,6 +440,8 @@ function App() {
   };
 
   const handleMainMenu = () => {
+    // No-op after a game over (already committed); counts an abandoned run.
+    abandonAchievementRun();
     setPaused(false);
     setDailyKey(null);
     setTodayRecord(getDailyRecord(getLocalDateKey()));
@@ -414,6 +473,15 @@ function App() {
         if (event.repeat || paused) return;
         canvasRef.current?.tap();
       }
+      return;
+    }
+
+    if (gameState === "START" && showAchievements) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setShowAchievements(false);
+      }
+      // Enter must not start a run from behind the panel.
       return;
     }
 
@@ -464,7 +532,14 @@ function App() {
 
   return (
     <div className="game-container">
-      {gameState === "START" && (
+      {gameState === "START" && showAchievements && (
+        <AchievementsPanel
+          record={achievementRecord}
+          onClose={() => setShowAchievements(false)}
+        />
+      )}
+
+      {gameState === "START" && !showAchievements && (
         <div className="screen start-screen">
           <h1 className="title">SHAPE STACK</h1>
           <p className="subtitle">Tap to stack. Don't overlap.</p>
@@ -510,6 +585,14 @@ function App() {
                 : "NOT PLAYED"}
             </span>
           </button>
+
+          <button
+            className="achievements-btn"
+            onClick={() => setShowAchievements(true)}
+            aria-label={`Achievements: ${unlockedAchievementCount} of ${ACHIEVEMENT_COUNT} unlocked`}
+          >
+            ACHIEVEMENTS {unlockedAchievementCount}/{ACHIEVEMENT_COUNT}
+          </button>
         </div>
       )}
 
@@ -532,6 +615,8 @@ function App() {
               onTimeUpdate={handleTimeUpdate}
               onStyleUpdate={handleStyleUpdate}
               onZenLivesChange={handleZenLivesChange}
+              onStack={recordAchievementStack}
+              onMiss={recordAchievementMiss}
             />
           </div>
 
@@ -745,6 +830,16 @@ function App() {
               )}
             </dl>
           </div>
+          {lastRun && lastRun.achievements.length > 0 && (
+            <div className="run-achievements">
+              <h3>UNLOCKED THIS RUN</h3>
+              <ul>
+                {lastRun.achievements.map((id) => (
+                  <li key={id}>{getAchievement(id).title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {lastRun?.daily ? (
             <div className="leaderboard daily-summary">
               <h3>TODAY</h3>
@@ -793,6 +888,8 @@ function App() {
           </button>
         </div>
       )}
+
+      <AchievementToaster ref={toasterRef} onShow={playAchievementCue} />
     </div>
   );
 }
