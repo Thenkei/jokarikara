@@ -1188,3 +1188,25 @@ button:focus-visible {
   color: #e6e8f0;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
 }
+
+/* ---------- Settings (pause menu + start screen) ---------- */
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.settings-row--pause {
+  margin-top: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.settings-row .fx-toggle-btn,
+.settings-row .mute-toggle-btn,
+.settings-row .music-toggle-btn {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.68rem;
+  min-height: 2.25rem; /* comfortable touch target */
+}

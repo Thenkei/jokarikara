@@ -266,10 +266,9 @@ test.describe("Gameplay Deterministic", () => {
 
   test("reduced fx toggle persists between runs", async ({ page }) => {
     await page.goto("/");
-    await page.click(".start-btn");
-    await waitForBridge(page);
 
-    const fxToggle = page.locator(".fx-toggle-btn");
+    // Settings live on the start screen and in the pause menu, not the HUD.
+    const fxToggle = page.locator(".start-screen .fx-toggle-btn");
     await expect(fxToggle).toHaveText("FX: FULL");
     await fxToggle.click();
     await expect(fxToggle).toHaveText("FX: LOW");
@@ -278,6 +277,10 @@ test.describe("Gameplay Deterministic", () => {
       window.localStorage.getItem("shape-stack-settings"),
     );
     expect(stored).toContain('"reducedFx":true');
+
+    await page.click(".start-btn");
+    await waitForBridge(page);
+    await expect(page.locator(".hud .fx-toggle-btn")).toHaveCount(0);
 
     const bridge = makeBridge(page);
     await bridge.pause();
@@ -288,6 +291,8 @@ test.describe("Gameplay Deterministic", () => {
     await expect(page.locator(".gameover-screen")).toBeVisible();
     await page.click(".retry-btn");
     await waitForBridge(page);
-    await expect(page.locator(".fx-toggle-btn")).toHaveText("FX: LOW");
+    await makeBridge(page).pause();
+    await page.click(".pause-btn");
+    await expect(page.locator(".pause-overlay .fx-toggle-btn")).toHaveText("FX: LOW");
   });
 });

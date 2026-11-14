@@ -64,26 +64,43 @@ test.describe("Dynamic soundtrack", () => {
     expect(await getMusicState(page)).toMatchObject({ active: false, playing: false });
   });
 
-  test("mute and music toggles silence the soundtrack mid-run", async ({ page }) => {
+  test("mute and music toggles in the pause menu silence the soundtrack", async ({
+    page,
+  }) => {
     await page.goto("/");
     await page.click(".start-btn");
     await waitForBridge(page);
     const bridge = makeBridge(page);
     await bridge.pause();
-    await bridge.forceStack(0.95); // reveals the secondary HUD
 
-    const mute = page.locator(".mute-toggle-btn");
+    const openPause = async () => {
+      await page.click(".pause-btn");
+      await expect(page.locator(".pause-overlay")).toBeVisible();
+    };
+    const resume = async () => {
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".pause-overlay")).toBeHidden();
+    };
+
+    const mute = page.locator(".pause-overlay .mute-toggle-btn");
+    await openPause();
     await mute.click();
     await expect(mute).toHaveText("SOUND: OFF");
+    await resume();
     expect((await getMusicState(page))?.playing).toBe(false);
+
+    await openPause();
     await mute.click();
     await expect(mute).toHaveText("SOUND: ON");
+    await resume();
     expect((await getMusicState(page))?.playing).toBe(true);
 
-    const music = page.locator(".music-toggle-btn");
+    const music = page.locator(".pause-overlay .music-toggle-btn");
+    await openPause();
     await expect(music).toHaveText("MUSIC: ON");
     await music.click();
     await expect(music).toHaveText("MUSIC: OFF");
+    await resume();
     expect(await getMusicState(page)).toMatchObject({ enabled: false, playing: false });
     expect(
       await page.evaluate(() => window.localStorage.getItem("shape-stack-settings")),
@@ -97,9 +114,10 @@ test.describe("Dynamic soundtrack", () => {
     await waitForBridge(page);
     expect(await getMusicState(page)).toMatchObject({ active: true, playing: false });
     await makeBridge(page).pause();
-    await makeBridge(page).forceStack(0.95);
-    await expect(page.locator(".music-toggle-btn")).toHaveText("MUSIC: OFF");
-    await page.locator(".music-toggle-btn").click();
+    await openPause();
+    await expect(music).toHaveText("MUSIC: OFF");
+    await music.click();
+    await resume();
     expect((await getMusicState(page))?.playing).toBe(true);
   });
 });
