@@ -2093,6 +2093,17 @@ button:focus-visible {
   text-shadow: 0 0 10px rgba(255, 90, 36, 0.5);
 }
 
+/*
+ * The record accent is celebratory, not a warning, so Mono keeps it in the
+ * tint (like PERFECT, NEW BEST and the toasts): the score still pops and the
+ * banner still says it. Its border/glow are restated in the tint because the
+ * score pill is left unfiltered while a critical badge shares its row (rule 2).
+ */
+.game-container[data-theme="mono"] .hud-primary.is-record {
+  border-color: rgba(150, 255, 190, 0.75);
+  box-shadow: 0 0 14px rgba(80, 255, 150, 0.3);
+}
+
 .game-container[data-theme="mono"] .timer-badge.critical,
 .game-container[data-theme="mono"] .lives-badge.critical {
   color: #fff1ea;
