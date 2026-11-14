@@ -101,13 +101,13 @@ describe("storage", () => {
 
   describe("getSettings", () => {
     it("returns the default settings when nothing is stored", () => {
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true, timingCue: false });
     });
 
     it("returns stored settings with reducedFx: true", () => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ reducedFx: true }));
 
-      expect(getSettings()).toEqual({ reducedFx: true, muted: false, music: true, haptics: true });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: false, music: true, haptics: true, timingCue: false });
     });
 
     it("falls back to the default for reducedFx when the stored value is not a boolean", () => {
@@ -128,7 +128,7 @@ describe("storage", () => {
     it("returns the default settings when JSON is corrupted", () => {
       localStorage.setItem(SETTINGS_KEY, "{{bad");
 
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true, timingCue: false });
     });
   });
 
@@ -150,7 +150,7 @@ describe("storage", () => {
       saveSettings({ reducedFx: true, muted: true });
       saveSettings({ music: false });
 
-      expect(getSettings()).toEqual({ reducedFx: true, muted: true, music: false, haptics: true });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: true, music: false, haptics: true, timingCue: false });
     });
 
     it("does not throw when localStorage.setItem throws", () => {
@@ -290,5 +290,41 @@ describe("haptics setting", () => {
   it("ignores a non-boolean stored value", () => {
     localStorage.setItem("shape-stack-settings", JSON.stringify({ haptics: "no" }));
     expect(getSettings().haptics).toBe(true);
+  });
+});
+
+describe("timing cue setting", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to off", () => {
+    expect(getSettings().timingCue).toBe(false);
+  });
+
+  it("keeps settings saved before the cue existed (off, others intact)", () => {
+    localStorage.setItem(
+      "shape-stack-settings",
+      JSON.stringify({ reducedFx: true, muted: true, music: false, haptics: false }),
+    );
+    expect(getSettings()).toEqual({
+      reducedFx: true,
+      muted: true,
+      music: false,
+      haptics: false,
+      timingCue: false,
+    });
+  });
+
+  it("persists independently of the other settings", () => {
+    saveSettings({ timingCue: true });
+    expect(getSettings()).toMatchObject({ timingCue: true, muted: false, haptics: true });
+    saveSettings({ muted: true });
+    expect(getSettings()).toMatchObject({ timingCue: true, muted: true });
+  });
+
+  it("ignores a non-boolean stored value", () => {
+    for (const value of ["yes", 1, null, {}]) {
+      localStorage.setItem("shape-stack-settings", JSON.stringify({ timingCue: value }));
+      expect(getSettings().timingCue).toBe(false);
+    }
   });
 });

@@ -446,7 +446,8 @@ button:active {
 .fx-toggle-btn,
 .mute-toggle-btn,
 .music-toggle-btn,
-.haptics-toggle-btn {
+.haptics-toggle-btn,
+.timing-cue-toggle-btn {
   background: rgba(255, 255, 255, 0.06);
   color: var(--world-hud-text);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -460,7 +461,8 @@ button:active {
 .fx-toggle-btn:hover,
 .mute-toggle-btn:hover,
 .music-toggle-btn:hover,
-.haptics-toggle-btn:hover {
+.haptics-toggle-btn:hover,
+.timing-cue-toggle-btn:hover {
   background: color-mix(in srgb, var(--world-hud-primary) 24%, rgba(255, 255, 255, 0.06));
 }
 
@@ -567,6 +569,7 @@ button:active {
   .mute-toggle-btn,
   .music-toggle-btn,
   .haptics-toggle-btn,
+  .timing-cue-toggle-btn,
   .restart-btn,
   .undo-btn {
     font-size: 0.6rem;
@@ -1210,7 +1213,8 @@ button:focus-visible {
 .settings-row .fx-toggle-btn,
 .settings-row .mute-toggle-btn,
 .settings-row .music-toggle-btn,
-.settings-row .haptics-toggle-btn {
+.settings-row .haptics-toggle-btn,
+.settings-row .timing-cue-toggle-btn {
   padding: 0.5rem 0.85rem;
   font-size: 0.68rem;
   min-height: 2.25rem; /* comfortable touch target */

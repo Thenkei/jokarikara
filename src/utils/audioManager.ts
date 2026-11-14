@@ -8,6 +8,7 @@ import {
 } from "../audio/soundtrack";
 import type { StackQuality } from "../types";
 import {
+  getCueNoteHz,
   getStackNoteHz,
   pentatonicSemitones,
   getWorldRoot,
@@ -399,6 +400,25 @@ class AudioManager implements IAudioService {
       { freq: 110, type: "sine", duration: 0.18, peak: 0.55, attack: 0.004, glideTo: 55 },
       { freq: 900, type: "triangle", duration: 0.025, peak: 0.06, attack: 0.001 },
     ]);
+  }
+
+  playCue(step: number, inWindow: boolean): void {
+    const freq = getCueNoteHz(step, inWindow);
+    // Approach: a short, soft sine "tock" with a faint click partial so it
+    // stays defined on phone speakers. PERFECT: a brighter, slightly longer
+    // triangle with a fifth on top, an audible "now" rather than a louder tick.
+    this.play(
+      "cue",
+      inWindow
+        ? [
+            { freq, type: "triangle", duration: 0.14, peak: 0.6, attack: 0.002 },
+            { freq: freq * 1.5, type: "sine", delay: 0.012, duration: 0.1, peak: 0.14, attack: 0.002 },
+          ]
+        : [
+            { freq, type: "sine", duration: 0.08, peak: 0.7, attack: 0.002 },
+            { freq: freq * 3, type: "sine", duration: 0.015, peak: 0.06, attack: 0.001 },
+          ],
+    );
   }
 
   playTimeBonus(): void {

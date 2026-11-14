@@ -6,6 +6,8 @@
  *   stack OK ≈ -24 … PERFECT ≈ -20   (quality hierarchy stays audible)
  *   level up ≈ -20, world up ≈ -18, game over ≈ -20
  *   Zen miss ≈ -26, early tap ≈ -28, countdown tick ≈ -28 / urgent ≈ -24
+ *   timing cue ≈ -33 / PERFECT tick ≈ -30: well under any stack, above
+ *   the music bed so the bed never masks it
  *   music bed ≥ 10 dB under a plain stack, so it never masks feedback
  *   worst simultaneous burst: peak ≤ -1 dBFS (no clipping)
  */
@@ -22,7 +24,8 @@ export type SfxId =
   | "heartbeat"
   | "combo"
   | "menu"
-  | "ui";
+  | "ui"
+  | "cue";
 
 /** Gain applied before the bus processing (linear). */
 export const MASTER_VOLUME = 1;
@@ -41,6 +44,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   combo: 0,
   menu: 0,
   ui: 2.5,
+  cue: 7,
 };
 
 /** Glue compressor: evens out stacked voices without pumping. */
