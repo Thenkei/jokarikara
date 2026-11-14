@@ -24,6 +24,9 @@ import {
   WORLD_UP_CHORD,
 } from "../audio/music";
 
+/** Seconds the record fanfare waits so the stack note under it reads first. */
+const RECORD_DELAY = 0.08;
+
 interface WindowWithWebkitAudioContext extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
@@ -596,6 +599,23 @@ class AudioManager implements IAudioService {
       );
     });
     this.play("chime", voices);
+  }
+
+  playRecord(world: number): void {
+    // "Ta-da": a short pickup on the fifth, then a held major chord an octave
+    // up with a bell partial on top. In the world's key but unshaped by the
+    // palette (like the combo fanfare), so it reads the same in every world.
+    const root = getWorldRoot(world) * 2;
+    const at = (semitones: number) => root * semitonesToRatio(semitones);
+    const chord = RECORD_DELAY + 0.12;
+    this.play("record", [
+      { freq: at(7), type: "triangle", delay: RECORD_DELAY, duration: 0.1, peak: 0.2, attack: 0.004 },
+      { freq: at(12), type: "triangle", delay: chord, duration: 0.75, peak: 0.26 },
+      { freq: at(16), type: "sine", delay: chord + 0.015, duration: 0.7, peak: 0.11 },
+      { freq: at(19), type: "sine", delay: chord + 0.03, duration: 0.65, peak: 0.09 },
+      { freq: at(24), type: "sine", delay: chord + 0.04, duration: 0.5, peak: 0.04, detune: 6 },
+      { freq: at(24) * 2.76, type: "sine", delay: chord, duration: 0.1, peak: 0.025, attack: 0.001 },
+    ]);
   }
 
   playHeartbeat(): void {

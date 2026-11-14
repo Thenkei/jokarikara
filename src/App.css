@@ -2157,6 +2157,100 @@ button:focus-visible {
   }
 }
 
+/* ---------- Personal best ("chase your best") ---------- */
+/* Target next to the score: present but quiet, it must not compete with it. */
+.pb-target {
+  color: var(--world-hud-subtle-text);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+/* Record accent: the score pill stays gold for the rest of the run. */
+.hud-primary.is-record {
+  border-color: rgba(255, 216, 77, 0.7);
+  box-shadow: 0 0 14px rgba(255, 190, 60, 0.3);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.hud-primary.is-record .score {
+  color: #ffd84d;
+  opacity: 1;
+  animation: recordScorePop 0.6s ease-out;
+}
+
+.hud-primary.is-record.reduced-fx .score {
+  animation: none;
+}
+
+@keyframes recordScorePop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.22);
+  }
+}
+
+/* Above the combo banner (30%) so both read when they land together. */
+.record-milestone {
+  position: absolute;
+  top: 19%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 93;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  animation: comboPop 1.8s ease-out forwards;
+}
+
+.record-milestone-title {
+  font-size: clamp(1.5rem, 7.5vw, 2.4rem);
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  background: linear-gradient(135deg, #fff3b0 0%, #ffd84d 45%, #ff9f1c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 16px rgba(255, 200, 60, 0.5));
+}
+
+.record-milestone-sub {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: #ffe9a3;
+  font-variant-numeric: tabular-nums;
+}
+
+.record-milestone.reduced-fx {
+  animation: timeBonusFade 1.8s linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .record-milestone {
+    animation: timeBonusFade 1.8s linear forwards;
+  }
+
+  .hud-primary.is-record .score {
+    animation: none;
+  }
+
+  .hud-primary.is-record {
+    transition: none;
+  }
+}
+
 /* Visually hidden, still read by screen readers. */
 .sr-only {
   position: absolute;
