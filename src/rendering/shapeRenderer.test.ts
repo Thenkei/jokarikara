@@ -13,7 +13,12 @@ import {
 import type { Shape } from "../utils/geometry";
 import { getWorldMechanics } from "../constants/game";
 import type { WorldMechanics } from "../constants/game";
-import { getWorldTheme, toMonoColor } from "../visual/theme";
+import {
+  DEFAULT_DANGER,
+  getWorldTheme,
+  MONO_DANGER,
+  toMonoColor,
+} from "../visual/theme";
 
 // Mock CanvasRenderingContext2D
 const createMockContext = () => {
@@ -221,6 +226,27 @@ describe("shapeRenderer", () => {
 
       // One arc for shape path + two arcs for fracture sectors.
       expect(ctx.arc).toHaveBeenCalledTimes(3);
+    });
+
+    it.each([
+      ["regular", false, DEFAULT_DANGER],
+      ["Mono", true, MONO_DANGER],
+    ] as const)("%s theme: strokes fracture windows with its danger colours", (_, mono, danger) => {
+      const ctx = createMockContext();
+      const strokes: string[] = [];
+      ctx.stroke = vi.fn(() => {
+        strokes.push(String(ctx.strokeStyle));
+      });
+      const shape: Shape = { type: "circle", size: 100, rotation: 0, color: "#3b82f6", opacity: 1 };
+      const theme = getWorldTheme(3, 1, false, mono);
+
+      drawShape(ctx, shape, 0, 0, 1, defaultMechanics, 0, true, 0, true, theme, {
+        centers: [0],
+        widthRad: Math.PI / 4,
+      });
+
+      // Shape outline, then the fracture glow and stroke passes.
+      expect(strokes.slice(-2)).toEqual([danger.fracture.glow, danger.fracture.stroke]);
     });
 
     it("should not draw fracture sectors for non-container shapes", () => {
@@ -599,6 +625,7 @@ describe("drawArena", () => {
       setLineDash: vi.fn(),
       strokeStyle: "",
       lineWidth: 0,
+      globalAlpha: 1,
     };
     return ctx as unknown as CanvasRenderingContext2D & typeof ctx;
   };
@@ -608,14 +635,37 @@ describe("drawArena", () => {
     drawArena(ctx, 100, 200, 150, 0.3, 0);
     expect(ctx.arc).toHaveBeenCalledWith(100, 200, 150, 0, Math.PI * 2);
     expect(ctx.setLineDash).toHaveBeenCalledWith([10, 8]);
-    expect(ctx.strokeStyle).toMatch(/^rgba\(255, 255, 255,/);
+    expect(ctx.strokeStyle).toBe("#ffffff");
+    expect(ctx.globalAlpha).toBeCloseTo(0.22);
   });
 
-  it("turns solid and red as the shape nears the rim", () => {
+  it("turns solid, brighter and red as the shape nears the rim", () => {
     const ctx = arenaCtx();
     drawArena(ctx, 0, 0, 150, 0.99, 0);
     expect(ctx.setLineDash).toHaveBeenCalledWith([]);
-    expect(ctx.strokeStyle).toMatch(/^rgba\(255, 9\d, 9\d,/);
+    // ~100/255 green and blue left: red.
+    expect(ctx.strokeStyle).toMatch(/^#ff([5-6][0-9a-f])\1$/);
+    expect(ctx.globalAlpha).toBeGreaterThan(0.7);
+  });
+
+  it("Mono: warms to the danger red-orange instead of a brighter green", () => {
+    const calm = arenaCtx();
+    drawArena(calm, 0, 0, 150, 0.3, 0, MONO_DANGER);
+    expect(calm.strokeStyle).toBe(MONO_DANGER.arenaRamp[0]);
+
+    const hot = arenaCtx();
+    drawArena(hot, 0, 0, 150, 1, 0, MONO_DANGER);
+    expect(hot.strokeStyle).toBe(MONO_DANGER.arenaRamp[MONO_DANGER.arenaRamp.length - 1]);
+    expect(hot.strokeStyle).not.toBe(DEFAULT_DANGER.arenaRamp.at(-1));
+  });
+
+  it("picks a cached colour: the same string for the same danger level", () => {
+    const a = arenaCtx();
+    const b = arenaCtx();
+    drawArena(a, 0, 0, 150, 0.9, 0.2, MONO_DANGER);
+    drawArena(b, 0, 0, 150, 0.9, 0.7, MONO_DANGER);
+    expect(a.strokeStyle).toBe(b.strokeStyle);
+    expect(MONO_DANGER.arenaRamp).toContain(a.strokeStyle);
   });
 
   it("skips a degenerate arena", () => {

@@ -56,7 +56,11 @@ export interface EffectsState {
   particles: readonly Particle[];
   rings: readonly Ring[];
   shake: Timed & { amp: number };
-  flash: Timed & { color: string; alpha: number };
+  /**
+   * `danger` marks the fail flash: a semantic signal drawn with the theme's
+   * danger colour (kept red-orange in Mono) instead of the palette tint.
+   */
+  flash: Timed & { color: string; alpha: number; danger: boolean };
   punch: Timed;
 }
 
@@ -64,7 +68,7 @@ export const createEffects = (): EffectsState => ({
   particles: [],
   rings: [],
   shake: { t: 0, dur: 0, amp: 0 },
-  flash: { t: 0, dur: 0, color: "#fff", alpha: 0 },
+  flash: { t: 0, dur: 0, color: "#fff", alpha: 0, danger: false },
   punch: { t: 0, dur: 0 },
 });
 
@@ -153,6 +157,7 @@ export const triggerFail = (
           dur: FAIL_FLASH_DURATION,
           color: "#ff2a2a",
           alpha: 0.35,
+          danger: true,
         },
   };
 };
@@ -174,6 +179,7 @@ export const triggerWorldUp = (
     dur: WORLD_FLASH_DURATION,
     color: "#ffffff",
     alpha: reducedFx ? 0.15 : 0.6,
+    danger: false,
   },
 });
 
@@ -270,18 +276,23 @@ export const drawEffects = (
   ctx.globalAlpha = 1;
 };
 
-/** Full-screen flash overlay (screen space). */
+/**
+ * Full-screen flash overlay (screen space). A danger flash uses
+ * `dangerColor` (the theme's, e.g. Mono's red-orange) when given: tinting it
+ * like a palette colour would turn the fail signal into a "good" green.
+ */
 export const drawFlash = (
   ctx: CanvasRenderingContext2D,
   fx: EffectsState,
   width: number,
   height: number,
   tint: ColorTint = identity,
+  dangerColor?: string,
 ) => {
-  const { t, dur, color, alpha } = fx.flash;
+  const { t, dur, color, alpha, danger } = fx.flash;
   if (t <= 0 || dur <= 0) return;
   ctx.globalAlpha = alpha * (t / dur);
-  ctx.fillStyle = tint(color);
+  ctx.fillStyle = danger && dangerColor ? dangerColor : tint(color);
   ctx.fillRect(0, 0, width, height);
   ctx.globalAlpha = 1;
 };

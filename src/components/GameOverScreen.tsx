@@ -201,7 +201,7 @@ export function GameOverScreen({
               )}
             </section>
             {endInsight && (
-              <div className="gameover-card end-insight" role="status">
+              <div className="gameover-card end-insight danger-signal" role="status">
                 <p className="end-insight-title">{endInsight.title}</p>
                 <p className="end-insight-tip">{endInsight.tip}</p>
               </div>

@@ -1230,7 +1230,7 @@ function App() {
             TIME_ATTACK_MISS_PENALTY !== undefined && (
               <div
                 key={`penalty-${penaltyPulseId}`}
-                className="time-penalty-pop"
+                className="time-penalty-pop danger-signal"
                 aria-hidden="true"
               >
                 −{TIME_ATTACK_MISS_PENALTY}s

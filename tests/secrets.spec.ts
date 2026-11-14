@@ -130,4 +130,59 @@ test.describe("Start screen secrets", () => {
     await expect(page.locator(".pause-overlay")).toBeHidden();
     expect((await bridge.getState())?.paused).toBe(false);
   });
+
+  test("Mono keeps danger signals red: the end-of-run insight is red-orange, not green", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator(".start-btn")).toBeVisible();
+    await page.locator("body").click({ position: { x: 5, y: 5 } });
+    await typeSequence(page);
+    await expect(page.locator(".game-container")).toHaveAttribute("data-theme", "mono");
+
+    await page.locator("body").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Enter");
+    await waitForBridge(page);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    // Outgrow the container: the run ends with an explained insight card.
+    const state = await bridge.getState();
+    await bridge.setActiveSize((state?.lastSize ?? 1) * 1.2);
+    await bridge.step(0.016);
+    await expect(page.locator(".end-insight-title")).toBeVisible();
+
+    // The text colour is what the eye sees only if no filter tints it on the
+    // way to the screen, so check the whole ancestor chain, then its hue.
+    const read = (selector: string) =>
+      page.locator(selector).evaluate((element) => {
+        const filters: string[] = [];
+        for (let node: Element | null = element; node; node = node.parentElement) {
+          const filter = getComputedStyle(node).filter;
+          if (filter && filter !== "none") filters.push(filter);
+        }
+        const [r, g, b] = (getComputedStyle(element).color.match(/[\d.]+/g) ?? [])
+          .slice(0, 3)
+          .map(Number);
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const d = max - min;
+        let hue = 0;
+        if (d > 0) {
+          if (max === r) hue = 60 * (((g - b) / d) % 6);
+          else if (max === g) hue = 60 * ((b - r) / d + 2);
+          else hue = 60 * ((r - g) / d + 4);
+        }
+        return { filters, hue: (hue + 360) % 360, chroma: d };
+      });
+
+    const danger = await read(".end-insight-title");
+    expect(danger.filters).toEqual([]);
+    expect(danger.chroma).toBeGreaterThan(80);
+    // Red to red-orange (the regular look is a light red, hue ~0).
+    expect(danger.hue <= 30 || danger.hue >= 345).toBe(true);
+
+    // The rest of the screen is still in the Mono tint.
+    const calm = await read(".gameover-title");
+    expect(calm.filters.length).toBe(1);
+  });
 });
