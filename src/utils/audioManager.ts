@@ -20,7 +20,14 @@ interface WindowWithWebkitAudioContext extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
-const MASTER_VOLUME = 0.32;
+import {
+  BUS_COMPRESSOR,
+  BUS_LIMITER,
+  dbToGain,
+  MASTER_VOLUME,
+  SFX_TRIM_DB,
+  type SfxId,
+} from "../audio/mix";
 /** Exponential ramps cannot target 0; this is effectively silence. */
 const SILENCE = 0.0001;
 
@@ -79,15 +86,26 @@ class AudioManager implements IAudioService {
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = this.muted ? 0 : MASTER_VOLUME;
 
-    const compressor =
-      typeof this.ctx.createDynamicsCompressor === "function"
-        ? this.ctx.createDynamicsCompressor()
-        : null;
-    if (compressor) {
-      compressor.threshold.value = -18;
-      compressor.ratio.value = 4;
+    // master -> glue compressor -> limiter -> out. Without dynamics support,
+    // fall back to a direct connection (levels are conservative enough).
+    if (typeof this.ctx.createDynamicsCompressor === "function") {
+      const compressor = this.ctx.createDynamicsCompressor();
+      const limiter = this.ctx.createDynamicsCompressor();
+      const apply = (
+        node: DynamicsCompressorNode,
+        settings: typeof BUS_COMPRESSOR | typeof BUS_LIMITER,
+      ) => {
+        node.threshold.value = settings.threshold;
+        node.knee.value = settings.knee;
+        node.ratio.value = settings.ratio;
+        node.attack.value = settings.attack;
+        node.release.value = settings.release;
+      };
+      apply(compressor, BUS_COMPRESSOR);
+      apply(limiter, BUS_LIMITER);
       this.masterGain.connect(compressor);
-      compressor.connect(this.ctx.destination);
+      compressor.connect(limiter);
+      limiter.connect(this.ctx.destination);
     } else {
       this.masterGain.connect(this.ctx.destination);
     }
@@ -204,10 +222,11 @@ class AudioManager implements IAudioService {
     return this.ctx && this.masterGain ? this.ctx : null;
   }
 
-  private play(voices: Voice[]): void {
+  private play(sfx: SfxId, voices: Voice[]): void {
     const ctx = this.ready();
     if (!ctx) return;
     const now = ctx.currentTime;
+    const trim = dbToGain(SFX_TRIM_DB[sfx]);
 
     for (const voice of voices) {
       const start = now + (voice.delay ?? 0);
@@ -226,7 +245,7 @@ class AudioManager implements IAudioService {
       }
 
       gain.gain.setValueAtTime(SILENCE, start);
-      gain.gain.linearRampToValueAtTime(voice.peak, start + attack);
+      gain.gain.linearRampToValueAtTime(voice.peak * trim, start + attack);
       gain.gain.exponentialRampToValueAtTime(SILENCE, end);
 
       osc.connect(gain);
@@ -249,7 +268,9 @@ class AudioManager implements IAudioService {
         type: "sine",
         delay: 0.03 * (i + 1),
         duration: 0.45 + 0.1 * i,
-        peak: 0.16,
+        // Kept low: each extra interval adds loudness, and the quality
+        // hierarchy should read as richer, not as much louder.
+        peak: 0.07,
       });
     });
     if (quality === "PERFECT") {
@@ -259,16 +280,17 @@ class AudioManager implements IAudioService {
         type: "sine",
         delay: 0.06,
         duration: 0.6,
-        peak: 0.07,
+        peak: 0.045,
         detune: 7,
       });
     }
-    this.play(voices);
+    this.play("stack", voices);
   }
 
   playLevelUp(world: number): void {
     const root = getWorldRoot(world) * 2;
     this.play(
+      "levelUp",
       LEVEL_UP_ARPEGGIO.map((interval, i) => ({
         freq: root * semitonesToRatio(interval),
         type: "triangle" as OscillatorType,
@@ -282,6 +304,7 @@ class AudioManager implements IAudioService {
   playWorldUp(world: number): void {
     const root = getWorldRoot(world);
     this.play(
+      "worldUp",
       WORLD_UP_CHORD.map((interval, i) => ({
         freq: root * semitonesToRatio(interval),
         type: (i === 0 ? "sawtooth" : "sine") as OscillatorType,
@@ -295,44 +318,42 @@ class AudioManager implements IAudioService {
 
   playStackSound(score: number): void {
     const freq = 220 * semitonesToRatio(score % 12);
-    this.play([
+    this.play("ui", [
       { freq, type: "sine", duration: 0.3, peak: 0.4, glideTo: freq * 1.5 },
     ]);
   }
 
   playFailSound(): void {
-    this.play([
+    this.play("fail", [
       { freq: 180, type: "sawtooth", duration: 0.6, peak: 0.28, glideTo: 45 },
       { freq: 90, type: "square", duration: 0.5, peak: 0.12, glideTo: 30 },
     ]);
   }
 
   playMissSound(): void {
-    this.play([
+    this.play("miss", [
       { freq: 330, type: "triangle", duration: 0.28, peak: 0.25, glideTo: 196 },
     ]);
   }
 
   playEarlyClickSound(): void {
-    this.play([
+    this.play("early", [
       { freq: 400, type: "triangle", duration: 0.15, peak: 0.25, glideTo: 300 },
     ]);
   }
 
   playTick(urgent: boolean): void {
-    this.play([
-      {
-        freq: urgent ? 1320 : 880,
-        type: "square",
-        duration: 0.05,
-        peak: urgent ? 0.12 : 0.07,
-        attack: 0.002,
-      },
+    // Wood-block style: a sine body plus a short click partial. Square waves
+    // at this level were harsh, and at the old level inaudible.
+    const freq = urgent ? 1320 : 880;
+    this.play("tick", [
+      { freq, type: "sine", duration: 0.12, peak: urgent ? 1 : 0.55, attack: 0.002 },
+      { freq: freq * 2.5, type: "triangle", duration: 0.03, peak: 0.12, attack: 0.001 },
     ]);
   }
 
   playTimeBonus(): void {
-    this.play([
+    this.play("timeBonus", [
       { freq: 784, type: "sine", duration: 0.18, peak: 0.2 },
       { freq: 1175, type: "sine", delay: 0.08, duration: 0.3, peak: 0.2 },
     ]);
