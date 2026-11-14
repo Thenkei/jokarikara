@@ -4,17 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Jokarikara (Shape Stack) is a minimalist rhythm timing game built with React 19, TypeScript, and HTML5 Canvas. Players stack geometric shapes by tapping at precise moments, with shapes that must be fully contained within the previous shape's boundary.
+Jokarikara (Shape Stack) is a minimalist rhythm timing game built with React 19, TypeScript, and HTML5 Canvas. Players stack geometric shapes by tapping at precise moments, with shapes that must be fully contained within the previous shape's boundary. Deployed to GitHub Pages under the base path `/jokarikara/` (installable PWA).
 
 ## Commands
 
 ```bash
-npm run dev          # Start development server (Vite)
-npm run build        # TypeScript compile + Vite production build
-npm run lint         # ESLint
-npm run test         # Vitest unit tests (src/**/*.test.{ts,tsx})
-npm run test:e2e     # Playwright E2E tests (tests/*.spec.ts)
-npm run test:e2e:ui  # Playwright with UI
+npm run dev               # Start development server (Vite)
+npm run build             # TypeScript compile + Vite production build
+npm run lint              # ESLint
+npm run test              # Vitest unit tests (src/**/*.test.{ts,tsx})
+npm run test:e2e          # Playwright E2E, targeted matrix (see Testing)
+npm run test:e2e:chromium # Playwright, Chromium only (fastest local loop)
+npm run test:e2e:full     # Playwright, every spec on every browser/device
+npm run test:e2e:ui       # Playwright with UI
+npm run perf              # Render FPS benchmark (tests/perf/render.perf.ts)
 ```
 
 Run a single unit test file:
@@ -22,22 +25,22 @@ Run a single unit test file:
 npx vitest run src/utils/geometry.test.ts
 ```
 
-Run a single E2E test:
+Run a single E2E test (E2E server defaults to port 6173; override with `E2E_PORT` if it is taken):
 ```bash
-npx playwright test tests/gameplay.spec.ts
+E2E_PORT=6471 npx playwright test tests/gameplay.spec.ts --project=chromium
 ```
 
 ## Architecture
 
 ### State Management Pattern
 The game uses a functional, immutable state pattern without external state libraries:
-- `src/types.ts` - Core interfaces (`GameState`, `GameMode`, `GameCallbacks`)
+- `src/types.ts` - Core interfaces (`GameState`, `GameMode`, `GameCallbacks`, `MissReason`/`EndReason`)
 - `src/core/gameState.ts` - Pure functions that take state and return new state (e.g., `updateActiveShape`, `stackActiveShape`, `handleMiss`)
 - State is held in a ref (`stateRef`) inside `GameCanvas` and updated each frame
 
 ### Game Loop
 `GameCanvas.tsx` orchestrates a `requestAnimationFrame` loop that:
-1. Calculates delta time
+1. Calculates delta time (clamped to `MAX_FRAME_DT`) and advances a pausable game clock (`elapsedTime` / `advanceClock`)
 2. Applies state transformations (active shape growth, zoom interpolation, rotation drift)
 3. Checks containment constraints
 4. Renders via extracted drawing functions
@@ -45,18 +48,31 @@ The game uses a functional, immutable state pattern without external state libra
 ### Module Responsibilities
 - `src/shapes/` - Shape factory functions (`createActiveShape`, `createInitialShape`)
 - `src/utils/geometry.ts` - Containment logic using vertex-in-polygon and ray casting algorithms
-- `src/rendering/shapeRenderer.ts` - Pure drawing functions (no state mutation)
-- `src/constants/game.ts` - Game balance constants, world mechanics, boss configurations, shape unlocks
-- `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation)
-- `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
-- `src/audio/soundtrack.ts` + `src/audio/musicEngine.ts` - Dynamic soundtrack: pure layer/tempo rules and the engine (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
+- `src/rendering/shapeRenderer.ts` - Pure drawing functions (no state mutation); glow uses `FAUX_GLOW` strokes, never `shadowBlur`
 - `src/rendering/effects.ts` - Pure, dt-based canvas juice (rings, particles, shake, flash); never touches gameplay state
+- `src/constants/game.ts` - Game balance constants, world mechanics, boss configurations, shape unlocks
+- `src/gameplay/config.ts` - Per-world mechanics and taglines; `builder.ts`, `fracture.ts`, `selectors.ts` support them
 - `src/gameplay/reverse.ts` - Reverse Stack (world 9): outward containment, arena limit, zoom-out camera
 - `src/gameplay/heartbeat.ts` - Heartbeat (world 10): beat-phase growth multiplier (mean 1) and visual pulse
 - `src/gameplay/guide.ts` - PERFECT ghost guide rules (Zen + first level; reverse-aware)
+- `src/gameplay/combo.ts` - Combo milestones (fanfare, banner, haptics)
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
-- `src/utils/storage.ts` - localStorage: per-mode high scores, daily records, settings, achievements (all validated on read)
+- `src/modes/runInsights.ts` - Game over insights: why the run ended, stack quality breakdown
+- `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation); `playUi` for menu sounds
+- `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
+- `src/audio/soundtrack.ts` + `src/audio/musicEngine.ts` - Dynamic soundtrack: pure layer/tempo rules and the engine (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
+- `src/audio/mix.ts` - Central gain table for every voice; `tests/audio-levels.spec.ts` guards relative levels
+- `src/utils/haptics.ts` - Vibration helper (respects the haptics setting)
+- `src/utils/storage.ts` - localStorage: per-mode top-5 high scores, daily records, settings, achievements (all validated on read)
 - `src/progression/achievements.ts` - Achievement catalogue, named thresholds, pure `evaluate(run, lifetime)` and run/lifetime reducers; `useAchievements.ts` is the React glue (run state in refs, fed by `GameCanvas`'s `onStack`/`onMiss`, re-renders only on unlock)
+- `src/components/StartBackdrop.tsx` - Animated start screen backdrop; layer data lives in `startBackdropLayers.ts` (non-component exports stay out of component modules for Fast Refresh)
+
+### localStorage keys
+Bump the version suffix on any incompatible schema change and migrate from the previous key (see `LEGACY_STORAGE_KEY`):
+- `shape-stack-high-scores-v3` (per-mode top 5; migrates from v2)
+- `shape-stack-settings` (`reducedFx`, `muted`, `music`, haptics, ...)
+- `shape-stack-daily-v1`
+- `shape-stack-achievements-v1`
 
 ### World Mechanics (src/gameplay/config.ts)
 Each world (1-10) introduces cumulative effects (each has a `tagline` shown on entry):
@@ -71,8 +87,8 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 
 ### Game Modes
 - **CLASSIC**: Standard fail-on-miss gameplay
-- **ZEN**: No fail state, restart/undo buttons available
-- **TIME_ATTACK**: 60-second timer, perfect stacks add bonus time
+- **ZEN**: No fail state, restart/undo buttons available; can start from any world already reached (practice)
+- **TIME_ATTACK**: 60-second timer; PERFECT +5s, GREAT +2s, miss −5s
 - **Daily Challenge**: not a `GameMode` but a run variant (CLASSIC rules, date-derived `runSeed`), handled in `App.tsx`
 
 ### Loop invariants
@@ -80,8 +96,34 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 - Keep React state updates out of the per-frame path (e.g. the Time Attack timer only reports when the displayed second changes).
 - The loop effect must stay single-instance (per-effect `cancelled` flag + `rafIdRef`).
 
-### Testing Strategy
-- **Unit tests** (Vitest + jsdom): Core logic in `src/**/*.test.ts` - geometry, game state, rendering
-- **E2E tests** (Playwright): Visual regression and gameplay flows in `tests/*.spec.ts`
-- Canvas mocking via `vitest-canvas-mock`
-- E2E drives the game through `window.__GAME_TEST__` (src/utils/testBridge.ts), only installed when `VITE_E2E=true`
+### Performance rules
+Measured with `npm run perf` and Chromium DevTools at 4× CPU throttle:
+- Never use canvas `shadowBlur`/`shadowColor` in the render path: on a full world-5 stack it dropped to ~13 FPS vs ~50 FPS with faux glow strokes. Fake glows with wider translucent strokes.
+- Cap the canvas device pixel ratio at 2 and keep `GLOW_LAYER_DEPTH` limited (only the top stacked layers glow).
+- Cache derived colours (hsl strings) rather than rebuilding them per frame.
+- HUD `backdrop-filter` and the background gradient were profiled and are not bottlenecks; don't optimise them blindly.
+- Input uses `pointerdown` (no click delay).
+
+## Testing Strategy
+- **Unit tests** (Vitest + jsdom): Core logic in `src/**/*.test.ts(x)` - geometry, game state, rendering, audio, progression
+- Canvas mocking via `vitest-canvas-mock`; Web Audio via `src/audio/mockAudioContext.testutil.ts`
+- **E2E tests** (Playwright): gameplay flows and visual regression in `tests/*.spec.ts`
+  - Drive the game through `window.__GAME_TEST__` (`src/utils/testBridge.ts`: pause, step, forceStack(ratio), setActiveSize, setTimeRemaining, tap, getState), only installed when `VITE_E2E=true`. Helpers in `tests/bridgeHelpers.ts`.
+  - Import `test` from `tests/fixtures.ts`: it clears localStorage on each navigation, so seed state with an `addInitScript` registered after the fixture.
+  - Prefer deterministic bridge control (pause + step) over wall-clock waits; the dev machine is often loaded and timings are noisy.
+- **Tiers**: by default Chromium runs every spec, other browsers/devices run only specs tagged `@cross-browser`. `E2E_FULL=1` runs the full matrix.
+- **Snapshots**: darwin baselines only; snapshot assertions are ignored on Linux CI. Update locally with `--update-snapshots` and review the diff images.
+
+## CI / Deploy (.github/workflows)
+- `ci.yml`: lint + build + unit tests, then E2E in the official Playwright container (version read from the lockfile), 2 shards. PRs run the targeted tier; pushes to `main` (or a manual `full_matrix` run) run the full matrix.
+- `deploy.yml`: GitHub Pages deploy triggered by `workflow_run` and only when CI succeeded on a push to `main`.
+
+## Workflow conventions
+- Branch per change (`<type>/<short-desc>`), conventional commits in English (`perf(render): ...`), one PR per improvement, squash-merge.
+- Run before pushing: `npm run lint`, `npm run test`, `npm run build`, and the relevant E2E specs. Check each command's own exit code; never judge success through a pipe (`npm run lint | tail` hides failures).
+- Merge only when `gh pr checks <n>` itself exits 0. Poll while it returns 8 (pending); 1 = failure. Don't use `gh pr checks --watch` (it exits early in non-TTY shells):
+  ```bash
+  until gh pr checks <n> >/dev/null 2>&1; rc=$?; [ $rc -ne 8 ]; do sleep 15; done; [ $rc -eq 0 ] && gh pr merge <n> --squash --delete-branch
+  ```
+- After merging, confirm CI on `main` and the Pages deploy both succeed.
+- Don't commit `.claude/` or temporary specs.
