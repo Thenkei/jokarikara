@@ -100,6 +100,24 @@ describe("audioManager", () => {
     mock.oscillators.forEach((osc) => expect(osc.start).toHaveBeenCalled());
   });
 
+  it("plays the personal best fanfare after the stack note, and nothing while muted", () => {
+    const audio = createAudioManager();
+    audio.setMuted(true);
+    audio.playRecord(3);
+    expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
+
+    audio.setMuted(false);
+    audio.playRecord(3);
+    // Pickup + held chord (octave, third, fifth, sparkle, bell partial).
+    expect(mock.oscillators).toHaveLength(6);
+    mock.oscillators.forEach((osc) => {
+      expect(osc.start).toHaveBeenCalled();
+      // Every voice starts after "now" (0): the stack note lands first.
+      const [when] = osc.start.mock.calls[0] as [number];
+      expect(when).toBeGreaterThan(0);
+    });
+  });
+
   it("zeroes master gain when muted after init and restores it", () => {
     const audio = createAudioManager();
     audio.init();

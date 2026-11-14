@@ -2,7 +2,7 @@
  * Thin wrapper over the Vibration API. Unsupported on iOS Safari and desktop,
  * where it is a silent no-op.
  */
-export type HapticPattern = "tap" | "perfect" | "miss" | "fail" | "levelUp";
+export type HapticPattern = "tap" | "perfect" | "miss" | "fail" | "levelUp" | "record";
 
 const PATTERNS: Record<HapticPattern, number | number[]> = {
   tap: 8,
@@ -10,6 +10,8 @@ const PATTERNS: Record<HapticPattern, number | number[]> = {
   miss: 30,
   fail: [40, 40, 90],
   levelUp: [10, 25, 10, 25, 20],
+  /** Personal best beaten: two taps then a long hold ("ta-da"). */
+  record: [14, 40, 14, 40, 70],
 };
 
 let enabled = true;

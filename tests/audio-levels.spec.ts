@@ -30,6 +30,7 @@ test("sound effects and music keep their mix relationships", async ({
       playHeartbeat: () => void;
       playComboMilestone: (tier: number, world: number) => void;
       playChime: () => void;
+      playRecord: (world: number) => void;
       playUi: (kind: "select" | "confirm" | "back") => void;
       playCue: (step: number, inWindow: boolean) => void;
       startMusic: (w: number) => void;
@@ -112,6 +113,15 @@ test("sound effects and music keep their mix relationships", async ({
       heartbeat: await measure(0.6, (a) => a.playHeartbeat()),
       combo: await measure(1.2, (a) => a.playComboMilestone(5, 1)),
       chime: await measure(1.6, (a) => a.playChime()),
+      record: await measure(1.5, (a) => a.playRecord(1)),
+      // The record lands on a stack, and often on a combo milestone and a
+      // level up too: the pile-up must not clip.
+      recordBurst: await measure(1.5, (a) => {
+        a.playStack("PERFECT", 10, 1);
+        a.playComboMilestone(5, 1);
+        a.playLevelUp(1);
+        a.playRecord(1);
+      }),
       uiSelect: await measure(0.5, (a) => a.playUi("select"), [0.25, 0.5]),
       uiConfirm: await measure(0.5, (a) => a.playUi("confirm")),
       uiBack: await measure(0.5, (a) => a.playUi("back")),
@@ -162,6 +172,13 @@ test("sound effects and music keep their mix relationships", async ({
   // but no louder than a level up (it plays over the unlock toast's cue).
   expect(levels.chime.rmsDb).toBeGreaterThan(levels.uiConfirm.rmsDb + 2);
   expect(levels.chime.rmsDb).toBeLessThanOrEqual(levels.levelUp.rmsDb);
+
+  // Beating your personal best is a once-per-run moment: it must stand out
+  // from the PERFECT stack it lands on (≈ the combo fanfare's level), never
+  // above the new-world chord.
+  expect(levels.record.rmsDb).toBeGreaterThan(levels.perfect.rmsDb);
+  expect(levels.record.rmsDb).toBeGreaterThan(levels.levelUp.rmsDb - 2);
+  expect(levels.record.rmsDb).toBeLessThanOrEqual(levels.worldUp.rmsDb + 1);
 
   // Menu sounds are subtle: quieter than any gameplay stack.
   for (const ui of [levels.uiSelect, levels.uiConfirm, levels.uiBack]) {
