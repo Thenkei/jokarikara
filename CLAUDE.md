@@ -49,6 +49,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/constants/game.ts` - Game balance constants, world mechanics, boss configurations, shape unlocks
 - `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation)
 - `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
+- `src/audio/soundtrack.ts` + `src/audio/musicEngine.ts` - Dynamic soundtrack: pure layer/tempo rules and the engine (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
 - `src/rendering/effects.ts` - Pure, dt-based canvas juice (rings, particles, shake, flash); never touches gameplay state
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
 - `src/utils/storage.ts` - localStorage: per-mode high scores, daily records, settings (all validated on read)

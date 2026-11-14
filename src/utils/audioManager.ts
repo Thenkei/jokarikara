@@ -1,4 +1,11 @@
-import type { IAudioService } from "../audio/types";
+import type { IAudioService, MusicIntensity, MusicState } from "../audio/types";
+import { MusicEngine } from "../audio/musicEngine";
+import {
+  MUSIC_VOLUME,
+  MUTE_FADE_SECONDS,
+  PAUSE_FADE_SECONDS,
+  STOP_FADE_SECONDS,
+} from "../audio/soundtrack";
 import type { StackQuality } from "../types";
 import {
   getStackNoteHz,
@@ -38,7 +45,22 @@ type Voice = {
 class AudioManager implements IAudioService {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  /** Soundtrack bus into the master, below SFX level. */
+  private musicGain: GainNode | null = null;
+  private music: MusicEngine | null = null;
   private muted = false;
+  private musicEnabled = true;
+  /**
+   * What the game wants from the soundtrack. The engine is reconciled against
+   * it (plus mute and the music setting) so every combination of
+   * pause/mute/toggle/stop converges to one well-defined state.
+   */
+  private musicIntent: {
+    active: boolean;
+    paused: boolean;
+    world: number;
+    intensity: MusicIntensity;
+  } = { active: false, paused: false, world: 1, intensity: 0 };
 
   init(): void {
     if (this.ctx) return;
@@ -69,6 +91,10 @@ class AudioManager implements IAudioService {
     } else {
       this.masterGain.connect(this.ctx.destination);
     }
+
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.gain.value = MUSIC_VOLUME;
+    this.musicGain.connect(this.masterGain);
   }
 
   setMuted(muted: boolean): void {
@@ -76,6 +102,7 @@ class AudioManager implements IAudioService {
     if (this.masterGain) {
       this.masterGain.gain.value = muted ? 0 : MASTER_VOLUME;
     }
+    this.reconcileMusic(MUTE_FADE_SECONDS);
   }
 
   isMuted(): boolean {
@@ -85,6 +112,89 @@ class AudioManager implements IAudioService {
   resume(): void {
     if (this.ctx && this.ctx.state === "suspended") {
       void this.ctx.resume();
+    }
+  }
+
+  // --- Soundtrack -------------------------------------------------------
+
+  startMusic(world: number): void {
+    this.musicIntent = { active: true, paused: false, world, intensity: 0 };
+    this.reconcileMusic(STOP_FADE_SECONDS);
+  }
+
+  setMusicIntensity(level: MusicIntensity): void {
+    if (this.musicIntent.intensity === level) return;
+    this.musicIntent.intensity = level;
+    this.music?.setIntensity(level);
+  }
+
+  setMusicWorld(world: number): void {
+    if (this.musicIntent.world === world) return;
+    this.musicIntent.world = world;
+    this.music?.setWorld(world);
+  }
+
+  pauseMusic(): void {
+    this.musicIntent.paused = true;
+    this.reconcileMusic(PAUSE_FADE_SECONDS);
+  }
+
+  resumeMusic(): void {
+    this.musicIntent.paused = false;
+    this.reconcileMusic(PAUSE_FADE_SECONDS);
+  }
+
+  stopMusic(): void {
+    this.musicIntent = { ...this.musicIntent, active: false, paused: false };
+    this.reconcileMusic(STOP_FADE_SECONDS);
+  }
+
+  setMusicEnabled(enabled: boolean): void {
+    this.musicEnabled = enabled;
+    this.reconcileMusic(PAUSE_FADE_SECONDS);
+  }
+
+  isMusicEnabled(): boolean {
+    return this.musicEnabled;
+  }
+
+  getMusicState(): MusicState {
+    const { active, paused, intensity, world } = this.musicIntent;
+    return {
+      active,
+      paused,
+      enabled: this.musicEnabled,
+      playing: this.music?.isRunning() ?? false,
+      intensity,
+      world,
+    };
+  }
+
+  /**
+   * Converge the engine to the desired state. Anything that should be silent
+   * (stopped, paused, muted, disabled) tears the graph down entirely: no
+   * oscillators, no scheduler timer. Audio failures never reach gameplay.
+   */
+  private reconcileMusic(fadeSeconds: number): void {
+    const { active, paused, world, intensity } = this.musicIntent;
+    const shouldPlay = active && !paused && !this.muted && this.musicEnabled;
+    try {
+      if (!shouldPlay) {
+        this.music?.stop(fadeSeconds);
+        return;
+      }
+      if (!this.ctx) this.init();
+      if (!this.ctx || !this.musicGain) return;
+      this.music ??= new MusicEngine(this.ctx, this.musicGain);
+      this.music.start(world, intensity);
+    } catch (error) {
+      console.warn("Music unavailable", error);
+      try {
+        this.music?.stop(0);
+      } catch {
+        // Engine is already unusable; drop it below.
+      }
+      this.music = null;
     }
   }
 

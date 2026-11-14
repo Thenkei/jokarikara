@@ -1,9 +1,14 @@
 import type { Page } from "@playwright/test";
 import type { GameTestBridgeState } from "../src/utils/testBridge";
+import type { MusicState } from "../src/audio/types";
 
 export const waitForBridge = async (page: Page) => {
   await page.waitForFunction(() => !!window.__GAME_TEST__);
 };
+
+/** Soundtrack state; readable on every screen (installed by <App/>). */
+export const getMusicState = (page: Page) =>
+  page.evaluate(() => window.__GAME_AUDIO__?.getMusicState() as MusicState | undefined);
 
 export const makeBridge = (page: Page) => ({
   getState: () =>
