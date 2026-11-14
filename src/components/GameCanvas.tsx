@@ -36,7 +36,11 @@ import {
   isEarlyReverseTap,
   isReverseState,
 } from "../gameplay/reverse";
-import { getBeatPhase, getHeartbeatPulse } from "../gameplay/heartbeat";
+import {
+  crossedBeat,
+  getBeatPhase,
+  getHeartbeatPulse,
+} from "../gameplay/heartbeat";
 import { installGameTestBridge } from "../utils/testBridge";
 import { getWorldTheme } from "../visual/theme";
 import { haptic } from "../utils/haptics";
@@ -550,7 +554,18 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         }
 
         if (dt > 0 && !wasOver) {
+          const clockBefore = state.elapsedTime;
           state = advanceClock(state, dt);
+          // Heartbeat worlds: audible beat, driven by the same game clock as
+          // the growth bursts and the visual pulse (so all three line up).
+          const beatMechanics = getWorldMechanics(state.world);
+          if (
+            beatMechanics.heartbeat &&
+            state.activeShape &&
+            crossedBeat(clockBefore, state.elapsedTime, beatMechanics.heartbeatBpm)
+          ) {
+            audioService.playHeartbeat();
+          }
           state = updateActiveShape(state, dt);
           state = updateZoom(state, dt);
           state = updateShapeRotations(state, dt);

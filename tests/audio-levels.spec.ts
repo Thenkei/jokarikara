@@ -25,6 +25,7 @@ test("sound effects and music keep their mix relationships", async ({
       playEarlyClickSound: () => void;
       playTick: (urgent: boolean) => void;
       playTimeBonus: () => void;
+      playHeartbeat: () => void;
       startMusic: (w: number) => void;
     };
     const SR = 44100;
@@ -68,6 +69,7 @@ test("sound effects and music keep their mix relationships", async ({
       tick: await measure(0.5, (a) => a.playTick(false)),
       tickUrgent: await measure(0.5, (a) => a.playTick(true)),
       timeBonus: await measure(1, (a) => a.playTimeBonus()),
+      heartbeat: await measure(0.6, (a) => a.playHeartbeat()),
       worst: await measure(2.5, (a) => {
         a.playStack("PERFECT", 10, 2);
         a.playWorldUp(2);
@@ -96,6 +98,9 @@ test("sound effects and music keep their mix relationships", async ({
   expect(levels.fail.rmsDb).toBeGreaterThan(levels.ok.rmsDb + 2);
   // Urgent countdown is louder than the regular tick.
   expect(levels.tickUrgent.rmsDb).toBeGreaterThan(levels.tick.rmsDb + 1.5);
+  // The beat is a rhythm cue: audible, but never louder than a stack.
+  expect(levels.heartbeat.rmsDb).toBeLessThan(levels.ok.rmsDb);
+
   // The music bed never masks gameplay feedback.
   expect(levels.music.rmsDb).toBeLessThan(levels.ok.rmsDb - 8);
 });

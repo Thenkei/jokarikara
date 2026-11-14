@@ -352,6 +352,15 @@ class AudioManager implements IAudioService {
     ]);
   }
 
+  playHeartbeat(): void {
+    // Low "lub" with a falling pitch plus a soft click for definition on
+    // small phone speakers that cannot reproduce the sub frequency.
+    this.play("heartbeat", [
+      { freq: 110, type: "sine", duration: 0.18, peak: 0.55, attack: 0.004, glideTo: 55 },
+      { freq: 900, type: "triangle", duration: 0.025, peak: 0.06, attack: 0.001 },
+    ]);
+  }
+
   playTimeBonus(): void {
     this.play("timeBonus", [
       { freq: 784, type: "sine", duration: 0.18, peak: 0.2 },

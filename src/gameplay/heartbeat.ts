@@ -24,6 +24,17 @@ export const getBeatPhase = (timeSec: number, bpm: number): number => {
 export const getHeartbeatMultiplier = (phase: number): number =>
   NORMALISER * Math.exp(-HEARTBEAT_SHARPNESS * Math.min(Math.max(phase, 0), 1));
 
+/** Index of the beat containing `timeSec` (0 for the first beat). */
+export const getBeatIndex = (timeSec: number, bpm: number): number =>
+  bpm > 0 && Number.isFinite(timeSec) ? Math.floor((timeSec * bpm) / 60) : 0;
+
+/**
+ * True when advancing the clock from `prevSec` to `nextSec` crosses a beat,
+ * i.e. a new burst of growth starts within this frame.
+ */
+export const crossedBeat = (prevSec: number, nextSec: number, bpm: number): boolean =>
+  nextSec > prevSec && getBeatIndex(nextSec, bpm) > getBeatIndex(prevSec, bpm);
+
 /** Visual pulse in [0, 1]: 1 on the beat, decaying until the next one. */
 export const getHeartbeatPulse = (phase: number): number =>
   Math.exp(-HEARTBEAT_SHARPNESS * Math.min(Math.max(phase, 0), 1));

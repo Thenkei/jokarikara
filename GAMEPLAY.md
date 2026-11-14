@@ -101,7 +101,7 @@ Effects are **cumulative**, and visual distortions only apply to stacked shapes,
 | **7** | 🧲 Gravity Drift | The growing shape slowly drifts downward. |
 | **8** | ↔️ Rotation Inversion | Stack rotation flips on even levels and during boss stacks. |
 | **9** | 🔄 Reverse Stack | Shapes grow **outward**: tap once the growing shape fully wraps the previous one, before it crosses the circular arena. PERFECT means a tight wrap. The camera zooms out after each stack. Fractures and the eclipse are off here. |
-| **10** | 💓 Heartbeat | Growth surges on a 90 BPM beat and nearly rests between beats, so you tap in rhythm. Average speed is unchanged. |
+| **10** | 💓 Heartbeat | Growth surges on a 90 BPM beat and nearly rests between beats, so you tap in rhythm. Each beat is audible (a soft thump) and visible (the scene pulses), both driven by the same game clock as the growth. Average speed is unchanged. |
 
 ## 🎵 Audio & Feel
 
