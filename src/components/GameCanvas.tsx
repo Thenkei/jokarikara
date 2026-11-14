@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
-import type { GameState, StyleUpdate } from "../types";
+import type { GameState, RunStats, StyleUpdate } from "../types";
 import {
   createInitialState,
   spawnActiveShape,
@@ -72,7 +72,12 @@ interface GameCanvasProps {
   runSeed?: number;
   reducedFx?: boolean;
   onScore: (score: number) => void;
-  onGameOver: (finalScore: number, world: number, level: number) => void;
+  onGameOver: (
+    finalScore: number,
+    world: number,
+    level: number,
+    stats?: RunStats,
+  ) => void;
   onLevelUp: (level: number) => void;
   onWorldUp: (world: number) => void;
   onTimeUpdate?: (time: number) => void;
@@ -85,7 +90,21 @@ interface GameCanvasProps {
 export interface GameCanvasHandle {
   restartShape: () => void;
   undo: () => void;
+  /**
+   * Player-facing pause (overlay). Freezes simulation, timer and input, and
+   * resets the frame clock on resume so dt does not spike. Independent from
+   * the e2e bridge's manual stepping mode.
+   */
+  setPaused: (paused: boolean) => void;
+  /** Programmatic tap (keyboard). No-op while paused or after game over. */
+  tap: () => void;
 }
+
+const toRunStats = (state: GameState): RunStats => ({
+  stackCount: state.stackCount,
+  perfectCount: state.perfectCount,
+  bestStreak: state.bestStreak,
+});
 
 /**
  * GameCanvas - Orchestrates the game loop and React lifecycle.
@@ -116,6 +135,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     const undoRequestedRef = useRef(false);
     const dimensionsRef = useRef({ width: 0, height: 0 });
     const manualModeRef = useRef(false);
+    const pausedRef = useRef(false);
+    const handleTapRef = useRef<() => void>(() => {});
     const loopRef = useRef<(time: number) => void>(undefined);
     const reducedFxRef = useRef(reducedFx);
     const effectsRef = useRef<EffectsState>(createEffects());
@@ -157,15 +178,15 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
     /** Delay the callback so fail feedback is visible; state is already over. */
     const notifyGameOver = useCallback(
-      (score: number, world: number, level: number) => {
+      (score: number, world: number, level: number, stats?: RunStats) => {
         if (GAME_OVER_DELAY_MS <= 0) {
-          onGameOver(score, world, level);
+          onGameOver(score, world, level, stats);
           return;
         }
         if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
         gameOverTimerRef.current = setTimeout(() => {
           gameOverTimerRef.current = null;
-          onGameOver(score, world, level);
+          onGameOver(score, world, level, stats);
         }, GAME_OVER_DELAY_MS);
       },
       [onGameOver],
@@ -182,6 +203,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           if (!stateRef.current || stateRef.current.isGameOver) return;
           undoRequestedRef.current = true;
         },
+        setPaused: (paused: boolean) => {
+          pausedRef.current = paused;
+          // Drop the stale timestamp so the first frame after resume is a
+          // baseline frame (dt = 0) instead of one huge delta.
+          lastTimeRef.current = 0;
+        },
+        tap: () => handleTapRef.current(),
       }),
       [],
     );
@@ -219,6 +247,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           stateRef.current.score,
           stateRef.current.world,
           stateRef.current.level,
+          toRunStats(stateRef.current),
         );
       } else {
         // Zen: a life is lost but the run continues.
@@ -234,6 +263,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
     const handleTap = useCallback(() => {
       if (
+        pausedRef.current ||
         !stateRef.current ||
         stateRef.current.isGameOver ||
         !stateRef.current.activeShape
@@ -326,6 +356,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       reducedFx,
       audioService,
     ]);
+
+    useEffect(() => {
+      handleTapRef.current = handleTap;
+    }, [handleTap]);
 
     const forceStack = useCallback(
       (sizeRatio: number) => {
@@ -445,7 +479,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
                 effectsRef.current,
                 reducedFx,
               );
-              notifyGameOver(state.score, state.world, state.level);
+              notifyGameOver(
+                state.score,
+                state.world,
+                state.level,
+                toRunStats(state),
+              );
               return;
             }
           }
@@ -592,6 +631,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         )
           return;
 
+        if (pausedRef.current) {
+          // Keep the rAF chain alive but do no simulation or drawing; the
+          // last rendered frame stays on screen behind the overlay.
+          lastTimeRef.current = 0;
+          if (!manualModeRef.current) {
+            rafIdRef.current = requestAnimationFrame(loop);
+          }
+          return;
+        }
+
         if (lastTimeRef.current === 0) {
           lastTimeRef.current = time;
           if (!manualModeRef.current) {
@@ -616,6 +665,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         tick,
         setManualMode,
         forceStack,
+        isPaused: () => pausedRef.current,
         getTheme: () =>
           stateRef.current
             ? getWorldTheme(

@@ -86,6 +86,7 @@ export const createInitialState = (
     styleScore: 0,
     streak: 0,
     bestStreak: 0,
+    perfectCount: 0,
     lastStackQuality: null,
   };
 };
@@ -377,6 +378,7 @@ export const stackActiveShape = (
       styleScore: styleEnabled ? state.styleScore + styleIncrement : state.styleScore,
       streak,
       bestStreak,
+      perfectCount: state.perfectCount + (isPerfect ? 1 : 0),
       lastStackQuality: styleEnabled ? quality : null,
     },
     leveledUp,
@@ -500,6 +502,10 @@ export const undoLastStack = (state: GameState): GameState => {
     score: newScore,
     stackCount: newStackCount,
     scoreHistory: newScoreHistory,
+    perfectCount:
+      lastAwarded === STYLE_SCORE_BY_QUALITY.PERFECT
+        ? Math.max(0, state.perfectCount - 1)
+        : state.perfectCount,
     world: newWorld,
     level: newLevel,
     targetZoom: newTargetZoom,

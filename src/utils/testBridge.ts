@@ -18,6 +18,8 @@ export type GameTestBridgeState = {
   styleScore: number;
   streak: number;
   bestStreak: number;
+  perfectCount: number;
+  paused: boolean;
   zenLivesRemaining?: number;
   lastStackQuality: GameState["lastStackQuality"];
   themeId?: string;
@@ -47,6 +49,7 @@ type InstallArgs = {
   setManualMode: (manual: boolean) => void;
   forceStack: (sizeRatio: number) => void;
   getTheme: () => WorldTheme | null;
+  isPaused: () => boolean;
 };
 
 const isE2eMode = (): boolean =>
@@ -127,6 +130,7 @@ export const installGameTestBridge = ({
   setManualMode,
   forceStack,
   getTheme,
+  isPaused,
 }: InstallArgs): (() => void) | undefined => {
   if (!isE2eMode()) return undefined;
 
@@ -159,6 +163,8 @@ export const installGameTestBridge = ({
         styleScore: state?.styleScore ?? 0,
         streak: state?.streak ?? 0,
         bestStreak: state?.bestStreak ?? 0,
+        perfectCount: state?.perfectCount ?? 0,
+        paused: isPaused(),
         zenLivesRemaining: state?.zenLivesRemaining,
         lastStackQuality: state?.lastStackQuality ?? null,
         themeId: theme?.id,

@@ -639,4 +639,47 @@ describe("gameState", () => {
       expect(shape0Delta).toBeLessThan(0);
     });
   });
+
+  describe("perfectCount", () => {
+    const stackAt = (state: ReturnType<typeof createInitialState>, ratio: number) => {
+      const spawned = spawnActiveShape(state);
+      const last = spawned.shapes[spawned.shapes.length - 1];
+      return stackActiveShape({
+        ...spawned,
+        activeShape: { ...spawned.activeShape!, size: last.size * ratio },
+      }).state;
+    };
+
+    it("starts at zero", () => {
+      expect(createInitialState(1000).perfectCount).toBe(0);
+    });
+
+    it("counts only perfect stacks", () => {
+      let state = createInitialState(1000);
+      state = stackAt(state, 0.999);
+      expect(state.lastStackQuality).toBe("PERFECT");
+      expect(state.perfectCount).toBe(1);
+      state = stackAt(state, 0.5);
+      expect(state.perfectCount).toBe(1);
+      state = stackAt(state, 0.999);
+      expect(state.perfectCount).toBe(2);
+    });
+
+    it("is not mutated on the input state", () => {
+      const state = createInitialState(1000);
+      stackAt(state, 0.999);
+      expect(state.perfectCount).toBe(0);
+    });
+
+    it("is reduced when a perfect stack is undone in Zen", () => {
+      let state = createInitialState(1000, "ZEN");
+      state = stackAt(state, 0.999);
+      state = stackAt(state, 0.5);
+      expect(state.perfectCount).toBe(1);
+      state = undoLastStack(state); // undoes the non-perfect stack
+      expect(state.perfectCount).toBe(1);
+      state = undoLastStack(state); // undoes the perfect stack
+      expect(state.perfectCount).toBe(0);
+    });
+  });
 });
