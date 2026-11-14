@@ -4,6 +4,15 @@
 
 This roadmap outlines the future vision for **Jokarikara**, expanding on its core minimalist stacking mechanics with deeper progression, rhythmic integration, and social features.
 
+## ✅ Shipped
+
+- **Game modes**: Classic, Zen (10 lives, undo/restart), Time Attack (+5 s per perfect) and a seeded **Daily Challenge** with shareable results.
+- **Boss stacks** (5 / 10 / 15 / 20) and 8 worlds of cumulative mechanics.
+- **Musical feedback**: pentatonic stack melody per world key, level/world cues, mute toggle.
+- **Haptics** on supported devices.
+- **Enhanced visuals**: particles and rings on perfect stacks, screen shake and flash on failure, zoom punch on level up.
+- **Polish**: pause (manual and automatic), keyboard controls, per-mode high scores, installable PWA metadata, frame-rate-independent simulation.
+
 ## 🎵 Audio & Rhythm
 
 The heartbeat of the game will evolve from simple procedural tones to a full rhythmic experience.

@@ -11,13 +11,25 @@ A minimalist, high-intensity rhythm timing game developed with React, TypeScript
 - **Concentric Stacking**: Every successful tap creates a new shape that grows from the center, nested inside the previous ones.
 - **Precise Collision Detection**: The game uses a custom geometric containment system. A tap is only successful if the new shape is strictly contained within the boundaries of the previous shape.
 - **Difficulty Scaling**: As your stack grows, shapes scale up faster and rotate more aggressively, increasing the cognitive load and requiring faster reflexes.
-- **Fail Conditions**: The game ends if you tap too early, too late, or if the growing shape's vertices breach the boundary of the existing stack.
+- **Quality Scoring**: The closer to the edge you stack, the more you score (PERFECT / GREAT / GOOD / OK), and consecutive stacks build a combo.
+- **Fail Conditions**: In Classic, the run ends as soon as the growing shape breaches the boundary of the shape below it.
+
+### Modes
+
+- **Classic**: one miss ends the run.
+- **Zen**: 10 lives, with undo and restart.
+- **Time Attack**: 60 seconds; PERFECT stacks add +5 s.
+- **Daily Challenge**: everyone plays the same seeded run each day, and the result can be shared.
+
+Controls: tap or `Space`/`Enter` to stack, `Esc`/`P` to pause. See [GAMEPLAY.md](GAMEPLAY.md) for the full rules, worlds and bosses.
 
 ## Technical Highlights
 
 - **Pixel-Perfect Geometry**: Implements vertex-in-polygon and perimeter-sampling algorithms to ensure containment logic is "pixel-perfect" regardless of shape type (circle, square, triangle) or rotation.
-- **Web Audio Engine**: Real-time sound synthesis using the Web Audio API. Pitches and tones shift dynamically based on your current score to reinforce the rhythmic flow.
-- **High-Performance Rendering**: Custom `requestAnimationFrame` loop on Canvas for butter-smooth 60FPS animations.
+- **Web Audio Engine**: Procedural synthesis only, no audio files. Stack notes follow a pentatonic melody in a per-world key, and harmony tracks stack quality. Everything goes through a compressor.
+- **Deterministic Runs**: A seeded RNG drives shapes, colours and speeds; the Daily Challenge seeds it from the date.
+- **High-Performance Rendering**: A `requestAnimationFrame` loop on Canvas with frame-rate-independent simulation (identical on 60/120 Hz), a clamped frame delta, a capped device pixel ratio, glow limited to recent layers, and React updates throttled out of the hot path.
+- **Installable**: A web app manifest and mobile meta tags let it run fullscreen from the home screen.
 - **Responsive Design**: Designed primarily for mobile portrait view with a premium "glassmorphism" aesthetic.
 
 ## Development
@@ -38,6 +50,14 @@ npm run dev
 
 ```bash
 npm run build
+```
+
+### Test
+
+```bash
+npm run lint
+npm run test       # Vitest unit tests
+npm run test:e2e   # Playwright (5 browser projects)
 ```
 
 ## Technologies Used
