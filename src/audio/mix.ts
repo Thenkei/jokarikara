@@ -11,7 +11,9 @@ import type { StackQuality } from "../types";
  *   timing cue ≈ -33 / PERFECT tick ≈ -30: well under any stack, above
  *   the music bed so the bed never masks it
  *   music bed ≈ 10 dB under a plain stack, so it never masks feedback
- *   worst simultaneous burst: peak ≤ -1 dBFS (measured ≈ -4.7, no clipping)
+ *   worst simultaneous burst: peak ≤ -1 dBFS (measured ≈ -4.5, no clipping)
+ *   (stack/level up/world up in world 1; worlds 2-10 reshape them through
+ *   `palette.ts` and stay within ±2 dB of world 1, measured ≤ 1.5 dB)
  *
  * Space: every voice also feeds a shared reverb (procedural 1.5 s room, see
  * `reverb.ts` / `reverbBus.ts`) whose return joins the master *before* the
