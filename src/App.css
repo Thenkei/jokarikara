@@ -803,7 +803,8 @@ button:focus-visible {
   letter-spacing: 0.18em;
 }
 
-.daily-summary {
+.daily-summary,
+.run-share {
   display: flex;
   flex-direction: column;
   align-items: center;

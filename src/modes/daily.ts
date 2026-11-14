@@ -53,7 +53,8 @@ const QUALITY_BY_POINTS = new Map<number, StackQuality>([
   [STYLE_QUALITY_POINTS.ok, "OK"],
 ]);
 
-const QUALITY_EMOJI: Record<StackQuality, string> = {
+/** Share legend, shared by the Daily trail and the regular run bar. */
+export const QUALITY_EMOJI: Readonly<Record<StackQuality, string>> = {
   PERFECT: "🟨",
   GREAT: "🟩",
   GOOD: "🟦",
