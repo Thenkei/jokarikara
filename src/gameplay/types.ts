@@ -119,6 +119,14 @@ export interface GameplayConfig {
     timeAttack: {
       startTime: number;
       perfectStackBonus: number;
+      /** Seconds added by a GREAT stack (default 0). */
+      greatStackBonus?: number;
+      /**
+       * Seconds lost on a miss. When set, a miss resets the growing shape and
+       * the run only ends when the clock runs out; when unset, a miss ends the
+       * run as in Classic.
+       */
+      missPenalty?: number;
     };
     zen: {
       minClickRatio: number;

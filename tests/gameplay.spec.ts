@@ -154,7 +154,7 @@ test.describe("Gameplay Deterministic", () => {
     await expect(page.locator(".gameover-screen")).toBeVisible();
   });
 
-  test("time attack: fracture hazard tap triggers game over in world 3", async ({
+  test("time attack: a fracture hazard tap costs time in world 3", async ({
     page,
   }) => {
     await page.goto("/");
@@ -174,9 +174,32 @@ test.describe("Gameplay Deterministic", () => {
     expect(state.fractureActive).toBe(true);
 
     await waitForFractureHazard(bridge);
+    const before = requireState(await bridge.getState()).timeRemaining ?? 0;
     await bridge.tap();
-    await bridge.step(0.016);
+    const after = requireState(await bridge.getState());
 
+    expect(after.isGameOver).toBe(false);
+    expect(after.timeRemaining).toBeCloseTo(before - 5, 5);
+    await expect(page.locator(".time-penalty-pop")).toHaveText("−5s");
+  });
+
+  test("time attack: misses drain the clock until the run ends", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.click('button:has-text("TIME")');
+    await page.click(".start-btn");
+    await waitForBridge(page);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+
+    await bridge.setTimeRemaining(9);
+    for (let i = 0; i < 2; i += 1) {
+      const s = requireState(await bridge.getState());
+      expect(s.isGameOver).toBe(false);
+      await bridge.setActiveSize((s.lastSize ?? 1) * 1.2);
+      await bridge.tap();
+    }
     await expect(page.locator(".gameover-screen")).toBeVisible();
   });
 

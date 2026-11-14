@@ -24,7 +24,7 @@ The game pauses automatically when you switch tabs or the window loses focus, an
 | --- | --- |
 | **Classic** | One miss ends the run. |
 | **Zen** | 10 lives; each miss costs one life and resets the growing shape. `UNDO` and `RESTART` are available. Taps before the shape reaches 30% of the container are ignored, with a soft cue. **Practice**: once you have reached a world in any run, Zen can start directly at that world (‹ › picker on the start screen). Practice runs skip leaderboards and achievements. |
-| **Time Attack** | 60 seconds on the clock. Every **PERFECT** stack adds **+5 s**. The timer turns red at 10 s, and the last 5 seconds tick audibly. |
+| **Time Attack** | 60 seconds on the clock. **PERFECT +5 s**, **GREAT +2 s**. A miss costs **−5 s** and resets the growing shape instead of ending the run, so the run ends only when the clock hits zero. The timer turns red at 10 s, and the last 5 seconds tick audibly. |
 | **Daily Challenge** | Classic rules on a **seed derived from today's date**, so everyone gets the same sequence of shapes, colours and speeds. Your best score and number of tries are kept per day, and **SHARE RESULT** copies a spoiler-free summary (score plus quality trail). Daily scores stay out of the Classic leaderboard. |
 
 Best scores are tracked separately for Classic, Zen and Time Attack (top 5 each).

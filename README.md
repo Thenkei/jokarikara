@@ -18,7 +18,7 @@ A minimalist, high-intensity rhythm timing game developed with React, TypeScript
 
 - **Classic**: one miss ends the run.
 - **Zen**: 10 lives, with undo and restart.
-- **Time Attack**: 60 seconds; PERFECT stacks add +5 s.
+- **Time Attack**: 60 seconds against the clock. PERFECT +5 s, GREAT +2 s, a miss −5 s.
 - **Daily Challenge**: everyone plays the same seeded run each day, and the result can be shared.
 
 Controls: tap or `Space`/`Enter` to stack, `Esc`/`P` to pause. See [GAMEPLAY.md](GAMEPLAY.md) for the full rules, worlds and bosses.

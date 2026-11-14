@@ -17,7 +17,12 @@ export const gameplayConfig = new GameplayBuilder()
     },
     streakBonusPerStack: 5,
   })
-  .modeTimeAttack({ startTime: 60, perfectStackBonus: 5 })
+  .modeTimeAttack({
+    startTime: 60,
+    perfectStackBonus: 5,
+    greatStackBonus: 2,
+    missPenalty: 5,
+  })
   .modeZen({ minClickRatio: 0.3, maxLives: 10 })
   .colors([
     "#3b82f6", // blue
