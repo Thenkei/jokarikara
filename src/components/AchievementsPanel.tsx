@@ -62,7 +62,7 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
           </li>
         ))}
       </ul>
-      <button className="achievements-back-btn" onClick={onClose} autoFocus>
+      <button className="achievements-back-btn" data-ui-sound="back" onClick={onClose} autoFocus>
         BACK
       </button>
     </section>

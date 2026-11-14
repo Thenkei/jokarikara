@@ -6,6 +6,7 @@ import {
   useEffect,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { GameCanvas, type GameCanvasHandle } from "./components/GameCanvas";
 import { audioManager } from "./utils/audioManager";
@@ -568,6 +569,8 @@ function App() {
     const next = !muted;
     setMuted(next);
     audioManager.setMuted(next);
+    // Audible confirmation that sound is back (muting stays silent).
+    if (!next) audioManager.playUi("select");
     saveSettings({ muted: next });
     revealSecondaryHud();
   };
@@ -693,6 +696,7 @@ function App() {
               : null;
     if (target === null) return;
     event.preventDefault();
+    audioManager.playUi("select");
     const next = GAME_MODES[target];
     setMode(next);
     modeButtonRefs.current[next]?.focus();
@@ -729,7 +733,7 @@ function App() {
         {reducedFx ? "FX: LOW" : "FX: FULL"}
       </button>
       <button
-        className="mute-toggle-btn"
+        className="mute-toggle-btn" data-ui-sound="none"
         onClick={handleToggleMute}
         aria-label="Mute sound"
         aria-pressed={muted}
@@ -751,8 +755,22 @@ function App() {
   const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
   const breakdownTotal = QUALITY_ORDER.reduce((sum, q) => sum + breakdown[q], 0);
 
+  /**
+   * Menu sounds via one delegated listener: every button plays "select"
+   * unless it declares data-ui-sound (confirm / back / none for buttons with
+   * their own feedback). Clicks are user gestures, so this also unlocks audio.
+   */
+  const handleUiClickCapture = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const button = (event.target as HTMLElement | null)?.closest("button");
+    if (!button || button.disabled) return;
+    const kind = button.dataset.uiSound ?? "select";
+    if (kind === "select" || kind === "confirm" || kind === "back") {
+      audioManager.playUi(kind);
+    }
+  };
+
   return (
-    <div className="game-container">
+    <div className="game-container" onClickCapture={handleUiClickCapture}>
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {/* key forces re-announcement of identical consecutive messages */}
         <span key={announcement.id}>{announcement.text}</span>
@@ -835,14 +853,14 @@ function App() {
           )}
 
           <button
-            className="start-btn"
+            className="start-btn" data-ui-sound="confirm"
             onClick={() => startRun({ mode, daily: false })}
           >
             START
           </button>
 
           <button
-            className="daily-btn"
+            className="daily-btn" data-ui-sound="confirm"
             onClick={() => startRun({ mode: "CLASSIC", daily: true })}
             aria-label={`Daily challenge for ${formatDailyLabel(getLocalDateKey())}. Same shapes for everyone today.`}
           >
@@ -944,7 +962,7 @@ function App() {
               {mode === "ZEN" && (
                 <div className="zen-controls">
                   <button
-                    className="restart-btn"
+                    className="restart-btn" data-ui-sound="none"
                     onClick={(event) => {
                       blurTarget(event);
                       handleRestartShape();
@@ -954,7 +972,7 @@ function App() {
                     RESTART
                   </button>
                   <button
-                    className="undo-btn"
+                    className="undo-btn" data-ui-sound="none"
                     onClick={(event) => {
                       blurTarget(event);
                       handleUndo();
@@ -977,19 +995,19 @@ function App() {
             >
               <h2 className="pause-title">PAUSED</h2>
               <button
-                className="pause-resume-btn"
+                className="pause-resume-btn" data-ui-sound="confirm"
                 onClick={() => applyPaused(false)}
                 autoFocus
               >
                 RESUME
               </button>
               <button
-                className="pause-restart-btn menu-btn"
+                className="pause-restart-btn menu-btn" data-ui-sound="confirm"
                 onClick={restartRun}
               >
                 RESTART
               </button>
-              <button className="pause-menu-btn menu-btn" onClick={handleMainMenu}>
+              <button className="pause-menu-btn menu-btn" data-ui-sound="back" onClick={handleMainMenu}>
                 MAIN MENU
               </button>
               {renderSettings("pause")}
@@ -1170,7 +1188,7 @@ function App() {
                 {lastRun.daily.attempts}{" "}
                 {lastRun.daily.attempts === 1 ? "TRY" : "TRIES"}
               </p>
-              <button className="share-btn" onClick={handleShare}>
+              <button className="share-btn" data-ui-sound="confirm" onClick={handleShare}>
                 SHARE RESULT
               </button>
               <p className="share-status" role="status">
@@ -1202,10 +1220,10 @@ function App() {
             )}
           </div>
           )}
-          <button className="retry-btn" onClick={restartRun}>
+          <button className="retry-btn" data-ui-sound="confirm" onClick={restartRun}>
             RETRY
           </button>
-          <button className="menu-btn" onClick={handleMainMenu}>
+          <button className="menu-btn" data-ui-sound="back" onClick={handleMainMenu}>
             MAIN MENU
           </button>
         </div>

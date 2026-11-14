@@ -1,4 +1,4 @@
-import type { IAudioService, MusicIntensity, MusicState } from "../audio/types";
+import type { IAudioService, UiSoundKind, MusicIntensity, MusicState } from "../audio/types";
 import { MusicEngine } from "../audio/musicEngine";
 import {
   MUSIC_VOLUME,
@@ -370,6 +370,26 @@ class AudioManager implements IAudioService {
       });
     }
     this.play("combo", voices);
+  }
+
+  playUi(kind: UiSoundKind): void {
+    // Quiet, short and in the A-major pentatonic family used by the game.
+    const voices: Voice[] =
+      kind === "confirm"
+        ? [
+            { freq: 659.25, type: "triangle", duration: 0.09, peak: 0.22, attack: 0.003 },
+            { freq: 987.77, type: "triangle", delay: 0.06, duration: 0.14, peak: 0.22, attack: 0.003 },
+          ]
+        : kind === "back"
+          ? [
+              { freq: 659.25, type: "triangle", duration: 0.08, peak: 0.18, attack: 0.003 },
+              { freq: 493.88, type: "triangle", delay: 0.05, duration: 0.12, peak: 0.18, attack: 0.003 },
+            ]
+          : [
+              { freq: 880, type: "triangle", duration: 0.14, peak: 0.85, attack: 0.002 },
+              { freq: 1760, type: "sine", duration: 0.05, peak: 0.12, attack: 0.001 },
+            ];
+    this.play("menu", voices);
   }
 
   playHeartbeat(): void {
