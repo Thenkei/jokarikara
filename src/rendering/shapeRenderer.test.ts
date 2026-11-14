@@ -61,6 +61,50 @@ describe("shapeRenderer", () => {
     });
   });
 
+  describe("drawShape performance guards", () => {
+    const shape: Shape = {
+      type: "circle",
+      size: 100,
+      rotation: 0,
+      color: "#ff0000",
+      opacity: 1,
+    };
+
+    it("skips fully faded shapes without touching the context", () => {
+      const ctx = createMockContext();
+      drawShape(ctx, { ...shape, opacity: 0 }, 0, 0, 1, defaultMechanics);
+      expect(ctx.save).not.toHaveBeenCalled();
+      expect(ctx.fill).not.toHaveBeenCalled();
+    });
+
+    it("applies shadow blur glow by default", () => {
+      const ctx = createMockContext();
+      drawShape(ctx, shape, 0, 0, 1, defaultMechanics);
+      expect(ctx.shadowBlur).toBeGreaterThan(0);
+    });
+
+    it("does not set shadow blur when glow is disabled", () => {
+      const ctx = createMockContext();
+      drawShape(
+        ctx,
+        shape,
+        0,
+        0,
+        1,
+        defaultMechanics,
+        0,
+        true,
+        0,
+        false,
+        undefined,
+        undefined,
+        false,
+      );
+      expect(ctx.shadowBlur).toBe(0);
+      expect(ctx.stroke).toHaveBeenCalled();
+    });
+  });
+
   describe("drawShape", () => {
     it("should save and restore context", () => {
       const ctx = createMockContext();

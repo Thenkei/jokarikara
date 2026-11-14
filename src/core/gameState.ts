@@ -537,34 +537,63 @@ export const updateZoom = (
 };
 
 /**
- * Update shape opacities (older shapes fade out).
+ * Reference frame duration. Legacy per-frame constants were tuned at 60 Hz;
+ * expressing them per second keeps the original feel on 60 Hz screens while
+ * making 120 Hz (ProMotion) and throttled 30 Hz devices behave identically.
  */
-export const updateShapeOpacities = (state: GameState): GameState => {
-  const updatedShapes = state.shapes.map((shape, index) => {
-    const age = state.shapes.length - 1 - index;
-    if (age > 10) {
-      return { ...shape, opacity: Math.max(0, shape.opacity - 0.005) };
+const REFERENCE_FRAME_DT = 1 / 60;
+
+/** Stacked-shape drift, in radians per second (was 0.005 rad/frame @ 60 Hz). */
+export const STACK_DRIFT_SPEED = 0.3;
+/** Opacity lost per second by shapes deeper than {@link FADE_AGE_THRESHOLD}. */
+export const STACK_FADE_SPEED = 0.3;
+/** Shapes older than this many layers start fading out. */
+export const FADE_AGE_THRESHOLD = 10;
+
+/**
+ * Update shape opacities (older shapes fade out).
+ * Frame-rate independent; returns the same state reference when nothing fades
+ * so the hot path does not allocate for small stacks.
+ */
+export const updateShapeOpacities = (
+  state: GameState,
+  dt: number = REFERENCE_FRAME_DT,
+): GameState => {
+  const { shapes } = state;
+  if (shapes.length - 1 <= FADE_AGE_THRESHOLD) return state;
+
+  const fade = STACK_FADE_SPEED * dt;
+  let changed = false;
+  const updatedShapes = shapes.map((shape, index) => {
+    const age = shapes.length - 1 - index;
+    if (age > FADE_AGE_THRESHOLD && shape.opacity > 0) {
+      changed = true;
+      return { ...shape, opacity: Math.max(0, shape.opacity - fade) };
     }
     return shape;
   });
 
-  return { ...state, shapes: updatedShapes };
+  return changed ? { ...state, shapes: updatedShapes } : state;
 };
 
 /**
- * Apply subtle rotation drift to stacked shapes.
+ * Apply subtle rotation drift to stacked shapes (frame-rate independent).
  */
-export const updateShapeRotations = (state: GameState): GameState => {
+export const updateShapeRotations = (
+  state: GameState,
+  dt: number = REFERENCE_FRAME_DT,
+): GameState => {
   const mechanics = getWorldMechanics(state.world);
   const invertByLevel = mechanics.rotationInvertByLevel && state.level % 2 === 0;
   const invertForBoss = mechanics.rotationFlipOnBoss && state.isBossLevel;
   const inversion = (invertByLevel ? -1 : 1) * (invertForBoss ? -1 : 1);
+  const step = STACK_DRIFT_SPEED * dt;
 
   const updatedShapes = state.shapes.map((shape, index) => {
     const direction = (index % 2 === 0 ? 1 : -1) * inversion;
     return {
       ...shape,
-      rotation: shape.rotation + 0.005 * direction,
+      rotation: shape.rotation + step * direction,
     };
   });
 
