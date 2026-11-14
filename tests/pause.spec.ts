@@ -57,12 +57,19 @@ test.describe("Pause and keyboard", () => {
     await waitForBridge(page);
     const bridge = makeBridge(page);
 
+    // Freeze the real rAF loop first: on slow runners the growing shape can
+    // reach the container (auto-fail -> game over) before the next click
+    // lands. Keyboard taps call handleTap directly, so Space still stacks.
+    await bridge.pause();
     await page.keyboard.press("Space");
     await expect.poll(async () => (await bridge.getState())?.stackCount).toBe(1);
 
     await page.click(".pause-btn");
     await page.click(".pause-restart-btn");
     await expect(page.locator(".pause-overlay")).toBeHidden();
+    // Restart remounts the canvas and reinstalls the bridge in real-time mode.
+    await waitForBridge(page);
+    await bridge.pause();
     await expect.poll(async () => (await bridge.getState())?.stackCount).toBe(0);
 
     await page.click(".pause-btn");
