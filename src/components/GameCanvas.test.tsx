@@ -278,6 +278,30 @@ describe("GameCanvas", () => {
       }
     };
 
+    it("keeps a single loop alive after deps change and cancels the latest rAF id", () => {
+      const cancel = vi.spyOn(window, "cancelAnimationFrame");
+      const props = {
+        onGameOver: vi.fn(),
+        onLevelUp: vi.fn(),
+        onWorldUp: vi.fn(),
+        audioService: mockAudioService,
+      };
+      const { rerender } = render(<GameCanvas onScore={vi.fn()} {...props} />);
+      // New callback identity => handleTap/tick/effect deps change => re-run.
+      rerender(<GameCanvas onScore={vi.fn()} {...props} />);
+      rerender(<GameCanvas onScore={vi.fn()} {...props} />);
+      expect(cancel).toHaveBeenCalled();
+
+      // Fire every queued frame (stale ones included, as a browser might).
+      const queued = frames.splice(0);
+      act(() => queued.forEach((cb) => cb(1000)));
+      // First frame only primes lastTime; exactly one loop must re-queue.
+      expect(frames).toHaveLength(1);
+      const next = frames.splice(0);
+      act(() => next.forEach((cb) => cb(1016)));
+      expect(frames).toHaveLength(1);
+    });
+
     it("reports Time Attack time once per displayed second, not every frame", () => {
       const onTimeUpdate = vi.fn();
       render(

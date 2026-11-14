@@ -28,6 +28,21 @@ import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture
 import { installGameTestBridge } from "../utils/testBridge";
 import { getWorldTheme } from "../visual/theme";
 import { haptic } from "../utils/haptics";
+import {
+  createEffects,
+  drawEffects,
+  drawFlash,
+  GAME_OVER_DELAY_MS,
+  getPunchScale,
+  getShakeOffset,
+  hasActiveEffects,
+  spawnStackBurst,
+  triggerFail,
+  triggerLevelUp,
+  triggerWorldUp,
+  updateEffects,
+  type EffectsState,
+} from "../rendering/effects";
 
 /** Time Attack: tick every second once this few seconds remain. */
 export const COUNTDOWN_TICK_FROM = 5;
@@ -103,6 +118,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     const manualModeRef = useRef(false);
     const loopRef = useRef<(time: number) => void>(undefined);
     const reducedFxRef = useRef(reducedFx);
+    const effectsRef = useRef<EffectsState>(createEffects());
+    const rafIdRef = useRef(0);
+    const gameOverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Last whole second reported to onTimeUpdate. The HUD only shows
     // Math.ceil(time), so reporting every frame re-rendered <App/> ~60x/s.
     const lastReportedSecondRef = useRef<number | null>(null);
@@ -122,12 +140,36 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       );
       stateRef.current = spawnActiveShape(initialState, reducedFxRef.current);
       lastReportedSecondRef.current = null;
+      effectsRef.current = createEffects();
       onZenLivesChange?.(
         stateRef.current.mode === "ZEN"
           ? (stateRef.current.zenLivesRemaining ?? null)
           : null,
       );
     }, [mode, runSeed, onZenLivesChange]);
+
+    useEffect(
+      () => () => {
+        if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
+      },
+      [],
+    );
+
+    /** Delay the callback so fail feedback is visible; state is already over. */
+    const notifyGameOver = useCallback(
+      (score: number, world: number, level: number) => {
+        if (GAME_OVER_DELAY_MS <= 0) {
+          onGameOver(score, world, level);
+          return;
+        }
+        if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
+        gameOverTimerRef.current = setTimeout(() => {
+          gameOverTimerRef.current = null;
+          onGameOver(score, world, level);
+        }, GAME_OVER_DELAY_MS);
+      },
+      [onGameOver],
+    );
 
     useImperativeHandle(
       ref,
@@ -148,7 +190,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       manualModeRef.current = manual;
       if (!manual && loopRef.current) {
         lastTimeRef.current = 0;
-        requestAnimationFrame(loopRef.current);
+        rafIdRef.current = requestAnimationFrame(loopRef.current);
       }
     }, []);
 
@@ -172,7 +214,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       if (stateRef.current.isGameOver && !wasGameOver) {
         audioService.playFailSound();
         haptic("fail");
-        onGameOver(
+        effectsRef.current = triggerFail(effectsRef.current, reducedFxRef.current);
+        notifyGameOver(
           stateRef.current.score,
           stateRef.current.world,
           stateRef.current.level,
@@ -181,8 +224,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         // Zen: a life is lost but the run continues.
         audioService.playMissSound();
         haptic("miss");
+        effectsRef.current = triggerFail(
+          effectsRef.current,
+          reducedFxRef.current,
+          true,
+        );
       }
-    }, [onGameOver, onStyleUpdate, onZenLivesChange, audioService]);
+    }, [notifyGameOver, onStyleUpdate, onZenLivesChange, audioService]);
 
     const handleTap = useCallback(() => {
       if (
@@ -234,6 +282,20 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           : result.state.streak;
       audioService.playStack(result.quality, melodyStep, state.world);
       haptic(result.quality === "PERFECT" ? "perfect" : "tap");
+      {
+        const stacked = result.state.shapes[result.state.shapes.length - 1];
+        const { width, height } = dimensionsRef.current;
+        if (stacked) {
+          effectsRef.current = spawnStackBurst(effectsRef.current, {
+            quality: result.quality,
+            x: width / 2,
+            y: height / 2,
+            radius: (stacked.size / 2) * result.state.zoom,
+            color: stacked.color,
+            reducedFx,
+          });
+        }
+      }
       if (result.isPerfect && result.state.mode === "TIME_ATTACK") {
         audioService.playTimeBonus();
       }
@@ -241,6 +303,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       // Check for level up
       if (result.leveledUp) {
         haptic("levelUp");
+        effectsRef.current = result.worldUp
+          ? triggerWorldUp(effectsRef.current, reducedFx)
+          : triggerLevelUp(effectsRef.current, reducedFx);
         if (result.worldUp) {
           onWorldUp(result.state.world);
           audioService.playWorldUp(result.state.world);
@@ -300,7 +365,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
     const tick = useCallback(
       (timeMs: number, dtOverrideSeconds?: number) => {
-        if (!stateRef.current || stateRef.current.isGameOver) return;
+        if (!stateRef.current) return;
+        // After game over only the fail feedback keeps animating.
+        if (
+          stateRef.current.isGameOver &&
+          !hasActiveEffects(effectsRef.current)
+        )
+          return;
 
         const ctx = ctxRef.current;
         if (!ctx) return;
@@ -316,15 +387,19 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         // Update state
         let state = stateRef.current;
+        const wasOver = state.isGameOver;
+        if (dt > 0) {
+          effectsRef.current = updateEffects(effectsRef.current, dt);
+        }
 
         // Process restart request within the loop context
-        if (restartRequestedRef.current) {
+        if (restartRequestedRef.current && !wasOver) {
           state = restartActiveShape(state, reducedFx);
           restartRequestedRef.current = false;
           audioService.playStackSound(0);
         }
 
-        if (undoRequestedRef.current) {
+        if (undoRequestedRef.current && !wasOver) {
           state = undoLastStack(state);
           undoRequestedRef.current = false;
           // If undo resulted in no active shape, spawn one
@@ -337,7 +412,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           audioService.playStackSound(state.stackCount);
         }
 
-        if (dt > 0) {
+        if (dt > 0 && !wasOver) {
           state = updateActiveShape(state, dt);
           state = updateZoom(state, dt);
           state = updateShapeRotations(state, dt);
@@ -366,7 +441,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             if (state.isGameOver) {
               stateRef.current = state;
               audioService.playFailSound();
-              onGameOver(state.score, state.world, state.level);
+              effectsRef.current = triggerFail(
+                effectsRef.current,
+                reducedFx,
+              );
+              notifyGameOver(state.score, state.world, state.level);
               return;
             }
           }
@@ -375,7 +454,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         stateRef.current = state;
 
         // Check auto-fail if shape starts poking out
-        if (!checkContainment(state)) {
+        if (!wasOver && !checkContainment(state)) {
           miss();
           return;
         }
@@ -387,6 +466,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const centerY = height / 2;
 
         ctx.save();
+        const fx = effectsRef.current;
+        if (hasActiveEffects(fx)) {
+          const shake = getShakeOffset(fx);
+          const punch = getPunchScale(fx);
+          ctx.translate(
+            shake.x + centerX * (1 - punch),
+            shake.y + centerY * (1 - punch),
+          );
+          ctx.scale(punch, punch);
+        }
 
         // Get world mechanics for current world
         const mechanics = getWorldMechanics(state.world);
@@ -434,12 +523,17 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           );
         }
 
+        if (fx.rings.length > 0 || fx.particles.length > 0) {
+          drawEffects(ctx, fx);
+        }
+
         ctx.restore();
+        if (fx.flash.t > 0) drawFlash(ctx, fx, width, height);
       },
       [
         audioService,
         miss,
-        onGameOver,
+        notifyGameOver,
         onLevelUp,
         onScore,
         onTimeUpdate,
@@ -484,14 +578,24 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       window.addEventListener("resize", resize);
       resize();
 
+      // Per-effect flag: a re-run of this effect must retire this loop even
+      // if a rAF callback is already queued (or re-queued via setManualMode).
+      let cancelled = false;
+
       const loop = (time: number) => {
+        if (cancelled) return;
         loopRef.current = loop;
-        if (!stateRef.current || stateRef.current.isGameOver) return;
+        if (!stateRef.current) return;
+        if (
+          stateRef.current.isGameOver &&
+          !hasActiveEffects(effectsRef.current)
+        )
+          return;
 
         if (lastTimeRef.current === 0) {
           lastTimeRef.current = time;
           if (!manualModeRef.current) {
-            requestAnimationFrame(loop);
+            rafIdRef.current = requestAnimationFrame(loop);
           }
           return;
         }
@@ -500,12 +604,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         lastTimeRef.current = time;
         tick(time, dt);
 
-        if (!manualModeRef.current) {
-          requestAnimationFrame(loop);
+        if (!cancelled && !manualModeRef.current) {
+          rafIdRef.current = requestAnimationFrame(loop);
         }
       };
 
-      const animId = requestAnimationFrame(loop);
+      rafIdRef.current = requestAnimationFrame(loop);
       const cleanupBridge = installGameTestBridge({
         stateRef,
         handleTap,
@@ -522,14 +626,15 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             : null,
       });
       return () => {
-        cancelAnimationFrame(animId);
+        cancelled = true;
+        cancelAnimationFrame(rafIdRef.current);
         window.removeEventListener("resize", resize);
         cleanupBridge?.();
       };
     }, [
       audioService,
       miss,
-      onGameOver,
+      notifyGameOver,
       onTimeUpdate,
       onScore,
       onLevelUp,
