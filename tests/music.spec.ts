@@ -67,7 +67,11 @@ test.describe("Dynamic soundtrack", () => {
 
   test("mute and music toggles in the pause menu silence the soundtrack", async ({
     page,
+    browserName,
   }) => {
+    // ~15 clicks through blurred overlays: software-rendered WebKit in CI
+    // spends 2.5-5 s per click waiting for stable frames, past 30 s total.
+    test.slow(browserName === "webkit", "slow overlay rendering on CI WebKit");
     await page.goto("/");
     await page.click(".start-btn");
     await waitForBridge(page);

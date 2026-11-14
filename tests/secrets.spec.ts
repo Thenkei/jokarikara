@@ -25,6 +25,19 @@ const typeSequence = async (page: Page) => {
 
 const title = (page: Page) => page.getByRole("heading", { level: 1, name: "SHAPE STACK" });
 
+/**
+ * Tap the title `count` times as raw pointer input at its centre. Locator
+ * clicks wait for actionability on every call, which takes 0.5-1.2 s each on
+ * software-rendered WebKit in CI: seven of them overrun the 3 s tap window.
+ */
+const tapTitle = async (page: Page, count: number) => {
+  const box = await title(page).boundingBox();
+  if (!box) throw new Error("Title not rendered");
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  for (let i = 0; i < count; i += 1) await page.mouse.click(x, y);
+};
+
 test.describe("Start screen secrets", () => {
   test("7 quick title taps play the backdrop flourish and unlock the hidden achievement", async ({
     page,
@@ -48,10 +61,10 @@ test.describe("Start screen secrets", () => {
     await page.click(".achievements-back-btn");
 
     // Six taps are not enough.
-    for (let i = 0; i < 6; i += 1) await heading.click();
+    await tapTitle(page, 6);
     await expect(backdrop).not.toHaveClass(/flourish/);
 
-    await heading.click();
+    await tapTitle(page, 1);
     await expect(backdrop).toHaveClass(/flourish/);
     await expect(page.locator(".achievement-toast")).toHaveText(
       "ACHIEVEMENT · Curious Mind",
