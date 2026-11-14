@@ -32,6 +32,7 @@ import {
 } from "../rendering/shapeRenderer";
 import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture";
 import { getPerfectGuide } from "../gameplay/guide";
+import { getComboTier, isComboMilestone } from "../gameplay/combo";
 import {
   getArenaRadius,
   isEarlyReverseTap,
@@ -405,6 +406,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           : result.state.streak;
       audioService.playStack(result.quality, melodyStep, state.world);
       haptic(result.quality === "PERFECT" ? "perfect" : "tap");
+      if (result.state.mode !== "ZEN" && isComboMilestone(result.state.streak)) {
+        audioService.playComboMilestone(
+          getComboTier(result.state.streak),
+          result.state.world,
+        );
+        haptic("levelUp");
+      }
       {
         const stacked = result.state.shapes[result.state.shapes.length - 1];
         const { width, height } = dimensionsRef.current;

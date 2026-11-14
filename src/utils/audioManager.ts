@@ -9,6 +9,7 @@ import {
 import type { StackQuality } from "../types";
 import {
   getStackNoteHz,
+  pentatonicSemitones,
   getWorldRoot,
   LEVEL_UP_ARPEGGIO,
   QUALITY_HARMONY,
@@ -350,6 +351,25 @@ class AudioManager implements IAudioService {
       { freq, type: "sine", duration: 0.12, peak: urgent ? 1 : 0.55, attack: 0.002 },
       { freq: freq * 2.5, type: "triangle", duration: 0.03, peak: 0.12, attack: 0.001 },
     ]);
+  }
+
+  playComboMilestone(tier: number, world: number): void {
+    // A quick rising pentatonic run, one octave above the world root, longer
+    // for higher tiers, closing on a held top note.
+    const root = getWorldRoot(world) * 2;
+    const notes = Math.min(3 + Math.max(1, Math.floor(tier)), 8);
+    const voices: Voice[] = [];
+    for (let i = 0; i < notes; i += 1) {
+      const last = i === notes - 1;
+      voices.push({
+        freq: root * semitonesToRatio(pentatonicSemitones(i * 2)),
+        type: "triangle",
+        delay: i * 0.055,
+        duration: last ? 0.5 : 0.16,
+        peak: last ? 0.3 : 0.22,
+      });
+    }
+    this.play("combo", voices);
   }
 
   playHeartbeat(): void {

@@ -1484,3 +1484,59 @@ button:focus-visible {
   letter-spacing: 0.08em;
   color: #8b93a3;
 }
+
+/* ---------- Combo milestones ---------- */
+.combo-milestone {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 92;
+  pointer-events: none;
+  font-size: clamp(1.4rem, 7vw, 2.2rem);
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #ffe066 0%, #ff8a3d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 14px rgba(255, 170, 60, 0.45));
+  animation: comboPop 1.2s ease-out forwards;
+}
+
+.combo-tier-3,
+.combo-tier-4,
+.combo-tier-5 {
+  background: linear-gradient(135deg, #00e5ff 0%, #ff4fd8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(255, 79, 216, 0.5));
+}
+
+@keyframes comboPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+  40% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -62%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combo-milestone {
+    animation: timeBonusFade 1.2s linear forwards;
+  }
+}

@@ -23,6 +23,7 @@ import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
 import { getWorldPalette, getWorldTheme } from "./visual/theme";
 import { StartBackdrop } from "./components/StartBackdrop";
 import { getTimeBonus } from "./core/gameState";
+import { getComboTier, isComboMilestone } from "./gameplay/combo";
 import {
   getEndInsight,
   getQualityBreakdown,
@@ -206,6 +207,8 @@ function App() {
   const [showSecondaryHud, setShowSecondaryHud] = useState(false);
   const [lastQuality, setLastQuality] = useState<StackQuality | null>(null);
   const [qualityPulseId, setQualityPulseId] = useState(0);
+  /** Last combo milestone reached (id replays the banner animation). */
+  const [comboBanner, setComboBanner] = useState({ streak: 0, id: 0 });
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -346,6 +349,7 @@ function App() {
     setLastQuality(null);
     setQualityPulseId(0);
     setPenaltyPulseId(0);
+    setComboBanner({ streak: 0, id: 0 });
     setHasStackedThisRun(false);
     setLevel(1);
     setWorld(startWorld);
@@ -463,6 +467,9 @@ function App() {
     setLastQuality(style.lastStackQuality);
     if (style.lastStackQuality) {
       setQualityPulseId((current) => current + 1);
+      if (isComboMilestone(style.streak)) {
+        setComboBanner((current) => ({ streak: style.streak, id: current.id + 1 }));
+      }
     }
   }, []);
 
@@ -945,6 +952,16 @@ function App() {
                 −{TIME_ATTACK_MISS_PENALTY}s
               </div>
             )}
+
+          {comboBanner.streak > 0 && mode !== "ZEN" && (
+            <div
+              key={`combo-${comboBanner.id}`}
+              className={`combo-milestone combo-tier-${getComboTier(comboBanner.streak)}`}
+              role="status"
+            >
+              COMBO ×{comboBanner.streak}
+            </div>
+          )}
 
           {showLevelUp && !showWorldUp && (
             <div className="level-up-overlay">
