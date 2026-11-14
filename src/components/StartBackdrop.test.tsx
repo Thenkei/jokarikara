@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { BACKDROP_LAYERS, StartBackdrop } from "./StartBackdrop";
+import { StartBackdrop } from "./StartBackdrop";
+import { BACKDROP_LAYERS } from "./startBackdropLayers";
 
 describe("StartBackdrop", () => {
   it("renders one centred layer per backdrop shape, hidden from assistive tech", () => {
