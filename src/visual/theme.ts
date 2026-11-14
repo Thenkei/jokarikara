@@ -240,7 +240,7 @@ const ensureContrast = (
   backgroundHex: string,
   contrastFloor: number,
 ): HslColor => {
-  let candidate = { ...color };
+  const candidate = { ...color };
   for (let i = 0; i < 8; i += 1) {
     const ratio = contrastRatio(hslToHex(candidate), backgroundHex);
     if (ratio >= contrastFloor) {

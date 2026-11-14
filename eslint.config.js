@@ -20,4 +20,15 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Playwright E2E tests: not React code.
+    // - Fixtures receive a `use` callback that the React hooks rule mistakes for React's `use()`.
+    // - Playwright reads the first parameter's destructuring to resolve fixture deps,
+    //   so fixtures with no deps must be written as `async ({}, use) => …`.
+    files: ['tests/**/*.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'no-empty-pattern': ['error', { allowObjectPatternsAsParameters: true }],
+    },
+  },
 ])
