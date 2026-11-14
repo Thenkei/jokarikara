@@ -15,7 +15,7 @@ test.describe("Achievements", () => {
     page,
   }) => {
     await page.goto("/");
-    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 0/12");
+    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 0/13");
 
     await page.click(".start-btn");
     await waitForBridge(page);
@@ -48,7 +48,7 @@ test.describe("Achievements", () => {
     await expect(page.locator(".run-achievements")).toContainText("First Stack");
 
     await page.click(".gameover-screen .menu-btn");
-    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 1/12");
+    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 1/13");
   });
 
   test("panel reflects live unlocks, including Perfect Alignment", async ({ page }) => {
@@ -68,13 +68,13 @@ test.describe("Achievements", () => {
     await page.click(".pause-btn");
     await page.click(".pause-menu-btn");
 
-    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 3/12");
+    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 3/13");
     await page.click(".achievements-btn");
 
     const panel = page.locator(".achievements-screen");
     await expect(panel).toBeVisible();
-    await expect(panel.locator(".achievements-count")).toHaveText("3 / 12 UNLOCKED");
-    await expect(panel.locator(".achievement-item")).toHaveCount(12);
+    await expect(panel.locator(".achievements-count")).toHaveText("3 / 13 UNLOCKED");
+    await expect(panel.locator(".achievement-item")).toHaveCount(13);
     await expect(panel.locator(".achievement-item.unlocked")).toHaveCount(3);
     for (const id of ["first-stack", "giant-slayer", "perfect-alignment"]) {
       await expect(

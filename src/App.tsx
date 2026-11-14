@@ -47,9 +47,11 @@ import {
 import { buildRunShareText } from "./modes/share";
 import {
   ACHIEVEMENT_COUNT,
+  SECRET_ACHIEVEMENT_ID,
   countUnlocked,
   type AchievementId,
 } from "./progression/achievements";
+import { MONO_SEQUENCE, registerTap, stepSequence } from "./utils/secrets";
 import { useAchievements } from "./progression/useAchievements";
 import { isFirstEverProfile } from "./progression/stats";
 import {
@@ -87,6 +89,8 @@ const createRunSeed = (): number => {
 };
 
 const HUD_REVEAL_DURATION_MS = 2000;
+/** Start backdrop flourish length: the CSS burst plus its last layer's delay. */
+const FLOURISH_MS = 1900;
 /** Long enough to read the world name and its rule reminder. */
 const WORLD_INTRO_MS = 2800;
 /** Time Attack timer turns critical (red, pulsing) at or below this. */
@@ -216,6 +220,15 @@ function App() {
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  /**
+   * Start screen secrets. Mono is session-only by design (never persisted):
+   * a reload brings the regular look back.
+   */
+  const [mono, setMono] = useState(false);
+  const [flourishing, setFlourishing] = useState(false);
+  const secretProgressRef = useRef(0);
+  const titleTapsRef = useRef<readonly number[]>([]);
+  const flourishTimeoutRef = useRef<number | null>(null);
   /** The gear that opened the sheet (start screen or pause menu, never both). */
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<GameCanvasHandle>(null);
@@ -236,6 +249,7 @@ function App() {
     setPaused: setAchievementsPaused,
     finishRun: finishAchievementRun,
     abandonRun: abandonAchievementRun,
+    unlock: unlockAchievement,
   } = useAchievements({ onUnlock: handleAchievementUnlock });
   const unlockedAchievementCount = countUnlocked(achievementRecord.unlocked);
 
@@ -272,12 +286,12 @@ function App() {
   const worldConfig = useMemo(() => getWorldConfig(world), [world]);
   // Fixed seed: the start screen keeps the same look between visits.
   const backdropPalette = useMemo(
-    () => getWorldPalette(1, 0, reducedFx),
-    [reducedFx]
+    () => getWorldPalette(1, 0, reducedFx, mono),
+    [reducedFx, mono]
   );
   const worldTheme = useMemo(
-    () => getWorldTheme(world, runSeed, reducedFx),
-    [world, runSeed, reducedFx]
+    () => getWorldTheme(world, runSeed, reducedFx, mono),
+    [world, runSeed, reducedFx, mono]
   );
 
   const clearSecondaryHudTimeout = useCallback(() => {
@@ -304,6 +318,49 @@ function App() {
 
   useEffect(() => installAudioTestBridge(audioManager), []);
 
+  // Secret inputs only count on the start screen itself: leaving it (or
+  // opening the achievements panel) forgets a half-entered sequence.
+  useEffect(() => {
+    secretProgressRef.current = 0;
+    titleTapsRef.current = [];
+  }, [gameState, showAchievements]);
+
+  useEffect(
+    () => () => {
+      if (flourishTimeoutRef.current !== null) {
+        window.clearTimeout(flourishTimeoutRef.current);
+      }
+    },
+    []
+  );
+
+  /** Title tapped 7 times quickly: backdrop flourish + chime. */
+  const handleTitleClick = (event: ReactMouseEvent<HTMLHeadingElement>) => {
+    // A celebration already playing swallows extra taps (no restart mid-burst).
+    if (flourishing) return;
+    const step = registerTap(titleTapsRef.current, event.timeStamp);
+    titleTapsRef.current = step.taps;
+    if (!step.triggered) return;
+    // Click (not pointerdown) so the 7th tap is a user activation on touch
+    // devices too, and the audio context may start. Silent when muted.
+    audioManager.playChime();
+    audioManager.resume();
+    setFlourishing(true);
+    flourishTimeoutRef.current = window.setTimeout(() => {
+      flourishTimeoutRef.current = null;
+      setFlourishing(false);
+    }, FLOURISH_MS);
+    unlockAchievement(SECRET_ACHIEVEMENT_ID);
+  };
+
+  /** Arrow sequence entered: toggle the Mono look (keyboard-reachable egg). */
+  const toggleMono = () => {
+    const next = !mono;
+    setMono(next);
+    audioManager.playUi(next ? "confirm" : "back");
+    announce(next ? "Mono look on" : "Mono look off");
+    unlockAchievement(SECRET_ACHIEVEMENT_ID);
+  };
   const gameplayThemeVars = useMemo(
     () =>
       ({
@@ -696,6 +753,14 @@ function App() {
       return;
     }
 
+    if (gameState === "START") {
+      // Observes keys only (no preventDefault): arrows keep driving the mode
+      // radio group, and the full sequence nets out to the same mode.
+      const step = stepSequence(MONO_SEQUENCE, secretProgressRef.current, event);
+      secretProgressRef.current = step.progress;
+      if (step.matched) toggleMono();
+    }
+
     if (event.key === "Enter" && !event.repeat && !isInteractiveTarget(event.target)) {
       if (gameState === "START") {
         event.preventDefault();
@@ -787,7 +852,11 @@ function App() {
   };
 
   return (
-    <div className="game-container" onClickCapture={handleUiClickCapture}>
+    <div
+      className="game-container"
+      data-theme={mono ? "mono" : undefined}
+      onClickCapture={handleUiClickCapture}
+    >
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {/* key forces re-announcement of identical consecutive messages */}
         <span key={announcement.id}>{announcement.text}</span>
@@ -799,7 +868,9 @@ function App() {
         />
       )}
 
-      {gameState === "START" && <StartBackdrop palette={backdropPalette} />}
+      {gameState === "START" && (
+        <StartBackdrop palette={backdropPalette} flourish={flourishing} />
+      )}
 
       {gameState === "START" && !showAchievements && (
         <button
@@ -816,7 +887,13 @@ function App() {
 
       {gameState === "START" && !showAchievements && (
         <div className="screen start-screen" inert={settingsSheetVisible}>
-          <h1 className="title">SHAPE STACK</h1>
+          {/* A plain heading for assistive tech: the tap secret is
+              pointer-only (React delegates the listener to the root, so the
+              heading is not exposed as clickable); keyboards get the arrow
+              sequence instead. */}
+          <h1 className="title" onClick={handleTitleClick}>
+            SHAPE STACK
+          </h1>
           <p className="subtitle">Tap to stack. Don't overlap.</p>
 
           <div
@@ -928,6 +1005,7 @@ function App() {
               runSeed={runSeed}
               startWorld={runStartWorld}
               reducedFx={reducedFx}
+              mono={mono}
               timingCue={timingCueOn}
               onScore={handleScore}
               onGameOver={handleGameOver}

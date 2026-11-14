@@ -17,6 +17,7 @@ const mockAudioService: IAudioService = {
   playTimeBonus: vi.fn(),
   playHeartbeat: vi.fn(),
   playComboMilestone: vi.fn(),
+  playChime: vi.fn(),
   playUi: vi.fn(),
   playCue: vi.fn(),
   setMuted: vi.fn(),

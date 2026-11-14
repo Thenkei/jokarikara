@@ -2,7 +2,7 @@ import type { Shape } from "../utils/geometry";
 import { getStarVertices } from "../utils/geometry";
 import type { WorldMechanics } from "../constants/game";
 import type { FractureOverlay } from "../gameplay/fracture";
-import type { WorldTheme } from "../visual/theme";
+import { MONO_HUE, toMonoColor, type WorldTheme } from "../visual/theme";
 
 /**
  * ShapeRenderer - Separates drawing logic from game loop (SRP).
@@ -231,6 +231,7 @@ export const drawArena = (
   radiusPx: number,
   reach: number,
   pulse: number,
+  mono: boolean = false,
 ): void => {
   if (radiusPx <= 0) return;
   const danger = Math.min(
@@ -240,9 +241,13 @@ export const drawArena = (
   ctx.save();
   ctx.beginPath();
   ctx.arc(x, y, radiusPx, 0, Math.PI * 2);
-  // White at rest, shifting to red as the growing shape nears the rim.
+  // White at rest, shifting to red as the growing shape nears the rim (Mono:
+  // a pale tint that only brightens; the width still grows with the danger).
+  const alpha = 0.22 + danger * 0.55 + pulse * 0.08;
   const gb = Math.round(255 - danger * 165);
-  ctx.strokeStyle = `rgba(255, ${gb}, ${gb}, ${0.22 + danger * 0.55 + pulse * 0.08})`;
+  ctx.strokeStyle = mono
+    ? `hsla(${MONO_HUE}, 100%, ${Math.round(70 + danger * 22)}%, ${alpha})`
+    : `rgba(255, ${gb}, ${gb}, ${alpha})`;
   ctx.lineWidth = 2 + danger * 2;
   if (typeof ctx.setLineDash === "function") {
     ctx.setLineDash(danger > 0 ? [] : [10, 8]);
@@ -277,20 +282,38 @@ export const FAUX_GLOW: ReadonlyArray<{ spread: number; alpha: number }> = [
  */
 export const MIN_VISIBLE_OPACITY = 0.01;
 
+/** Fracture windows: red, or the brightest Mono shade (a warning by brightness). */
+const FRACTURE_COLORS = {
+  normal: {
+    reduced: "rgba(255, 130, 130, 0.36)",
+    stroke: "rgba(255, 108, 108, 0.78)",
+    glow: "rgba(255, 90, 90, 0.28)",
+  },
+  mono: {
+    reduced: `hsla(${MONO_HUE}, 100%, 90%, 0.4)`,
+    stroke: `hsla(${MONO_HUE}, 100%, 92%, 0.85)`,
+    glow: `hsla(${MONO_HUE}, 100%, 80%, 0.3)`,
+  },
+} as const;
+
+/** Eclipse container outline (alpha pulses per frame, as before). */
+const eclipseStroke = (alpha: number, mono: boolean): string =>
+  mono ? `hsla(${MONO_HUE}, 100%, 88%, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
+
 const drawFractureOverlay = (
   ctx: CanvasRenderingContext2D,
   size: number,
   shapeRotation: number,
   overlay: FractureOverlay,
   reducedFx: boolean,
+  mono: boolean = false,
 ): void => {
   const radius = size / 2;
   const halfWidth = overlay.widthRad / 2;
+  const colors = mono ? FRACTURE_COLORS.mono : FRACTURE_COLORS.normal;
 
   ctx.save();
-  ctx.strokeStyle = reducedFx
-    ? "rgba(255, 130, 130, 0.36)"
-    : "rgba(255, 108, 108, 0.78)";
+  ctx.strokeStyle = reducedFx ? colors.reduced : colors.stroke;
   const lineWidth = reducedFx ? Math.max(4, size * 0.03) : Math.max(6, size * 0.045);
   ctx.lineCap = "round";
 
@@ -306,10 +329,10 @@ const drawFractureOverlay = (
     );
     if (!reducedFx) {
       // Faux glow (wide faint stroke) instead of shadowBlur; see FAUX_GLOW.
-      ctx.strokeStyle = "rgba(255, 90, 90, 0.28)";
+      ctx.strokeStyle = colors.glow;
       ctx.lineWidth = lineWidth + Math.max(10, size * 0.07);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(255, 108, 108, 0.78)";
+      ctx.strokeStyle = colors.stroke;
     }
     ctx.lineWidth = lineWidth;
     ctx.stroke();
@@ -371,9 +394,10 @@ export const drawShape = (
   }
   ctx.globalAlpha = opacity;
 
-  // Color shift effect (stacked shapes only)
-  let fillColor = shape.color;
-  if (mechanics.colorShift && isStacked) {
+  // Color shift effect (stacked shapes only; off in Mono, which is one hue)
+  const mono = theme?.mono ?? false;
+  let fillColor = mono ? toMonoColor(shape.color) : shape.color;
+  if (mechanics.colorShift && isStacked && !mono) {
     const hueShiftMultiplier = theme?.fx.hueShiftMultiplier ?? 1;
     const hueShift =
       time * mechanics.colorShiftSpeed * hueShiftMultiplier + stackIndex * 30;
@@ -406,7 +430,7 @@ export const drawShape = (
     const pulse =
       (Math.sin(time * Math.PI * 2 * mechanics.eclipsePulseSpeed) + 1) / 2;
     const flash = theme?.fx.flashMultiplier ?? 1;
-    strokeStyle = `rgba(255, 255, 255, ${0.1 + pulse * 0.5 * flash})`;
+    strokeStyle = eclipseStroke(0.1 + pulse * 0.5 * flash, mono);
     lineWidth = 4;
   }
 
@@ -433,6 +457,7 @@ export const drawShape = (
       shape.rotation,
       fractureOverlay,
       theme?.reducedFx ?? false,
+      mono,
     );
   }
 

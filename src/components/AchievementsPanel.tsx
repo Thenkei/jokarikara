@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
-import { ACHIEVEMENTS, ACHIEVEMENT_COUNT } from "../progression/achievements";
+import {
+  ACHIEVEMENTS,
+  ACHIEVEMENT_COUNT,
+  HIDDEN_ACHIEVEMENT_TEXT,
+} from "../progression/achievements";
 import { buildStatRows, isFirstEverProfile } from "../progression/stats";
 import type { AchievementRecord } from "../utils/storage";
 
@@ -18,7 +22,10 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
           !unlocked && achievement.progress
             ? achievement.progress({ run: null, lifetime: record.lifetime })
             : null;
-        return { achievement, unlocked, progress };
+        // A locked secret keeps its title and description to itself.
+        const text =
+          achievement.hidden && !unlocked ? HIDDEN_ACHIEVEMENT_TEXT : achievement;
+        return { achievement, unlocked, progress, text };
       }),
     [record],
   );
@@ -67,18 +74,20 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
         </section>
       )}
       <ul className="achievement-list">
-        {items.map(({ achievement, unlocked, progress }) => (
+        {items.map(({ achievement, unlocked, progress, text }) => (
           <li
             key={achievement.id}
-            className={`achievement-item ${unlocked ? "unlocked" : "locked"}`}
+            className={`achievement-item ${unlocked ? "unlocked" : "locked"}${
+              achievement.hidden ? " hidden-achievement" : ""
+            }`}
             data-achievement-id={achievement.id}
           >
             <span className="achievement-mark" aria-hidden="true">
               {unlocked ? "◆" : "◇"}
             </span>
             <span className="achievement-text">
-              <span className="achievement-title">{achievement.title}</span>
-              <span className="achievement-desc">{achievement.description}</span>
+              <span className="achievement-title">{text.title}</span>
+              <span className="achievement-desc">{text.description}</span>
             </span>
             {progress && progress.current > 0 && (
               <span

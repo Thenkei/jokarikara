@@ -11,6 +11,7 @@ import type { StackQuality } from "../types";
  *   timing cue ≈ -31 / PERFECT tick ≈ -28: well under any stack, ≥ 3 dB above
  *   the music bed so the bed never masks it
  *   music bed ≈ 10 dB under a plain stack, so it never masks feedback
+ *   secret chime (start screen) ≈ -21: above menu clicks, under a level up
  *   worst simultaneous burst: peak ≤ -1 dBFS (measured ≈ -4.5, no clipping)
  *   (stack/level up/world up in world 1; worlds 2-10 reshape them through
  *   `palette.ts` and stay within ±2 dB of world 1, measured ≤ 1.5 dB)
@@ -37,6 +38,7 @@ export type SfxId =
   | "timeBonus"
   | "heartbeat"
   | "combo"
+  | "chime"
   | "menu"
   | "ui"
   | "cue";
@@ -56,6 +58,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   timeBonus: -0.5,
   heartbeat: 4,
   combo: 0,
+  chime: -8,
   menu: 0,
   ui: 2.5,
   cue: 9,
@@ -82,6 +85,8 @@ export const SFX_REVERB_SEND_DB: Readonly<Record<SfxId, number>> = {
   timeBonus: -16,
   heartbeat: -30,
   combo: -12,
+  // Start screen sparkle: no gameplay timing to protect, so it may bloom.
+  chime: -10,
   menu: -42,
   ui: -26,
   // Timing cue is a rhythm aid: a tail would smear where the beat lands.

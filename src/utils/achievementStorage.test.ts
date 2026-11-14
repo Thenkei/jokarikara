@@ -122,5 +122,19 @@ describe("achievement storage", () => {
     localStorage.setItem(KEY, JSON.stringify({ lifetime: { bestWorld: 7 } }));
     expect(getAchievementRecord().lifetime.bestWorld).toBe(7);
   });
-});
 
+  it("keeps the hidden achievement across reads and ignores unknown ids", () => {
+    // Older records (no hidden id) and records from a newer version (ids this
+    // build does not know) both load without losing anything it understands.
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({
+        unlocked: { "first-stack": 1, "curious-mind": 2, "from-the-future": 3 },
+        lifetime: { totalStacks: 4 },
+      }),
+    );
+    const record = getAchievementRecord();
+    expect(record.unlocked).toEqual({ "first-stack": 1, "curious-mind": 2 });
+    expect(record.lifetime.totalStacks).toBe(4);
+  });
+});

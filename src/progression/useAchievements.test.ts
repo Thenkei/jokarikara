@@ -172,5 +172,34 @@ describe("useAchievements", () => {
     expect(lifetime.runsPlayed).toBe(0);
     expect(lifetime.bestWorld).toBe(9);
   });
-});
 
+  it("unlock() grants an event achievement once, persists it, and leaves runs alone", () => {
+    const { hook, onUnlock } = setup();
+    act(() => hook.result.current.unlock("curious-mind"));
+    expect(onUnlock).toHaveBeenCalledWith(["curious-mind"]);
+    expect(hook.result.current.record.unlocked["curious-mind"]).toBe(1700000000000);
+    expect(getAchievementRecord().unlocked["curious-mind"]).toBe(1700000000000);
+    expect(getAchievementRecord().lifetime.runsPlayed).toBe(0);
+
+    act(() => hook.result.current.unlock("curious-mind"));
+    expect(onUnlock).toHaveBeenCalledTimes(1);
+
+    // A later session reads it back from storage.
+    const { hook: reloaded, onUnlock: reloadedUnlock } = setup();
+    expect(reloaded.result.current.record.unlocked["curious-mind"]).toBe(1700000000000);
+    act(() => reloaded.result.current.unlock("curious-mind"));
+    expect(reloadedUnlock).not.toHaveBeenCalled();
+  });
+
+  it("unlock() does not re-announce what another tab already unlocked", () => {
+    const { hook, onUnlock } = setup();
+    // Another tab writes the unlock after this one loaded its record.
+    localStorage.setItem(
+      "shape-stack-achievements-v1",
+      JSON.stringify({ unlocked: { "curious-mind": 42 }, lifetime: {} }),
+    );
+    act(() => hook.result.current.unlock("curious-mind"));
+    expect(onUnlock).not.toHaveBeenCalled();
+    expect(hook.result.current.record.unlocked["curious-mind"]).toBe(42);
+  });
+});

@@ -45,7 +45,7 @@ import {
   getHeartbeatPulse,
 } from "../gameplay/heartbeat";
 import { installGameTestBridge } from "../utils/testBridge";
-import { getWorldTheme } from "../visual/theme";
+import { getWorldTheme, toMonoColor } from "../visual/theme";
 import { haptic } from "../utils/haptics";
 import {
   createEffects,
@@ -95,6 +95,8 @@ interface GameCanvasProps {
   /** Practice: start at level 1 of this world (default 1). */
   startWorld?: number;
   reducedFx?: boolean;
+  /** Session-only Mono look (start screen secret): one-tint rendering. */
+  mono?: boolean;
   /** Opt-in audio ticks towards the PERFECT window (see gameplay/timingCue). */
   timingCue?: boolean;
   onScore: (score: number) => void;
@@ -165,6 +167,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       runSeed = 0,
       startWorld = 1,
       reducedFx = false,
+      mono = false,
       timingCue = false,
       onScore,
       onGameOver,
@@ -204,6 +207,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     // menu never rebuilds the loop; the stepper memory is plain loop state.
     const timingCueRef = useRef(timingCue);
     const cueClockRef = useRef<CueClock>(IDLE_CUE_CLOCK);
+    // Presentation only, read by the renderer: a ref keeps the loop and its
+    // callbacks independent from it (it only changes on the start screen).
+    const monoRef = useRef(mono);
 
     useEffect(() => {
       reducedFxRef.current = reducedFx;
@@ -212,6 +218,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     useEffect(() => {
       timingCueRef.current = timingCue;
     }, [timingCue]);
+
+    useEffect(() => {
+      monoRef.current = mono;
+    }, [mono]);
 
     // Initialize game state
     useEffect(() => {
@@ -673,7 +683,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         // Get world mechanics for current world
         const mechanics = getWorldMechanics(state.world);
-        const theme = getWorldTheme(state.world, state.runSeed, reducedFx);
+        const theme = getWorldTheme(
+          state.world,
+          state.runSeed,
+          reducedFx,
+          monoRef.current,
+        );
+        const tint = theme.mono ? toMonoColor : undefined;
         const timeInSeconds = timeMs / 1000;
         const fractureOverlay = getFractureOverlay(state, state.elapsedTime);
 
@@ -721,7 +737,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             centerY + offsetY,
             state.zoom,
             guide.inPerfectBand,
-            PERFECT_GUIDE_COLOR,
+            tint ? tint(PERFECT_GUIDE_COLOR) : PERFECT_GUIDE_COLOR,
           );
         };
         const drawActive = () => {
@@ -748,7 +764,15 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           const reach = state.activeShape
             ? state.activeShape.size / 2 / arenaRadius
             : 0;
-          drawArena(ctx, centerX, centerY, arenaRadius * state.zoom, reach, scenePulse);
+          drawArena(
+            ctx,
+            centerX,
+            centerY,
+            arenaRadius * state.zoom,
+            reach,
+            scenePulse,
+            theme.mono,
+          );
           drawActive();
           for (let index = state.shapes.length - 1; index >= 0; index -= 1) {
             drawStacked(index);
@@ -763,11 +787,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         }
 
         if (fx.rings.length > 0 || fx.particles.length > 0) {
-          drawEffects(ctx, fx);
+          drawEffects(ctx, fx, tint);
         }
 
         ctx.restore();
-        if (fx.flash.t > 0) drawFlash(ctx, fx, width, height);
+        if (fx.flash.t > 0) drawFlash(ctx, fx, width, height, tint);
       },
       [
         audioService,
@@ -877,6 +901,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
                 stateRef.current.world,
                 stateRef.current.runSeed,
                 reducedFx,
+                monoRef.current,
               )
             : null,
       });

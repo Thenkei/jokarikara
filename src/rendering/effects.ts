@@ -226,14 +226,23 @@ export const getPunchScale = (fx: EffectsState): number => {
   return 1 + PUNCH_SCALE * Math.sin(Math.PI * p);
 };
 
+/**
+ * Maps an effect colour at draw time (the Mono look). Must be cheap and
+ * allocation-free per call, e.g. a memoised lookup like `toMonoColor`.
+ */
+export type ColorTint = (color: string) => string;
+
+const identity: ColorTint = (color) => color;
+
 /** Draws rings + particles (world space; call inside the shake/punch transform). */
 export const drawEffects = (
   ctx: CanvasRenderingContext2D,
   fx: EffectsState,
+  tint: ColorTint = identity,
 ) => {
   for (const r of fx.rings) {
     ctx.globalAlpha = r.alpha * (r.life / r.maxLife);
-    ctx.strokeStyle = r.color;
+    ctx.strokeStyle = tint(r.color);
     ctx.lineWidth = r.lineWidth;
     ctx.beginPath();
     ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
@@ -249,7 +258,7 @@ export const drawEffects = (
     }
     ctx.globalAlpha = 0.9;
     for (const [color, list] of byColor) {
-      ctx.fillStyle = color;
+      ctx.fillStyle = tint(color);
       ctx.beginPath();
       for (const p of list) {
         const s = p.size * (p.life / p.maxLife);
@@ -267,11 +276,12 @@ export const drawFlash = (
   fx: EffectsState,
   width: number,
   height: number,
+  tint: ColorTint = identity,
 ) => {
   const { t, dur, color, alpha } = fx.flash;
   if (t <= 0 || dur <= 0) return;
   ctx.globalAlpha = alpha * (t / dur);
-  ctx.fillStyle = color;
+  ctx.fillStyle = tint(color);
   ctx.fillRect(0, 0, width, height);
   ctx.globalAlpha = 1;
 };

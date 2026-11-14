@@ -29,6 +29,7 @@ test("sound effects and music keep their mix relationships", async ({
       playTimeBonus: () => void;
       playHeartbeat: () => void;
       playComboMilestone: (tier: number, world: number) => void;
+      playChime: () => void;
       playUi: (kind: "select" | "confirm" | "back") => void;
       playCue: (step: number, inWindow: boolean) => void;
       startMusic: (w: number) => void;
@@ -110,6 +111,7 @@ test("sound effects and music keep their mix relationships", async ({
       timeBonus: await measure(1, (a) => a.playTimeBonus()),
       heartbeat: await measure(0.6, (a) => a.playHeartbeat()),
       combo: await measure(1.2, (a) => a.playComboMilestone(5, 1)),
+      chime: await measure(1.6, (a) => a.playChime()),
       uiSelect: await measure(0.5, (a) => a.playUi("select"), [0.25, 0.5]),
       uiConfirm: await measure(0.5, (a) => a.playUi("confirm")),
       uiBack: await measure(0.5, (a) => a.playUi("back")),
@@ -155,6 +157,11 @@ test("sound effects and music keep their mix relationships", async ({
   // than the new-world chord.
   expect(levels.combo.rmsDb).toBeGreaterThan(levels.ok.rmsDb);
   expect(levels.combo.rmsDb).toBeLessThanOrEqual(levels.worldUp.rmsDb + 1);
+
+  // The start screen's secret chime is a reward: clearly above menu clicks,
+  // but no louder than a level up (it plays over the unlock toast's cue).
+  expect(levels.chime.rmsDb).toBeGreaterThan(levels.uiConfirm.rmsDb + 2);
+  expect(levels.chime.rmsDb).toBeLessThanOrEqual(levels.levelUp.rmsDb);
 
   // Menu sounds are subtle: quieter than any gameplay stack.
   for (const ui of [levels.uiSelect, levels.uiConfirm, levels.uiBack]) {
