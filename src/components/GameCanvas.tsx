@@ -32,6 +32,7 @@ import {
 } from "../rendering/shapeRenderer";
 import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture";
 import { getPerfectGuide } from "../gameplay/guide";
+import { advanceTimingCue, IDLE_CUE_CLOCK, type CueClock } from "../gameplay/timingCue";
 import { getComboTier, isComboMilestone } from "../gameplay/combo";
 import {
   getArenaRadius,
@@ -94,6 +95,8 @@ interface GameCanvasProps {
   /** Practice: start at level 1 of this world (default 1). */
   startWorld?: number;
   reducedFx?: boolean;
+  /** Opt-in audio ticks towards the PERFECT window (see gameplay/timingCue). */
+  timingCue?: boolean;
   onScore: (score: number) => void;
   onGameOver: (
     finalScore: number,
@@ -162,6 +165,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       runSeed = 0,
       startWorld = 1,
       reducedFx = false,
+      timingCue = false,
       onScore,
       onGameOver,
       onLevelUp,
@@ -196,10 +200,18 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     // Zen has no combo streak: the soundtrack follows stacks since the last
     // miss instead. UI/audio-only bookkeeping, deliberately not in GameState.
     const zenCleanStacksRef = useRef(0);
+    // Timing cue: the setting lives in a ref so toggling it from the pause
+    // menu never rebuilds the loop; the stepper memory is plain loop state.
+    const timingCueRef = useRef(timingCue);
+    const cueClockRef = useRef<CueClock>(IDLE_CUE_CLOCK);
 
     useEffect(() => {
       reducedFxRef.current = reducedFx;
     }, [reducedFx]);
+
+    useEffect(() => {
+      timingCueRef.current = timingCue;
+    }, [timingCue]);
 
     // Initialize game state
     useEffect(() => {
@@ -626,6 +638,19 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         if (!wasOver && !checkContainment(state)) {
           miss("overflow");
           return;
+        }
+
+        // Timing cue: the pure stepper decides on the game clock, the loop
+        // only plays. Paused frames never reach this point; muted or disabled
+        // forgets the phase so re-enabling starts a clean approach.
+        if (dt > 0 && !wasOver) {
+          if (timingCueRef.current && !audioService.isMuted()) {
+            const cue = advanceTimingCue(cueClockRef.current, state);
+            cueClockRef.current = cue.clock;
+            if (cue.tick) audioService.playCue(cue.tick.step, cue.tick.inWindow);
+          } else {
+            cueClockRef.current = IDLE_CUE_CLOCK;
+          }
         }
 
         // Render (use logical dimensions, not scaled canvas size)

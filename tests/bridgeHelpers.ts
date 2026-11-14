@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import type { GameTestBridgeState } from "../src/utils/testBridge";
+import type { CueCall, GameTestBridgeState } from "../src/utils/testBridge";
 import type { MusicState } from "../src/audio/types";
 
 export const waitForBridge = async (page: Page) => {
@@ -9,6 +9,13 @@ export const waitForBridge = async (page: Page) => {
 /** Soundtrack state; readable on every screen (installed by <App/>). */
 export const getMusicState = (page: Page) =>
   page.evaluate(() => window.__GAME_AUDIO__?.getMusicState() as MusicState | undefined);
+
+/** Timing cue calls recorded at the audio service (installed by <App/>). */
+export const getCueCalls = (page: Page) =>
+  page.evaluate(() => (window.__GAME_AUDIO__?.getCueCalls() ?? []) as CueCall[]);
+
+export const clearCueCalls = (page: Page) =>
+  page.evaluate(() => window.__GAME_AUDIO__?.clearCueCalls());
 
 export const makeBridge = (page: Page) => ({
   getState: () =>

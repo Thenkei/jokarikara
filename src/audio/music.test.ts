@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  CUE_MAX_STEP,
+  CUE_ROOT_HZ,
+  getCueNoteHz,
   getStackNoteHz,
   getWorldRoot,
   MELODY_SPAN,
@@ -43,5 +46,18 @@ describe("music", () => {
     expect(QUALITY_HARMONY.GREAT.length).toBeLessThan(
       QUALITY_HARMONY.PERFECT.length,
     );
+  });
+
+  it("gives the timing cue a slight pentatonic rise and an octave arrival", () => {
+    const approach = [0, 1, 2, 3].map((step) => getCueNoteHz(step, false));
+    expect(approach[0]).toBe(CUE_ROOT_HZ);
+    for (let i = 1; i < approach.length; i += 1) {
+      expect(approach[i]).toBeGreaterThan(approach[i - 1]);
+    }
+    // At most a fifth of rise, and the PERFECT tick clearly above it.
+    expect(approach.at(-1)! / CUE_ROOT_HZ).toBeCloseTo(semitonesToRatio(7), 10);
+    expect(getCueNoteHz(0, true)).toBe(CUE_ROOT_HZ * 2);
+    expect(getCueNoteHz(CUE_MAX_STEP + 5, false)).toBe(approach.at(-1));
+    expect(getCueNoteHz(-2, false)).toBe(CUE_ROOT_HZ);
   });
 });

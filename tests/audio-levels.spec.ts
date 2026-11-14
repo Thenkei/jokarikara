@@ -28,6 +28,7 @@ test("sound effects and music keep their mix relationships", async ({
       playHeartbeat: () => void;
       playComboMilestone: (tier: number, world: number) => void;
       playUi: (kind: "select" | "confirm" | "back") => void;
+      playCue: (step: number, inWindow: boolean) => void;
       startMusic: (w: number) => void;
     };
     const SR = 44100;
@@ -76,6 +77,8 @@ test("sound effects and music keep their mix relationships", async ({
       uiSelect: await measure(0.5, (a) => a.playUi("select")),
       uiConfirm: await measure(0.5, (a) => a.playUi("confirm")),
       uiBack: await measure(0.5, (a) => a.playUi("back")),
+      cue: await measure(0.5, (a) => a.playCue(3, false)),
+      cueWindow: await measure(0.5, (a) => a.playCue(3, true)),
       worst: await measure(2.5, (a) => {
         a.playStack("PERFECT", 10, 2);
         a.playWorldUp(2);
@@ -116,6 +119,14 @@ test("sound effects and music keep their mix relationships", async ({
 
   // The beat is a rhythm cue: audible, but never louder than a stack.
   expect(levels.heartbeat.rmsDb).toBeLessThan(levels.ok.rmsDb);
+
+  // The timing cue is a background aid: well under any stack, the PERFECT
+  // tick a notch brighter than the approach ticks.
+  expect(levels.cue.rmsDb).toBeLessThan(levels.ok.rmsDb - 6);
+  expect(levels.cueWindow.rmsDb).toBeLessThan(levels.ok.rmsDb - 3);
+  expect(levels.cueWindow.rmsDb).toBeGreaterThan(levels.cue.rmsDb + 1.5);
+  // ...but it must still cut through the music bed it plays over.
+  expect(levels.cue.rmsDb).toBeGreaterThan(levels.music.rmsDb + 1);
 
   // The music bed never masks gameplay feedback.
   expect(levels.music.rmsDb).toBeLessThan(levels.ok.rmsDb - 8);

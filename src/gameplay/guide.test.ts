@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createInitialState, spawnActiveShape } from "../core/gameState";
-import { getPerfectGuide, shouldShowPerfectGuide } from "./guide";
+import { getPerfectGuide, getPerfectTarget, shouldShowPerfectGuide } from "./guide";
 import { STYLE_QUALITY_THRESHOLDS } from "../constants/game";
 import type { GameMode, GameState } from "../types";
 
@@ -58,6 +58,26 @@ describe("perfect guide", () => {
     expect(at(0.9)).toBe(false); // cannot contain yet
     expect(at(1.01)).toBe(true);
     expect(at(1.1)).toBe(false); // too loose for PERFECT
+  });
+
+  it("exposes the band bounds, and the ungated target outside the tutorial", () => {
+    const classic = { ...fresh("CLASSIC"), world: 4, level: 3 };
+    const container = classic.shapes[classic.shapes.length - 1];
+    expect(getPerfectGuide(classic)).toBeNull();
+    const target = getPerfectTarget(classic);
+    expect(target?.bandEntrySize).toBeCloseTo(
+      container.size * STYLE_QUALITY_THRESHOLDS.perfectMinRatio,
+      10,
+    );
+    expect(target?.bandExitSize).toBe(Number.POSITIVE_INFINITY);
+
+    const reverse = getPerfectTarget({ ...classic, world: 9 });
+    expect(reverse?.bandEntrySize).toBe(container.size);
+    expect(reverse?.bandExitSize).toBeCloseTo(
+      container.size / STYLE_QUALITY_THRESHOLDS.perfectMinRatio,
+      10,
+    );
+    expect(getPerfectTarget({ ...classic, isGameOver: true })).toBeNull();
   });
 });
 

@@ -65,6 +65,12 @@ export interface IAudioService {
   /** Heartbeat worlds: a soft thump on each beat of the growth pulse. */
   playHeartbeat(): void;
 
+  /**
+   * Optional timing cue: a soft tick while the shape approaches the PERFECT
+   * band (`step` raises the pitch slightly), a brighter one inside it.
+   */
+  playCue(step: number, inWindow: boolean): void;
+
   /** Short menu feedback: move/toggle, confirm/start, back/leave. */
   playUi(kind: UiSoundKind): void;
 
