@@ -111,6 +111,8 @@ Effects are **cumulative**, and visual distortions only apply to stacked shapes,
 - **Haptics** on supported phones.
 - **Settings** (saved):
   - `SOUND: ON/OFF`.
+  - `MUSIC: ON/OFF` (background soundtrack only).
+  - `HAPTICS: ON/OFF` (shown on devices that can vibrate).
   - `FX: FULL/LOW`. LOW removes shake and particles and tones down glow. It defaults to LOW when your OS asks for reduced motion.
 
 ## 🏆 Achievements
