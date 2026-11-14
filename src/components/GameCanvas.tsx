@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent 
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
 import { getMusicIntensity } from "../audio/soundtrack";
-import type { GameState, RunStats, StackEvent, StackQuality, StyleUpdate } from "../types";
+import type { GameState, MissReason, RunStats, StackEvent, StackQuality, StyleUpdate } from "../types";
 import {
   createInitialState,
   spawnActiveShape,
@@ -16,6 +16,7 @@ import {
   isStackValid,
   updateTimer,
   handleMiss,
+  getEndReason,
   restartActiveShape,
   undoLastStack,
 } from "../core/gameState";
@@ -130,6 +131,7 @@ const toRunStats = (state: GameState): RunStats => ({
   perfectCount: state.perfectCount,
   bestStreak: state.bestStreak,
   scoreHistory: state.scoreHistory,
+  endReason: getEndReason(state),
 });
 
 /** `wasBoss` must be read from the pre-stack state (spawn sets the flag). */
@@ -297,11 +299,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       }
     }, []);
 
-    const miss = useCallback(() => {
+    const miss = useCallback((reason: MissReason) => {
       if (!stateRef.current) return;
 
       const wasGameOver = stateRef.current.isGameOver;
-      stateRef.current = handleMiss(stateRef.current);
+      stateRef.current = handleMiss(stateRef.current, reason);
       onStyleUpdate?.({
         styleScore: stateRef.current.styleScore,
         streak: stateRef.current.streak,
@@ -375,12 +377,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       // Regular: inside the container. Reverse: contains the previous shape
       // and still inside the arena.
       if (!isStackValid(state)) {
-        miss();
+        miss("badTap");
         return;
       }
 
       if (isTapBlockedByFracture(state, state.elapsedTime)) {
-        miss();
+        miss("fracture");
         return;
       }
 
@@ -614,7 +616,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         // Check auto-fail if shape starts poking out
         if (!wasOver && !checkContainment(state)) {
-          miss();
+          miss("overflow");
           return;
         }
 
