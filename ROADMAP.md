@@ -12,6 +12,7 @@ This roadmap outlines the future vision for **Jokarikara**, expanding on its cor
 - **Haptics** on supported devices.
 - **Enhanced visuals**: particles and rings on perfect stacks, screen shake and flash on failure, zoom punch on level up.
 - **Polish**: pause (manual and automatic), keyboard controls, per-mode high scores, installable PWA metadata, frame-rate-independent simulation.
+- **Achievements**: 12 achievements (Perfect Alignment, Speed Demon, Zen Master, Time Lord, Daily Devotee, Architect, ...) with live unlock toasts, a start-screen list with progress, and lifetime stats stored on the device.
 
 ## 🎵 Audio & Rhythm
 
@@ -39,7 +40,7 @@ Giving players long-term goals and reasons to compete.
   - _Cyberpunk_: Neon glitched aesthetics.
   - _Vaporwave_: Pink/cyan gradients and retro grids.
   - _Nature_: Organic textures and calming earth tones.
-- **Achievements**: specific challenges like "Perfect Alignment" (10 perfect drops in a row) or "Speed Demon" (reach level 5 in under 30 seconds).
+- **More achievements**: build on the shipped catalogue (`src/progression/achievements.ts`), for example tiered goals or achievement-gated skins.
 
 ## 🛠️ Polish & Tech
 
