@@ -887,6 +887,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     return (
       <canvas
         ref={canvasRef}
+        role="img"
+        aria-label="Game board: tap, click or press Space to stack the growing shape"
         onPointerDown={handlePointerDown}
         style={{ width: "100%", height: "100%", cursor: "pointer" }}
       />
