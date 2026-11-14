@@ -26,6 +26,7 @@ test("sound effects and music keep their mix relationships", async ({
       playTick: (urgent: boolean) => void;
       playTimeBonus: () => void;
       playHeartbeat: () => void;
+      playComboMilestone: (tier: number, world: number) => void;
       startMusic: (w: number) => void;
     };
     const SR = 44100;
@@ -70,6 +71,7 @@ test("sound effects and music keep their mix relationships", async ({
       tickUrgent: await measure(0.5, (a) => a.playTick(true)),
       timeBonus: await measure(1, (a) => a.playTimeBonus()),
       heartbeat: await measure(0.6, (a) => a.playHeartbeat()),
+      combo: await measure(1.2, (a) => a.playComboMilestone(5, 1)),
       worst: await measure(2.5, (a) => {
         a.playStack("PERFECT", 10, 2);
         a.playWorldUp(2);
@@ -98,6 +100,11 @@ test("sound effects and music keep their mix relationships", async ({
   expect(levels.fail.rmsDb).toBeGreaterThan(levels.ok.rmsDb + 2);
   // Urgent countdown is louder than the regular tick.
   expect(levels.tickUrgent.rmsDb).toBeGreaterThan(levels.tick.rmsDb + 1.5);
+  // A combo milestone is a celebration: louder than a plain stack, no louder
+  // than the new-world chord.
+  expect(levels.combo.rmsDb).toBeGreaterThan(levels.ok.rmsDb);
+  expect(levels.combo.rmsDb).toBeLessThanOrEqual(levels.worldUp.rmsDb + 1);
+
   // The beat is a rhythm cue: audible, but never louder than a stack.
   expect(levels.heartbeat.rmsDb).toBeLessThan(levels.ok.rmsDb);
 

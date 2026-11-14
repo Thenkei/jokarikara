@@ -40,7 +40,7 @@ Each stack is graded by its size relative to the container:
 | GOOD | ≥ 82% | 50 |
 | OK | below 82% | 25 |
 
-Outside Zen, consecutive stacks build a **combo**. The **style score** adds a streak bonus on top of the quality points, and a miss resets the combo.
+Outside Zen, consecutive stacks build a **combo**. Combos of **×5, ×10, ×20, ×30, ×50** (then every 25) trigger a milestone: a rising fanfare in the world's key, a COMBO banner and a haptic pulse. The **style score** adds a streak bonus on top of the quality points, and a miss resets the combo.
 
 ## ⚙️ Mechanics
 

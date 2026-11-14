@@ -63,6 +63,9 @@ export interface IAudioService {
   /** Heartbeat worlds: a soft thump on each beat of the growth pulse. */
   playHeartbeat(): void;
 
+  /** Combo milestone fanfare; `tier` 1..5 lengthens the run of notes. */
+  playComboMilestone(tier: number, world: number): void;
+
   setMuted(muted: boolean): void;
   isMuted(): boolean;
 

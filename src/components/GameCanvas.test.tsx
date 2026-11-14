@@ -16,6 +16,7 @@ const mockAudioService: IAudioService = {
   playTick: vi.fn(),
   playTimeBonus: vi.fn(),
   playHeartbeat: vi.fn(),
+  playComboMilestone: vi.fn(),
   setMuted: vi.fn(),
   isMuted: vi.fn(() => false),
   init: vi.fn(),
@@ -443,6 +444,38 @@ describe("GameCanvas", () => {
       expect(intensities).toEqual([0, 0, 1, 1, 1, 2]);
       expect(mockAudioService.setMusicWorld).toHaveBeenCalledWith(1);
     });
+  });
+
+  it("celebrates combo milestones in Classic but not in Zen", async () => {
+    for (const mode of ["CLASSIC", "ZEN"] as const) {
+      vi.clearAllMocks();
+      const { container, unmount } = render(
+        <GameCanvas
+          mode={mode}
+          onScore={vi.fn()}
+          onGameOver={vi.fn()}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          audioService={mockAudioService}
+        />
+      );
+      const canvas = container.querySelector("canvas");
+      if (!canvas) throw new Error("Canvas not found");
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      // Freshly spawned shapes are tiny, so immediate taps always fit
+      // (Zen ignores them as too early, so it never stacks at all).
+      for (let i = 0; i < 5; i += 1) tap(canvas);
+
+      if (mode === "CLASSIC") {
+        expect(mockAudioService.playComboMilestone).toHaveBeenCalledTimes(1);
+        expect(mockAudioService.playComboMilestone).toHaveBeenCalledWith(1, 1);
+      } else {
+        expect(mockAudioService.playComboMilestone).not.toHaveBeenCalled();
+      }
+      unmount();
+    }
   });
 
   it("ignores non-primary mouse buttons", async () => {

@@ -287,6 +287,19 @@ test.describe("Gameplay Deterministic", () => {
     expect(state.lastStackQuality).not.toBeNull();
   });
 
+  test("classic: a x5 combo shows a milestone banner", async ({ page }) => {
+    await page.goto("/");
+    await page.click(".start-btn");
+    await waitForBridge(page);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+
+    for (let i = 0; i < 4; i += 1) await stackOnce(bridge, 0.9);
+    await expect(page.locator(".combo-milestone")).toHaveCount(0);
+    await stackOnce(bridge, 0.9);
+    await expect(page.locator(".combo-milestone")).toHaveText("COMBO ×5");
+  });
+
   test("reduced fx toggle persists between runs", async ({ page }) => {
     await page.goto("/");
 

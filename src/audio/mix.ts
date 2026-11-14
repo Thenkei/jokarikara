@@ -20,6 +20,7 @@ export type SfxId =
   | "tick"
   | "timeBonus"
   | "heartbeat"
+  | "combo"
   | "ui";
 
 /** Gain applied before the bus processing (linear). */
@@ -36,6 +37,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   tick: 10,
   timeBonus: -0.5,
   heartbeat: 4,
+  combo: 0,
   ui: 2.5,
 };
 
