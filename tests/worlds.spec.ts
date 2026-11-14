@@ -42,6 +42,8 @@ test.describe("Reverse Stack (world 9)", () => {
     const bridge = makeBridge(page);
     await bridge.setActiveSize((state.lastSize ?? 1) * 6);
     await bridge.step(0.016);
+    // The game over screen follows the end effects, played by real frames.
+    await bridge.resume();
     await expect(page.locator(".gameover-screen")).toBeVisible();
   });
 
