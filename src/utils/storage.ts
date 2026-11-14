@@ -21,6 +21,8 @@ export const MAX_HIGH_SCORES = 5;
 export interface GameSettings {
   reducedFx: boolean;
   muted: boolean;
+  /** Background soundtrack (independent from `muted`, which silences all). */
+  music: boolean;
 }
 
 const prefersReducedMotion = (): boolean => {
@@ -39,6 +41,7 @@ const prefersReducedMotion = (): boolean => {
 const getDefaultSettings = (): GameSettings => ({
   reducedFx: prefersReducedMotion(),
   muted: false,
+  music: true,
 });
 
 const byScoreDesc = (a: HighScore, b: HighScore) => b.score - a.score;
@@ -125,6 +128,8 @@ export const getSettings = (): GameSettings => {
           : getDefaultSettings().reducedFx,
       muted:
         typeof parsed.muted === "boolean" ? parsed.muted : getDefaultSettings().muted,
+      music:
+        typeof parsed.music === "boolean" ? parsed.music : getDefaultSettings().music,
     };
   } catch (e) {
     console.error("Failed to load settings", e);
