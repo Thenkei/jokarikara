@@ -1,4 +1,10 @@
-import type { IAudioService, UiSoundKind, MusicIntensity, MusicState } from "../audio/types";
+import type {
+  IAudioService,
+  UiSoundKind,
+  MusicIntensity,
+  MusicState,
+  Voice,
+} from "../audio/types";
 import { MusicEngine } from "../audio/musicEngine";
 import {
   MUSIC_VOLUME,
@@ -34,6 +40,15 @@ import {
   type SfxId,
 } from "../audio/mix";
 import {
+  DEFAULT_ATTACK_SECONDS,
+  getWorldPalette,
+  paletteFx,
+  paletteHarmony,
+  paletteOrder,
+  shapeVoices,
+  type VoiceFx,
+} from "../audio/palette";
+import {
   createReverbBus,
   deferToIdle,
   type DeferTask,
@@ -50,17 +65,28 @@ export interface AudioManagerOptions {
 /** Exponential ramps cannot target 0; this is effectively silence. */
 const SILENCE = 0.0001;
 
-type Voice = {
-  freq: number;
-  type?: OscillatorType;
-  /** Seconds from now. */
-  delay?: number;
-  duration: number;
-  peak: number;
-  attack?: number;
-  /** Target frequency at the end of the note (glide). */
-  glideTo?: number;
-  detune?: number;
+/** Butterworth Q: a palette lowpass darkens without a resonant bump. */
+const LOWPASS_Q = Math.SQRT1_2;
+
+/**
+ * Per-sound palette effects. `input`/`output` is the filter/tremolo chain the
+ * voices feed instead of the master (`null` = route voices directly);
+ * `vibrato` is an LFO depth node each oscillator's detune listens to.
+ */
+type FxChain = {
+  input: AudioNode | null;
+  output: AudioNode | null;
+  vibrato: AudioNode | null;
+};
+
+const safeDisconnect = (nodes: readonly AudioNode[]): void => {
+  for (const node of nodes) {
+    try {
+      node.disconnect();
+    } catch {
+      // Never connected / already released.
+    }
+  }
 };
 
 /**
@@ -292,18 +318,92 @@ class AudioManager implements IAudioService {
     return this.ctx && this.masterGain ? this.ctx : null;
   }
 
-  private play(sfx: SfxId, voices: Voice[], reverbBoostDb = 0): void {
+  /**
+   * Build the palette chain for one sound (lowpass -> tremolo, plus a shared
+   * vibrato LFO), alive from `start` until `end`. Per sound, never per frame.
+   * Any failure returns `null`: the sound then plays unshaped, never breaks.
+   */
+  private createFxChain(
+    ctx: AudioContext,
+    fx: VoiceFx,
+    start: number,
+    end: number,
+  ): FxChain | null {
+    const created: AudioNode[] = [];
+    const lfos: OscillatorNode[] = [];
+    const lfo = (rateHz: number, depth: number): GainNode => {
+      const osc = ctx.createOscillator();
+      created.push(osc);
+      osc.type = "sine";
+      osc.frequency.value = rateHz;
+      const amount = ctx.createGain();
+      created.push(amount);
+      amount.gain.value = depth;
+      osc.connect(amount);
+      lfos.push(osc);
+      return amount;
+    };
+    try {
+      let filter: BiquadFilterNode | null = null;
+      if (fx.lowpassHz !== null && typeof ctx.createBiquadFilter === "function") {
+        filter = ctx.createBiquadFilter();
+        created.push(filter);
+        filter.type = "lowpass";
+        filter.frequency.value = fx.lowpassHz;
+        filter.Q.value = LOWPASS_Q;
+      }
+      let tremolo: GainNode | null = null;
+      if (fx.tremolo) {
+        // Gain swings within [1 - depth, 1]: the tremolo only ever dips, so it
+        // cannot push a strike past its unshaped peak.
+        tremolo = ctx.createGain();
+        created.push(tremolo);
+        tremolo.gain.value = 1 - fx.tremolo.depth / 2;
+        lfo(fx.tremolo.rateHz, fx.tremolo.depth / 2).connect(tremolo.gain);
+      }
+      if (filter && tremolo) filter.connect(tremolo);
+      const vibrato = fx.vibrato ? lfo(fx.vibrato.rateHz, fx.vibrato.depth) : null;
+      for (const osc of lfos) {
+        osc.start(start);
+        osc.stop(end + 0.02);
+      }
+      return { input: filter ?? tremolo, output: tremolo ?? filter, vibrato };
+    } catch (error) {
+      console.warn("Sound palette unavailable, playing unshaped", error);
+      safeDisconnect(created);
+      return null;
+    }
+  }
+
+  private play(
+    sfx: SfxId,
+    voices: Voice[],
+    reverbBoostDb = 0,
+    fx: VoiceFx | null = null,
+  ): void {
     const ctx = this.ready();
     if (!ctx) return;
     const now = ctx.currentTime;
     const trim = dbToGain(SFX_TRIM_DB[sfx]);
     const reverbSend =
       this.reverb?.send(SFX_REVERB_SEND_DB[sfx] + reverbBoostDb) ?? null;
+    const master = this.masterGain!;
+    const lastEnd = voices.reduce(
+      (latest, voice) => Math.max(latest, (voice.delay ?? 0) + voice.duration),
+      0,
+    );
+    const chain = fx ? this.createFxChain(ctx, fx, now, now + lastEnd) : null;
+    // Voices feed the palette chain when there is one, else the buses directly.
+    const sink = chain?.input ?? null;
+    if (chain?.output) {
+      chain.output.connect(master);
+      if (reverbSend) chain.output.connect(reverbSend);
+    }
 
     for (const voice of voices) {
       const start = now + (voice.delay ?? 0);
       const end = start + voice.duration;
-      const attack = voice.attack ?? 0.008;
+      const attack = voice.attack ?? DEFAULT_ATTACK_SECONDS;
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -321,21 +421,28 @@ class AudioManager implements IAudioService {
       gain.gain.exponentialRampToValueAtTime(SILENCE, end);
 
       osc.connect(gain);
-      gain.connect(this.masterGain!);
-      if (reverbSend) gain.connect(reverbSend);
+      if (chain?.vibrato && osc.detune) chain.vibrato.connect(osc.detune);
+      if (sink) {
+        gain.connect(sink);
+      } else {
+        gain.connect(master);
+        if (reverbSend) gain.connect(reverbSend);
+      }
       osc.start(start);
       osc.stop(end + 0.02);
     }
   }
 
   playStack(quality: StackQuality, streak: number, world: number): void {
+    const palette = getWorldPalette(world);
     const base = getStackNoteHz(world, streak);
     const voices: Voice[] = [
-      { freq: base, type: "triangle", duration: 0.32, peak: 0.42 },
+      { freq: base, type: "triangle", duration: 0.32, peak: 0.42, role: "lead" },
       // Soft sub-octave body so notes feel "placed", not just beeped.
-      { freq: base / 2, type: "sine", duration: 0.22, peak: 0.18 },
+      { freq: base / 2, type: "sine", duration: 0.22, peak: 0.18, role: "body" },
     ];
-    QUALITY_HARMONY[quality].forEach((interval, i) => {
+    // A mirrored world inverts the intervals (fifths become fourths).
+    paletteHarmony(QUALITY_HARMONY[quality], palette).forEach((interval, i) => {
       voices.push({
         freq: base * semitonesToRatio(interval),
         type: "sine",
@@ -357,36 +464,46 @@ class AudioManager implements IAudioService {
         detune: 7,
       });
     }
-    this.play("stack", voices, STACK_REVERB_BOOST_DB[quality]);
+    this.play(
+      "stack",
+      shapeVoices(voices, palette),
+      STACK_REVERB_BOOST_DB[quality],
+      paletteFx(palette),
+    );
   }
 
   playLevelUp(world: number): void {
+    const palette = getWorldPalette(world);
     const root = getWorldRoot(world) * 2;
-    this.play(
-      "levelUp",
-      LEVEL_UP_ARPEGGIO.map((interval, i) => ({
+    const voices = LEVEL_UP_ARPEGGIO.map(
+      (interval, i): Voice => ({
         freq: root * semitonesToRatio(interval),
-        type: "triangle" as OscillatorType,
-        delay: i * 0.07,
+        type: "triangle",
+        // A mirrored world runs the arpeggio downward.
+        delay: paletteOrder(i, LEVEL_UP_ARPEGGIO.length, palette) * 0.07,
         duration: 0.35,
         peak: 0.24,
-      })),
+        role: "lead",
+      }),
     );
+    this.play("levelUp", shapeVoices(voices, palette), 0, paletteFx(palette));
   }
 
   playWorldUp(world: number): void {
+    const palette = getWorldPalette(world);
     const root = getWorldRoot(world);
-    this.play(
-      "worldUp",
-      WORLD_UP_CHORD.map((interval, i) => ({
+    // The pad keeps its own saw + sines; the palette shapes envelope and space.
+    const voices = WORLD_UP_CHORD.map(
+      (interval, i): Voice => ({
         freq: root * semitonesToRatio(interval),
-        type: (i === 0 ? "sawtooth" : "sine") as OscillatorType,
-        delay: i * 0.05,
+        type: i === 0 ? "sawtooth" : "sine",
+        delay: paletteOrder(i, WORLD_UP_CHORD.length, palette) * 0.05,
         attack: 0.08,
         duration: 1.4,
         peak: i === 0 ? 0.08 : 0.16,
-      })),
+      }),
     );
+    this.play("worldUp", shapeVoices(voices, palette), 0, paletteFx(palette));
   }
 
   playStackSound(score: number): void {
