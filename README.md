@@ -60,6 +60,7 @@ npm run test               # Vitest unit tests (~2 s)
 npm run test:e2e:chromium  # every E2E spec, Chromium only (fastest loop)
 npm run test:e2e           # Chromium: all specs; Firefox/WebKit/mobile: @cross-browser specs only
 npm run test:e2e:full      # every spec on all 5 projects
+npm run perf               # render/simulation benchmark (Chromium, not in CI)
 ```
 
 Gameplay E2E specs drive deterministic state through the test bridge, so they run on Chromium only. Specs tagged `@cross-browser` (canvas rendering, responsive layout) run on every engine.
