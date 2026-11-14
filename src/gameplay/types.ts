@@ -37,6 +37,16 @@ export interface WorldMechanics {
   fractureBaseRotationSpeed: number; // radians/sec
   fractureBandMinRatio: number; // active/container size ratio threshold
   fractureDisableOnBoss: boolean;
+
+  /**
+   * Reverse stacking: the growing shape must contain the previous one; a
+   * circular on-screen arena is the outer limit and the camera zooms out.
+   */
+  reverseStacking: boolean;
+
+  /** Heartbeat: growth advances in bursts on a fixed tempo. */
+  heartbeat: boolean;
+  heartbeatBpm: number;
 }
 
 export interface WorldVisualProfile {
@@ -70,6 +80,8 @@ export interface BossConfig {
 export interface WorldConfig {
   mechanics: WorldMechanics;
   name?: string;
+  /** One-line rule reminder shown when the world starts. */
+  tagline?: string;
   visualProfile?: Partial<WorldVisualProfile>;
 }
 

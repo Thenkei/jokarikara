@@ -7,6 +7,7 @@ import {
   drawShapeStack,
   drawPerfectGuide,
   PERFECT_GUIDE_ALPHA,
+  drawArena,
 } from "./shapeRenderer";
 import type { Shape } from "../utils/geometry";
 import { getWorldMechanics } from "../constants/game";
@@ -562,6 +563,43 @@ describe("drawPerfectGuide", () => {
   it("draws nothing for a non-positive size", () => {
     const ctx = ctxWithDash();
     drawPerfectGuide(ctx, active, 0, 0, 0, 1, false);
+    expect(ctx.stroke).not.toHaveBeenCalled();
+  });
+});
+
+describe("drawArena", () => {
+  const arenaCtx = () => {
+    const ctx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      stroke: vi.fn(),
+      setLineDash: vi.fn(),
+      strokeStyle: "",
+      lineWidth: 0,
+    };
+    return ctx as unknown as CanvasRenderingContext2D & typeof ctx;
+  };
+
+  it("draws a calm dashed ring when the shape is far from the rim", () => {
+    const ctx = arenaCtx();
+    drawArena(ctx, 100, 200, 150, 0.3, 0);
+    expect(ctx.arc).toHaveBeenCalledWith(100, 200, 150, 0, Math.PI * 2);
+    expect(ctx.setLineDash).toHaveBeenCalledWith([10, 8]);
+    expect(ctx.strokeStyle).toMatch(/^rgba\(255, 255, 255,/);
+  });
+
+  it("turns solid and red as the shape nears the rim", () => {
+    const ctx = arenaCtx();
+    drawArena(ctx, 0, 0, 150, 0.99, 0);
+    expect(ctx.setLineDash).toHaveBeenCalledWith([]);
+    expect(ctx.strokeStyle).toMatch(/^rgba\(255, 9\d, 9\d,/);
+  });
+
+  it("skips a degenerate arena", () => {
+    const ctx = arenaCtx();
+    drawArena(ctx, 0, 0, 0, 1, 0);
     expect(ctx.stroke).not.toHaveBeenCalled();
   });
 });

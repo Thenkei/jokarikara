@@ -13,6 +13,7 @@ import {
   updateShapeOpacities,
   stackActiveShape,
   checkContainment,
+  isStackValid,
   updateTimer,
   handleMiss,
   restartActiveShape,
@@ -24,11 +25,18 @@ import { forwardRef, useImperativeHandle } from "react";
 import {
   drawShape,
   drawPerfectGuide,
+  drawArena,
   drawBackground,
   clearCanvas,
 } from "../rendering/shapeRenderer";
 import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture";
 import { getPerfectGuide } from "../gameplay/guide";
+import {
+  getArenaRadius,
+  isEarlyReverseTap,
+  isReverseState,
+} from "../gameplay/reverse";
+import { getBeatPhase, getHeartbeatPulse } from "../gameplay/heartbeat";
 import { installGameTestBridge } from "../utils/testBridge";
 import { getWorldTheme } from "../visual/theme";
 import { haptic } from "../utils/haptics";
@@ -343,18 +351,22 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
       const state = stateRef.current;
       const lastShape = state.shapes[state.shapes.length - 1];
+      const reverse = isReverseState(state);
 
-      // Zen mode: require minimum size ratio to prevent spam-clicking
+      // Zen mode: ignore premature taps instead of costing a life.
       if (state.mode === "ZEN") {
-        const sizeRatio = state.activeShape!.size / lastShape.size;
-        if (sizeRatio < ZEN_MIN_CLICK_RATIO) {
+        const tooEarly = reverse
+          ? isEarlyReverseTap(state)
+          : state.activeShape!.size / lastShape.size < ZEN_MIN_CLICK_RATIO;
+        if (tooEarly) {
           audioService.playEarlyClickSound();
           return;
         }
       }
 
-      // Check if active shape is contained
-      if (!checkContainment(stateRef.current)) {
+      // Regular: inside the container. Reverse: contains the previous shape
+      // and still inside the arena.
+      if (!isStackValid(state)) {
         miss();
         return;
       }
@@ -443,12 +455,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const lastShape =
           stateRef.current.shapes[stateRef.current.shapes.length - 1];
         const wasBoss = !!stateRef.current.isBossLevel;
+        // `sizeRatio` is the quality ratio: active/last in regular worlds,
+        // last/active in reverse worlds (the new shape surrounds the last).
+        const size = isReverseState(stateRef.current)
+          ? lastShape.size / Math.max(sizeRatio, 1e-6)
+          : lastShape.size * sizeRatio;
         stateRef.current = {
           ...stateRef.current,
-          activeShape: {
-            ...stateRef.current.activeShape,
-            size: lastShape.size * sizeRatio,
-          },
+          activeShape: { ...stateRef.current.activeShape, size },
         };
 
         const result = stackActiveShape(stateRef.current);
@@ -609,10 +623,19 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const timeInSeconds = timeMs / 1000;
         const fractureOverlay = getFractureOverlay(state, state.elapsedTime);
 
-        drawBackground(ctx, width, height, pulse, mechanics, theme);
+        const reverse = isReverseState(state);
+        // Heartbeat worlds pulse the scene on the beat instead of the idle breath.
+        const scenePulse = mechanics.heartbeat
+          ? getHeartbeatPulse(
+              getBeatPhase(state.elapsedTime, mechanics.heartbeatBpm),
+            )
+          : pulse;
+
+        drawBackground(ctx, width, height, scenePulse, mechanics, theme);
 
         const glowFloor = state.shapes.length - GLOW_LAYER_DEPTH;
-        state.shapes.forEach((shape, index) => {
+        const drawStacked = (index: number) => {
+          const shape = state.shapes[index];
           const isContainer = index === state.shapes.length - 1;
           drawShape(
             ctx,
@@ -629,24 +652,26 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             isContainer ? (fractureOverlay ?? undefined) : undefined,
             index >= glowFloor,
           );
-        });
+        };
 
-        if (state.activeShape) {
-          const offsetX = state.activeOffset?.x ?? 0;
-          const offsetY = state.activeOffset?.y ?? 0;
-          const guide = getPerfectGuide(state);
-          if (guide) {
-            drawPerfectGuide(
-              ctx,
-              state.activeShape,
-              guide.perfectSize,
-              centerX + offsetX,
-              centerY + offsetY,
-              state.zoom,
-              guide.inPerfectBand,
-              PERFECT_GUIDE_COLOR,
-            );
-          }
+        const offsetX = state.activeOffset?.x ?? 0;
+        const offsetY = state.activeOffset?.y ?? 0;
+        const guide = state.activeShape ? getPerfectGuide(state) : null;
+        const drawGuide = () => {
+          if (!guide || !state.activeShape) return;
+          drawPerfectGuide(
+            ctx,
+            state.activeShape,
+            guide.perfectSize,
+            centerX + offsetX,
+            centerY + offsetY,
+            state.zoom,
+            guide.inPerfectBand,
+            PERFECT_GUIDE_COLOR,
+          );
+        };
+        const drawActive = () => {
+          if (!state.activeShape) return;
           drawShape(
             ctx,
             state.activeShape,
@@ -660,6 +685,27 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             false,
             theme,
           );
+        };
+
+        if (reverse) {
+          // Outward stacking: the growing shape is the largest, so paint it
+          // first, then the stack from newest (largest) to oldest (smallest).
+          const arenaRadius = getArenaRadius(state);
+          const reach = state.activeShape
+            ? state.activeShape.size / 2 / arenaRadius
+            : 0;
+          drawArena(ctx, centerX, centerY, arenaRadius * state.zoom, reach, scenePulse);
+          drawActive();
+          for (let index = state.shapes.length - 1; index >= 0; index -= 1) {
+            drawStacked(index);
+          }
+          drawGuide();
+        } else {
+          for (let index = 0; index < state.shapes.length; index += 1) {
+            drawStacked(index);
+          }
+          drawGuide();
+          drawActive();
         }
 
         if (fx.rings.length > 0 || fx.particles.length > 0) {

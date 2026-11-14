@@ -21,6 +21,7 @@ import {
 import type { HighScoresByMode } from "./utils/storage";
 import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
 import { getWorldTheme } from "./visual/theme";
+import { getWorldConfig } from "./gameplay/selectors";
 import {
   LEVELS_PER_WORLD,
   PERFECT_STACK_TIME_BONUS,
@@ -65,6 +66,8 @@ const createRunSeed = (): number => {
 };
 
 const HUD_REVEAL_DURATION_MS = 2000;
+/** Long enough to read the world name and its rule reminder. */
+const WORLD_INTRO_MS = 2800;
 /** Time Attack timer turns critical (red, pulsing) at or below this. */
 const TIMER_CRITICAL_SECONDS = 10;
 
@@ -210,6 +213,7 @@ function App() {
   const playAchievementCue = useCallback(() => {
     audioManager.playLevelUp(worldRef.current);
   }, []);
+  const worldConfig = useMemo(() => getWorldConfig(world), [world]);
   const worldTheme = useMemo(
     () => getWorldTheme(world, runSeed, reducedFx),
     [world, runSeed, reducedFx]
@@ -351,7 +355,7 @@ function App() {
     setWorld(newWorld);
     setLevel(1);
     setShowWorldUp(true);
-    setTimeout(() => setShowWorldUp(false), 1400);
+    setTimeout(() => setShowWorldUp(false), WORLD_INTRO_MS);
     revealSecondaryHud();
   }, [revealSecondaryHud]);
 
@@ -784,9 +788,15 @@ function App() {
             </div>
           )}
           {showWorldUp && (
-            <div className="world-up-overlay">
+            <div className="world-up-overlay" role="status">
               <span className="world-up-title">NEW WORLD</span>
               <span className="world-up-text">WORLD {world}</span>
+              {worldConfig.name && (
+                <span className="world-up-name">{worldConfig.name}</span>
+              )}
+              {worldConfig.tagline && (
+                <span className="world-up-tagline">{worldConfig.tagline}</span>
+              )}
             </div>
           )}
         </div>
