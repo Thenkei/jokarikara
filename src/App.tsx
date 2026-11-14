@@ -5,6 +5,7 @@ import {
   useRef,
   useEffect,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { GameCanvas, type GameCanvasHandle } from "./components/GameCanvas";
 import { audioManager } from "./utils/audioManager";
@@ -209,6 +210,15 @@ function App() {
   const [qualityPulseId, setQualityPulseId] = useState(0);
   /** Last combo milestone reached (id replays the banner animation). */
   const [comboBanner, setComboBanner] = useState({ streak: 0, id: 0 });
+  /**
+   * Screen-reader announcements for events that are otherwise purely visual
+   * (level/world/combo/pause/game over). Score itself is not announced: it
+   * changes on every stack and would flood the live region.
+   */
+  const [announcement, setAnnouncement] = useState({ text: "", id: 0 });
+  const announce = useCallback((text: string) => {
+    setAnnouncement((current) => ({ text, id: current.id + 1 }));
+  }, []);
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -350,6 +360,7 @@ function App() {
     setQualityPulseId(0);
     setPenaltyPulseId(0);
     setComboBanner({ streak: 0, id: 0 });
+    markProgress("reset", startWorld);
     setHasStackedThisRun(false);
     setLevel(1);
     setWorld(startWorld);
@@ -424,8 +435,13 @@ function App() {
       clearSecondaryHudTimeout();
       setShowSecondaryHud(false);
       setGameState("GAMEOVER");
+      const reason = getEndInsight(stats.endReason, finalWorld)?.title;
+      announce(
+        ["Game over", reason, `Score ${finalScore}`].filter(Boolean).join(". "),
+      );
     },
     [
+      announce,
       clearSecondaryHudTimeout,
       mode,
       dailyKey,
@@ -441,12 +457,38 @@ function App() {
     revealSecondaryHud();
   }, [revealSecondaryHud]);
 
+  // Last progression announced; undo re-reports the current level/world and
+  // must not be re-announced.
+  const announcedProgressRef = useRef({ world: 1, level: 1 });
+  /**
+   * Single owner of the ref's mutations (the React compiler rejects mutating
+   * a ref from several hook closures). Returns true when the value is new.
+   */
+  const markProgress = useCallback(
+    (kind: "world" | "level" | "reset", value: number): boolean => {
+      const progress = announcedProgressRef.current;
+      if (kind === "reset") {
+        progress.world = value;
+        progress.level = 1;
+        return true;
+      }
+      if (progress[kind] === value) return false;
+      progress[kind] = value;
+      if (kind === "world") progress.level = 1;
+      return true;
+    },
+    [],
+  );
+
   const handleLevelUp = useCallback((newLevel: number) => {
     setLevel(newLevel);
     setShowLevelUp(true);
     setTimeout(() => setShowLevelUp(false), 1100);
     revealSecondaryHud();
-  }, [revealSecondaryHud]);
+    if (markProgress("level", newLevel)) {
+      announce(`Level ${newLevel}`);
+    }
+  }, [revealSecondaryHud, announce, markProgress]);
 
   const handleWorldUp = useCallback((newWorld: number) => {
     setWorld(newWorld);
@@ -454,7 +496,13 @@ function App() {
     setShowWorldUp(true);
     setTimeout(() => setShowWorldUp(false), WORLD_INTRO_MS);
     revealSecondaryHud();
-  }, [revealSecondaryHud]);
+    if (markProgress("world", newWorld)) {
+      const config = getWorldConfig(newWorld);
+      announce(
+        [`World ${newWorld}`, config.name, config.tagline].filter(Boolean).join(". "),
+      );
+    }
+  }, [revealSecondaryHud, announce, markProgress]);
 
   const handleTimeUpdate = useCallback((time: number) => {
     setTimeRemaining(time);
@@ -469,9 +517,10 @@ function App() {
       setQualityPulseId((current) => current + 1);
       if (isComboMilestone(style.streak)) {
         setComboBanner((current) => ({ streak: style.streak, id: current.id + 1 }));
+        announce(`Combo ${style.streak}`);
       }
     }
-  }, []);
+  }, [announce]);
 
   const handleZenLivesChange = useCallback(
     (lives: number | null) => {
@@ -487,11 +536,12 @@ function App() {
   const applyPaused = useCallback(
     (next: boolean) => {
       setPaused(next);
+      announce(next ? "Paused" : "Resumed");
       canvasRef.current?.setPaused(next);
       // Paused time does not count towards play-time achievements.
       setAchievementsPaused(next);
     },
-    [setAchievementsPaused]
+    [setAchievementsPaused, announce]
   );
 
   const handleRestartShape = () => {
@@ -626,6 +676,28 @@ function App() {
     };
   }, [gameState, applyPaused]);
 
+  const modeButtonRefs = useRef<Partial<Record<GameMode, HTMLButtonElement | null>>>({});
+  /** WAI-ARIA radio group keys: arrows move and select, Home/End jump. */
+  const handleModeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const index = GAME_MODES.indexOf(mode);
+    const last = GAME_MODES.length - 1;
+    const target =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? (index + 1) % GAME_MODES.length
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? (index - 1 + GAME_MODES.length) % GAME_MODES.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? last
+              : null;
+    if (target === null) return;
+    event.preventDefault();
+    const next = GAME_MODES[target];
+    setMode(next);
+    modeButtonRefs.current[next]?.focus();
+  };
+
   const blurTarget = (event: { currentTarget: HTMLElement }) =>
     event.currentTarget.blur();
 
@@ -681,6 +753,10 @@ function App() {
 
   return (
     <div className="game-container">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {/* key forces re-announcement of identical consecutive messages */}
+        <span key={announcement.id}>{announcement.text}</span>
+      </div>
       {gameState === "START" && showAchievements && (
         <AchievementsPanel
           record={achievementRecord}
@@ -695,14 +771,25 @@ function App() {
           <h1 className="title">SHAPE STACK</h1>
           <p className="subtitle">Tap to stack. Don't overlap.</p>
 
-          <div className="mode-selection" role="group" aria-label="Game mode">
+          <div
+            className="mode-selection"
+            role="radiogroup"
+            aria-label="Game mode"
+            onKeyDown={handleModeKeyDown}
+          >
             {GAME_MODES.map((m) => (
               <div className="mode-option" key={m}>
                 <button
+                  ref={(node) => {
+                    modeButtonRefs.current[m] = node;
+                  }}
                   className={`mode-btn ${mode === m ? "active" : ""}`}
                   onClick={() => setMode(m)}
                   aria-label={MODE_LABELS[m].aria}
-                  aria-pressed={mode === m}
+                  role="radio"
+                  aria-checked={mode === m}
+                  // Roving tabindex: one tab stop for the group, arrows inside.
+                  tabIndex={mode === m ? 0 : -1}
                 >
                   {MODE_LABELS[m].label}
                 </button>
