@@ -636,7 +636,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           // last rendered frame stays on screen behind the overlay.
           lastTimeRef.current = 0;
           if (!manualModeRef.current) {
-            requestAnimationFrame(loop);
+            rafIdRef.current = requestAnimationFrame(loop);
           }
           return;
         }
