@@ -8,6 +8,7 @@ import {
 } from "react";
 import { GameCanvas, type GameCanvasHandle } from "./components/GameCanvas";
 import { audioManager } from "./utils/audioManager";
+import { installAudioTestBridge } from "./utils/testBridge";
 import {
   GAME_MODES,
   getAllHighScores,
@@ -153,6 +154,11 @@ function App() {
     audioManager.setMuted(initial);
     return initial;
   });
+  const [musicOn, setMusicOn] = useState(() => {
+    const initial = getSettings().music;
+    audioManager.setMusicEnabled(initial);
+    return initial;
+  });
   const [styleScore, setStyleScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
@@ -189,6 +195,8 @@ function App() {
       clearSecondaryHudTimeout();
     };
   }, [clearSecondaryHudTimeout]);
+
+  useEffect(() => installAudioTestBridge(audioManager), []);
 
   const gameplayThemeVars = useMemo(
     () =>
@@ -350,6 +358,14 @@ function App() {
     setMuted(next);
     audioManager.setMuted(next);
     saveSettings({ muted: next });
+    revealSecondaryHud();
+  };
+
+  const handleToggleMusic = () => {
+    const next = !musicOn;
+    setMusicOn(next);
+    audioManager.setMusicEnabled(next);
+    saveSettings({ music: next });
     revealSecondaryHud();
   };
 
@@ -616,6 +632,17 @@ function App() {
                 aria-pressed={muted}
               >
                 {muted ? "SOUND: OFF" : "SOUND: ON"}
+              </button>
+              <button
+                className="music-toggle-btn"
+                onClick={(event) => {
+                  blurTarget(event);
+                  handleToggleMusic();
+                }}
+                aria-label="Background music"
+                aria-pressed={musicOn}
+              >
+                {musicOn ? "MUSIC: ON" : "MUSIC: OFF"}
               </button>
             </div>
           </div>

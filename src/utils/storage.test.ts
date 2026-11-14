@@ -101,13 +101,13 @@ describe("storage", () => {
 
   describe("getSettings", () => {
     it("returns the default settings when nothing is stored", () => {
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true });
     });
 
     it("returns stored settings with reducedFx: true", () => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ reducedFx: true }));
 
-      expect(getSettings()).toEqual({ reducedFx: true, muted: false });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: false, music: true });
     });
 
     it("falls back to the default for reducedFx when the stored value is not a boolean", () => {
@@ -119,10 +119,16 @@ describe("storage", () => {
       expect(getSettings().reducedFx).toBe(false);
     });
 
+    it("falls back to music on when the stored value is not a boolean", () => {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ music: "off" }));
+
+      expect(getSettings().music).toBe(true);
+    });
+
     it("returns the default settings when JSON is corrupted", () => {
       localStorage.setItem(SETTINGS_KEY, "{{bad");
 
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true });
     });
   });
 
@@ -138,6 +144,13 @@ describe("storage", () => {
       saveSettings({ reducedFx: false });
 
       expect(getSettings().reducedFx).toBe(false);
+    });
+
+    it("persists the music preference without touching other settings", () => {
+      saveSettings({ reducedFx: true, muted: true });
+      saveSettings({ music: false });
+
+      expect(getSettings()).toEqual({ reducedFx: true, muted: true, music: false });
     });
 
     it("does not throw when localStorage.setItem throws", () => {

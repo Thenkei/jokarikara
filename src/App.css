@@ -442,7 +442,8 @@ button:active {
 }
 
 .fx-toggle-btn,
-.mute-toggle-btn {
+.mute-toggle-btn,
+.music-toggle-btn {
   background: rgba(255, 255, 255, 0.06);
   color: var(--world-hud-text);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -454,7 +455,8 @@ button:active {
 }
 
 .fx-toggle-btn:hover,
-.mute-toggle-btn:hover {
+.mute-toggle-btn:hover,
+.music-toggle-btn:hover {
   background: color-mix(in srgb, var(--world-hud-primary) 24%, rgba(255, 255, 255, 0.06));
 }
 
@@ -559,6 +561,7 @@ button:active {
   .best-streak-badge,
   .fx-toggle-btn,
   .mute-toggle-btn,
+  .music-toggle-btn,
   .restart-btn,
   .undo-btn {
     font-size: 0.6rem;

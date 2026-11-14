@@ -80,6 +80,7 @@ export interface ShapeCreationOptions {
 declare global {
   interface Window {
     __GAME_TEST__?: import("./utils/testBridge").GameTestBridge;
+    __GAME_AUDIO__?: import("./utils/testBridge").AudioTestBridge;
   }
 }
 

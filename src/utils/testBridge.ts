@@ -1,4 +1,5 @@
 import type { MutableRefObject } from "react";
+import type { IAudioService, MusicState } from "../audio/types";
 import { getWorldMechanics } from "../constants/game";
 import { isFractureActive, isTapBlockedByFracture } from "../gameplay/fracture";
 import type { GameState } from "../types";
@@ -40,6 +41,11 @@ export type GameTestBridge = {
   resume: () => void;
   showDiagnostics: () => void;
   hideDiagnostics: () => void;
+};
+
+/** E2E-only, read-only view of the audio service (outlives GameCanvas). */
+export type AudioTestBridge = {
+  getMusicState: () => MusicState;
 };
 
 type InstallArgs = {
@@ -224,5 +230,20 @@ export const installGameTestBridge = ({
     if ((window as Window & { __GAME_TEST__?: GameTestBridge }).__GAME_TEST__) {
       delete (window as Window & { __GAME_TEST__?: GameTestBridge }).__GAME_TEST__;
     }
+  };
+};
+
+/**
+ * Exposes the soundtrack state to E2E tests. Installed by <App/> (not
+ * GameCanvas) so it stays readable on the start and game-over screens, where
+ * music must be stopped.
+ */
+export const installAudioTestBridge = (
+  audio: IAudioService,
+): (() => void) | undefined => {
+  if (!isE2eMode()) return undefined;
+  window.__GAME_AUDIO__ = { getMusicState: () => audio.getMusicState() };
+  return () => {
+    delete window.__GAME_AUDIO__;
   };
 };
