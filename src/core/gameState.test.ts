@@ -17,6 +17,7 @@ import {
   getStackQuality,
   STACK_DRIFT_SPEED,
   STACK_FADE_SPEED,
+  advanceClock,
 } from "./gameState";
 
 import {
@@ -142,9 +143,28 @@ describe("gameState", () => {
       // due to the sine wave in pulseOffset. Actually, growthIncrement is constant for a fixed state,
       // but pulseOffset depends on Date.now().
 
-      // To test definitively, we'd need to mock Date.now() or check the logic.
-      // For now, let's just ensure it doesn't crash and changes size.
       expect(updated1.activeShape!.size).not.toBe(state.activeShape!.size);
+    });
+
+    it("drives boss pulse from the game clock, not wall time", () => {
+      let state = createInitialState(1000);
+      state.stackCount = 4;
+      state = spawnActiveShape(state);
+
+      const atA = { ...state, elapsedTime: 0.2 };
+      const atB = { ...state, elapsedTime: 0.6 };
+      // Same game time => identical result, whatever Date.now() says.
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy.mockReturnValue(1_000);
+      const first = updateActiveShape(atA, 0.1);
+      nowSpy.mockReturnValue(9_999_999);
+      const again = updateActiveShape(atA, 0.1);
+      nowSpy.mockRestore();
+      expect(again.activeShape).toEqual(first.activeShape);
+      // Different game time => different pulse/hue.
+      expect(updateActiveShape(atB, 0.1).activeShape!.color).not.toBe(
+        first.activeShape!.color,
+      );
     });
 
     it("should apply erratic rotation on boss levels with erraticRotationEnabled", () => {
@@ -159,17 +179,15 @@ describe("gameState", () => {
       );
     });
 
-    it("should apply boss hue shift deterministically with mocked time", () => {
-      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1000);
+    it("should apply boss hue shift deterministically from the game clock", () => {
       let state = createInitialState(1000);
       state.stackCount = 4; // Boss at stack 5
       state = spawnActiveShape(state);
       expect(state.isBossLevel).toBe(true);
 
-      const updated = updateActiveShape(state, 0.1);
+      // hue = (elapsedTime * 100) % 360
+      const updated = updateActiveShape({ ...state, elapsedTime: 1 }, 0.1);
       expect(updated.activeShape!.color).toBe("hsl(100, 80%, 60%)");
-
-      nowSpy.mockRestore();
     });
 
     it("should apply gravity drift when enabled", () => {
@@ -680,6 +698,21 @@ describe("gameState", () => {
       expect(state.perfectCount).toBe(1);
       state = undoLastStack(state); // undoes the perfect stack
       expect(state.perfectCount).toBe(0);
+    });
+  });
+
+  describe("advanceClock", () => {
+    it("starts at zero and accumulates simulated time", () => {
+      const state = createInitialState(1000);
+      expect(state.elapsedTime).toBe(0);
+      const later = advanceClock(advanceClock(state, 0.25), 0.5);
+      expect(later.elapsedTime).toBeCloseTo(0.75, 10);
+    });
+
+    it("returns the same state for non-positive dt", () => {
+      const state = createInitialState(1000);
+      expect(advanceClock(state, 0)).toBe(state);
+      expect(advanceClock(state, -1)).toBe(state);
     });
   });
 });

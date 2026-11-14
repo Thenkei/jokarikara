@@ -150,7 +150,7 @@ export const installGameTestBridge = ({
       const theme = getTheme();
       const fractureActive = state ? isFractureActive(state) : undefined;
       const fractureWillMissOnTap = state
-        ? isTapBlockedByFracture(state, Date.now() / 1000)
+        ? isTapBlockedByFracture(state, state.elapsedTime)
         : undefined;
       const fractureSectorWidthDeg = state
         ? getWorldMechanics(state.world).fractureSectorWidthDeg
