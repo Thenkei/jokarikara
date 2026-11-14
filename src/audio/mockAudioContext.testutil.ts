@@ -15,7 +15,7 @@ export interface MockParam {
 }
 
 export interface MockNode {
-  kind: "oscillator" | "gain" | "filter" | "compressor";
+  kind: "oscillator" | "gain" | "filter" | "compressor" | "convolver";
   connect: Mock;
   disconnect: Mock;
 }
@@ -35,6 +35,19 @@ export interface MockGain extends MockNode {
   gain: MockParam;
 }
 
+export interface MockBuffer {
+  numberOfChannels: number;
+  length: number;
+  sampleRate: number;
+  getChannelData: (channel: number) => Float32Array;
+}
+
+export interface MockConvolver extends MockNode {
+  kind: "convolver";
+  normalize: boolean;
+  buffer: MockBuffer | null;
+}
+
 const param = (value = 0): MockParam => ({
   value,
   setValueAtTime: vi.fn(),
@@ -47,6 +60,7 @@ export const makeMockAudioContext = () => {
   const nodes: MockNode[] = [];
   const oscillators: MockOscillator[] = [];
   const gains: MockGain[] = [];
+  const convolvers: MockConvolver[] = [];
 
   const track = <T extends MockNode>(node: T): T => {
     nodes.push(node);
@@ -55,6 +69,7 @@ export const makeMockAudioContext = () => {
 
   const ctx = {
     currentTime: 0,
+    sampleRate: 44100,
     state: "running" as AudioContextState,
     destination: {},
     resume: vi.fn().mockResolvedValue(undefined),
@@ -93,6 +108,31 @@ export const makeMockAudioContext = () => {
         disconnect: vi.fn(),
       }),
     ),
+    createBuffer: vi.fn(
+      (numberOfChannels: number, length: number, sampleRate: number): MockBuffer => {
+        const data = Array.from(
+          { length: numberOfChannels },
+          () => new Float32Array(length),
+        );
+        return {
+          numberOfChannels,
+          length,
+          sampleRate,
+          getChannelData: (channel: number) => data[channel],
+        };
+      },
+    ),
+    createConvolver: vi.fn(() => {
+      const node: MockConvolver = track({
+        kind: "convolver",
+        normalize: true,
+        buffer: null,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      });
+      convolvers.push(node);
+      return node;
+    }),
     createDynamicsCompressor: vi.fn(() =>
       track({
         kind: "compressor" as const,
@@ -123,6 +163,7 @@ export const makeMockAudioContext = () => {
     nodes,
     oscillators,
     gains,
+    convolvers,
     endStoppedOscillators,
     /** Cast for code under test that expects real Web Audio types. */
     asAudioContext: () => ctx as unknown as AudioContext,

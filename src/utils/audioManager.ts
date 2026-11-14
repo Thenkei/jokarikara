@@ -27,9 +27,26 @@ import {
   BUS_LIMITER,
   dbToGain,
   MASTER_VOLUME,
+  MUSIC_REVERB_SEND_DB,
+  SFX_REVERB_SEND_DB,
   SFX_TRIM_DB,
+  STACK_REVERB_BOOST_DB,
   type SfxId,
 } from "../audio/mix";
+import {
+  createReverbBus,
+  deferToIdle,
+  type DeferTask,
+  type ReverbBus,
+} from "../audio/reverbBus";
+
+export interface AudioManagerOptions {
+  /**
+   * Schedules non-urgent setup (the reverb IR). Defaults to an idle callback;
+   * offline renders and tests inject a synchronous or manual one.
+   */
+  defer?: DeferTask;
+}
 /** Exponential ramps cannot target 0; this is effectively silence. */
 const SILENCE = 0.0001;
 
@@ -56,6 +73,15 @@ class AudioManager implements IAudioService {
   private masterGain: GainNode | null = null;
   /** Soundtrack bus into the master, below SFX level. */
   private musicGain: GainNode | null = null;
+  /** Shared room reverb; `null` means a dry mix (not built yet, unsupported or failed). */
+  private reverb: ReverbBus | null = null;
+  /** Deferred reverb build: not scheduled, scheduled, or settled (built or given up). */
+  private reverbBuild: "idle" | "pending" | "done" = "idle";
+  private readonly defer: DeferTask;
+
+  constructor(options: AudioManagerOptions = {}) {
+    this.defer = options.defer ?? deferToIdle;
+  }
   private music: MusicEngine | null = null;
   private muted = false;
   private musicEnabled = true;
@@ -115,6 +141,47 @@ class AudioManager implements IAudioService {
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = MUSIC_VOLUME;
     this.musicGain.connect(this.masterGain);
+
+    // The dry graph above is all the first sound needs; the reverb (IR
+    // generation is several ms, more on low-end phones) follows when idle.
+    this.scheduleReverb();
+  }
+
+  /**
+   * Build the shared reverb off the first-sound path. Sounds played before it
+   * exists stay dry; later voices pick up their send in `play()`. Never
+   * allocates while muted: a build skipped for mute is retried on unmute or
+   * on the next sound. Failures leave the mix dry for the session.
+   */
+  private scheduleReverb(): void {
+    const ctx = this.ctx;
+    const master = this.masterGain;
+    if (this.reverbBuild !== "idle" || this.muted || !ctx || !master) return;
+    this.reverbBuild = "pending";
+    const build = () => {
+      if (this.muted) {
+        this.reverbBuild = "idle";
+        return;
+      }
+      // Torn down, replaced or closed meanwhile: nothing to attach to.
+      this.reverbBuild = "done";
+      if (this.ctx !== ctx || ctx.state === "closed") return;
+      try {
+        // Returns into the master, so mute silences the tail too and the
+        // compressor/limiter still catch dry + wet together.
+        this.reverb = createReverbBus(ctx, master);
+        const musicSend = this.reverb?.send(MUSIC_REVERB_SEND_DB);
+        if (musicSend) this.musicGain?.connect(musicSend);
+      } catch (error) {
+        console.warn("Reverb unavailable, mixing dry", error);
+      }
+    };
+    try {
+      this.defer(build);
+    } catch (error) {
+      console.warn("Reverb scheduling unavailable, mixing dry", error);
+      this.reverbBuild = "done";
+    }
   }
 
   setMuted(muted: boolean): void {
@@ -123,6 +190,7 @@ class AudioManager implements IAudioService {
       this.masterGain.gain.value = muted ? 0 : MASTER_VOLUME;
     }
     this.reconcileMusic(MUTE_FADE_SECONDS);
+    if (!muted) this.scheduleReverb();
   }
 
   isMuted(): boolean {
@@ -224,11 +292,13 @@ class AudioManager implements IAudioService {
     return this.ctx && this.masterGain ? this.ctx : null;
   }
 
-  private play(sfx: SfxId, voices: Voice[]): void {
+  private play(sfx: SfxId, voices: Voice[], reverbBoostDb = 0): void {
     const ctx = this.ready();
     if (!ctx) return;
     const now = ctx.currentTime;
     const trim = dbToGain(SFX_TRIM_DB[sfx]);
+    const reverbSend =
+      this.reverb?.send(SFX_REVERB_SEND_DB[sfx] + reverbBoostDb) ?? null;
 
     for (const voice of voices) {
       const start = now + (voice.delay ?? 0);
@@ -252,6 +322,7 @@ class AudioManager implements IAudioService {
 
       osc.connect(gain);
       gain.connect(this.masterGain!);
+      if (reverbSend) gain.connect(reverbSend);
       osc.start(start);
       osc.stop(end + 0.02);
     }
@@ -286,7 +357,7 @@ class AudioManager implements IAudioService {
         detune: 7,
       });
     }
-    this.play("stack", voices);
+    this.play("stack", voices, STACK_REVERB_BOOST_DB[quality]);
   }
 
   playLevelUp(world: number): void {
@@ -429,6 +500,7 @@ class AudioManager implements IAudioService {
   }
 }
 
-export const createAudioManager = (): IAudioService => new AudioManager();
+export const createAudioManager = (options?: AudioManagerOptions): IAudioService =>
+  new AudioManager(options);
 
 export const audioManager: IAudioService = createAudioManager();
