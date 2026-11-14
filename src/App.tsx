@@ -14,11 +14,24 @@ import {
   saveHighScore,
   getSettings,
   saveSettings,
+  getDailyRecord,
+  saveDailyResult,
 } from "./utils/storage";
 import type { HighScoresByMode } from "./utils/storage";
 import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
 import { getWorldTheme } from "./visual/theme";
-import { LEVELS_PER_WORLD, ZEN_MAX_LIVES } from "./constants/game";
+import {
+  LEVELS_PER_WORLD,
+  PERFECT_STACK_TIME_BONUS,
+  ZEN_MAX_LIVES,
+} from "./constants/game";
+import {
+  buildDailyShareText,
+  formatDailyLabel,
+  getDailySeed,
+  getLocalDateKey,
+  qualitiesFromScoreHistory,
+} from "./modes/daily";
 import "./App.css";
 
 const isE2eMode = (): boolean =>
@@ -39,6 +52,8 @@ const createRunSeed = (): number => {
 };
 
 const HUD_REVEAL_DURATION_MS = 2000;
+/** Time Attack timer turns critical (red, pulsing) at or below this. */
+const TIMER_CRITICAL_SECONDS = 10;
 
 const MODE_LABELS: Record<GameMode, { label: string; aria: string; description: string }> = {
   CLASSIC: {
@@ -58,14 +73,48 @@ const MODE_LABELS: Record<GameMode, { label: string; aria: string; description: 
   },
 };
 
+interface DailyRunResult {
+  dateKey: string;
+  best: number;
+  attempts: number;
+}
+
 interface LastRun {
   mode: GameMode;
   isNewBest: boolean;
   stats: RunStats;
   scores: HighScoresByMode[GameMode];
+  daily: DailyRunResult | null;
 }
 
-const EMPTY_STATS: RunStats = { stackCount: 0, perfectCount: 0, bestStreak: 0 };
+type ShareStatus = "idle" | "copied" | "shared" | "failed";
+
+const EMPTY_STATS: RunStats = {
+  stackCount: 0,
+  perfectCount: 0,
+  bestStreak: 0,
+  scoreHistory: [],
+};
+
+/** Web Share on mobile, clipboard elsewhere. Never throws. */
+const shareText = async (text: string): Promise<ShareStatus> => {
+  try {
+    if (typeof navigator.share === "function") {
+      await navigator.share({ text });
+      return "shared";
+    }
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return "copied";
+    }
+  } catch (error) {
+    // AbortError = user dismissed the share sheet: not a failure.
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return "idle";
+    }
+  }
+  return "failed";
+};
 
 /** True when the key event came from a control that handles Space/Enter itself. */
 const isInteractiveTarget = (target: EventTarget | null): boolean =>
@@ -90,6 +139,12 @@ function App() {
   const [paused, setPaused] = useState(false);
   const [runId, setRunId] = useState(0);
   const [mode, setMode] = useState<GameMode>("CLASSIC");
+  /** Date key of the running Daily Challenge, null for a regular run. */
+  const [dailyKey, setDailyKey] = useState<string | null>(null);
+  const [todayRecord, setTodayRecord] = useState(() =>
+    getDailyRecord(getLocalDateKey())
+  );
+  const [shareStatus, setShareStatus] = useState<ShareStatus>("idle");
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [runSeed, setRunSeed] = useState(0);
   const [reducedFx, setReducedFx] = useState(() => getSettings().reducedFx);
@@ -147,16 +202,27 @@ function App() {
     [worldTheme]
   );
 
-  const startGame = (selectedMode: GameMode = mode) => {
-    const initialZenLives = selectedMode === "ZEN" ? ZEN_MAX_LIVES : null;
+  const startRun = ({
+    mode: selectedMode,
+    daily,
+  }: {
+    mode: GameMode;
+    daily: boolean;
+  }) => {
+    // The Daily Challenge always uses Classic rules.
+    const runMode: GameMode = daily ? "CLASSIC" : selectedMode;
+    const initialZenLives = runMode === "ZEN" ? ZEN_MAX_LIVES : null;
+    const todayKey = daily ? getLocalDateKey() : null;
 
-    setMode(selectedMode);
+    setMode(runMode);
+    setDailyKey(todayKey);
+    setShareStatus("idle");
     setPaused(false);
     setLastRun(null);
     setRunId((current) => current + 1);
     audioManager.init();
     audioManager.resume();
-    setRunSeed(createRunSeed());
+    setRunSeed(todayKey ? getDailySeed(todayKey) : createRunSeed());
     setScore(0);
     setStyleScore(0);
     setStreak(0);
@@ -172,6 +238,9 @@ function App() {
     revealSecondaryHud();
   };
 
+  /** Same kind of run again (keeps Daily vs regular). */
+  const restartRun = () => startRun({ mode, daily: dailyKey !== null });
+
   const handleGameOver = useCallback(
     (
       finalScore: number,
@@ -179,9 +248,23 @@ function App() {
       finalLevel: number,
       stats: RunStats = EMPTY_STATS
     ) => {
-      const { scores, isNewBest } = saveHighScore(finalScore, mode);
-      setAllScores((current) => ({ ...current, [mode]: scores }));
-      setLastRun({ mode, isNewBest, stats, scores });
+      if (dailyKey) {
+        // Daily runs have their own per-day record and stay out of the
+        // Classic leaderboard (a known seed would skew it).
+        const result = saveDailyResult(dailyKey, finalScore);
+        setTodayRecord({ best: result.best, attempts: result.attempts });
+        setLastRun({
+          mode,
+          isNewBest: result.isNewBest,
+          stats,
+          scores: allScores[mode],
+          daily: { dateKey: dailyKey, best: result.best, attempts: result.attempts },
+        });
+      } else {
+        const { scores, isNewBest } = saveHighScore(finalScore, mode);
+        setAllScores((current) => ({ ...current, [mode]: scores }));
+        setLastRun({ mode, isNewBest, stats, scores, daily: null });
+      }
       setPaused(false);
       setScore(finalScore);
       setWorld(finalWorld);
@@ -190,7 +273,7 @@ function App() {
       setShowSecondaryHud(false);
       setGameState("GAMEOVER");
     },
-    [clearSecondaryHudTimeout, mode]
+    [clearSecondaryHudTimeout, mode, dailyKey, allScores]
   );
 
   const handleScore = useCallback((newScore: number) => {
@@ -270,8 +353,23 @@ function App() {
     revealSecondaryHud();
   };
 
+  const handleShare = async () => {
+    if (!lastRun?.daily) return;
+    const text = buildDailyShareText({
+      dateKey: lastRun.daily.dateKey,
+      score,
+      world,
+      level,
+      stackCount: lastRun.stats.stackCount,
+      qualities: qualitiesFromScoreHistory(lastRun.stats.scoreHistory),
+    });
+    setShareStatus(await shareText(text));
+  };
+
   const handleMainMenu = () => {
     setPaused(false);
+    setDailyKey(null);
+    setTodayRecord(getDailyRecord(getLocalDateKey()));
     clearSecondaryHudTimeout();
     setShowSecondaryHud(false);
     setZenLives(null);
@@ -304,9 +402,12 @@ function App() {
     }
 
     if (event.key === "Enter" && !event.repeat && !isInteractiveTarget(event.target)) {
-      if (gameState === "START" || gameState === "GAMEOVER") {
+      if (gameState === "START") {
         event.preventDefault();
-        startGame(mode);
+        startRun({ mode, daily: false });
+      } else if (gameState === "GAMEOVER") {
+        event.preventDefault();
+        restartRun();
       }
     }
   };
@@ -373,8 +474,25 @@ function App() {
             {MODE_LABELS[mode].description}
           </p>
 
-          <button className="start-btn" onClick={() => startGame(mode)}>
+          <button
+            className="start-btn"
+            onClick={() => startRun({ mode, daily: false })}
+          >
             START
+          </button>
+
+          <button
+            className="daily-btn"
+            onClick={() => startRun({ mode: "CLASSIC", daily: true })}
+            aria-label={`Daily challenge for ${formatDailyLabel(getLocalDateKey())}. Same shapes for everyone today.`}
+          >
+            <span className="daily-btn-title">DAILY CHALLENGE</span>
+            <span className="daily-btn-meta">
+              {formatDailyLabel(getLocalDateKey())} ·{" "}
+              {todayRecord.attempts > 0
+                ? `BEST ${todayRecord.best} · ${todayRecord.attempts} ${todayRecord.attempts === 1 ? "TRY" : "TRIES"}`
+                : "NOT PLAYED"}
+            </span>
           </button>
         </div>
       )}
@@ -417,8 +535,17 @@ function App() {
               <span className="score score-readout">{score}</span>
               <span className="world-badge">W {world}</span>
               <span className="level-badge">L {level}</span>
+              {dailyKey && <span className="daily-badge">DAILY</span>}
               {mode === "TIME_ATTACK" && timeRemaining !== null && (
-                <span className="timer-badge">{Math.ceil(timeRemaining)}s</span>
+                <span
+                  className={`timer-badge ${
+                    timeRemaining <= TIMER_CRITICAL_SECONDS ? "critical" : ""
+                  }`}
+                  role="timer"
+                  aria-label={`${Math.ceil(timeRemaining)} seconds left`}
+                >
+                  {Math.ceil(timeRemaining)}s
+                </span>
               )}
               {mode === "ZEN" && (
                 <span
@@ -510,7 +637,7 @@ function App() {
               </button>
               <button
                 className="pause-restart-btn menu-btn"
-                onClick={() => startGame(mode)}
+                onClick={restartRun}
               >
                 RESTART
               </button>
@@ -526,6 +653,16 @@ function App() {
               className={`quality-overlay quality-${lastQuality.toLowerCase()}`}
             >
               {lastQuality}
+            </div>
+          )}
+
+          {mode === "TIME_ATTACK" && lastQuality === "PERFECT" && (
+            <div
+              key={`bonus-${qualityPulseId}`}
+              className="time-bonus-pop"
+              aria-hidden="true"
+            >
+              +{PERFECT_STACK_TIME_BONUS}s
             </div>
           )}
 
@@ -546,6 +683,11 @@ function App() {
       {gameState === "GAMEOVER" && (
         <div className="screen gameover-screen">
           <h1 className="title">GAME OVER</h1>
+          {lastRun?.daily && (
+            <p className="daily-result-label">
+              DAILY · {formatDailyLabel(lastRun.daily.dateKey)}
+            </p>
+          )}
           {lastRun?.isNewBest && (
             <div className="new-best-badge" role="status">
               NEW BEST
@@ -576,6 +718,24 @@ function App() {
               )}
             </dl>
           </div>
+          {lastRun?.daily ? (
+            <div className="leaderboard daily-summary">
+              <h3>TODAY</h3>
+              <p className="daily-summary-line">
+                BEST <strong>{lastRun.daily.best}</strong> ·{" "}
+                {lastRun.daily.attempts}{" "}
+                {lastRun.daily.attempts === 1 ? "TRY" : "TRIES"}
+              </p>
+              <button className="share-btn" onClick={handleShare}>
+                SHARE RESULT
+              </button>
+              <p className="share-status" role="status">
+                {shareStatus === "copied" && "Copied to clipboard"}
+                {shareStatus === "shared" && "Shared!"}
+                {shareStatus === "failed" && "Sharing unavailable"}
+              </p>
+            </div>
+          ) : (
           <div className="leaderboard">
             <h3>TOP SCORES - {MODE_LABELS[mode].label}</h3>
             {allScores[mode].length === 0 ? (
@@ -597,7 +757,8 @@ function App() {
               </ul>
             )}
           </div>
-          <button className="retry-btn" onClick={() => startGame(mode)}>
+          )}
+          <button className="retry-btn" onClick={restartRun}>
             RETRY
           </button>
           <button className="menu-btn" onClick={handleMainMenu}>

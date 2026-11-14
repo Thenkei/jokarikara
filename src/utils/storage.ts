@@ -13,6 +13,9 @@ export const GAME_MODES: readonly GameMode[] = ["CLASSIC", "ZEN", "TIME_ATTACK"]
 const LEGACY_STORAGE_KEY = "shape-stack-high-scores-v2";
 const STORAGE_KEY = "shape-stack-high-scores-v3";
 const SETTINGS_STORAGE_KEY = "shape-stack-settings";
+const DAILY_STORAGE_KEY = "shape-stack-daily-v1";
+/** Daily records older than this many entries are pruned (oldest first). */
+export const MAX_DAILY_RECORDS = 30;
 export const MAX_HIGH_SCORES = 5;
 
 export interface GameSettings {
@@ -136,4 +139,70 @@ export const saveSettings = (partial: Partial<GameSettings>): void => {
   } catch (e) {
     console.error("Failed to save settings", e);
   }
+};
+
+export interface DailyRecord {
+  best: number;
+  attempts: number;
+}
+
+export interface SaveDailyResult extends DailyRecord {
+  isNewBest: boolean;
+}
+
+const isDailyRecord = (value: unknown): value is DailyRecord =>
+  typeof value === "object" &&
+  value !== null &&
+  Number.isFinite((value as DailyRecord).best) &&
+  Number.isInteger((value as DailyRecord).attempts) &&
+  (value as DailyRecord).attempts >= 0;
+
+const readDailyRecords = (): Record<string, DailyRecord> => {
+  try {
+    const raw = localStorage.getItem(DAILY_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(([, v]) =>
+        isDailyRecord(v),
+      ),
+    ) as Record<string, DailyRecord>;
+  } catch (e) {
+    console.error("Failed to load daily records", e);
+    return {};
+  }
+};
+
+export const getDailyRecord = (dateKey: string): DailyRecord =>
+  readDailyRecords()[dateKey] ?? { best: 0, attempts: 0 };
+
+/** Records one Daily attempt; keeps only the most recent days. */
+export const saveDailyResult = (
+  dateKey: string,
+  score: number,
+): SaveDailyResult => {
+  const records = readDailyRecords();
+  const previous = records[dateKey] ?? { best: 0, attempts: 0 };
+  const next: DailyRecord = {
+    best: Math.max(previous.best, score),
+    attempts: previous.attempts + 1,
+  };
+  records[dateKey] = next;
+
+  // ISO date keys sort chronologically as strings.
+  const kept = Object.keys(records)
+    .sort()
+    .slice(-MAX_DAILY_RECORDS)
+    .reduce<Record<string, DailyRecord>>((acc, key) => {
+      acc[key] = records[key];
+      return acc;
+    }, {});
+
+  try {
+    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(kept));
+  } catch (e) {
+    console.error("Failed to save daily result", e);
+  }
+  return { ...next, isNewBest: score > 0 && score > previous.best };
 };

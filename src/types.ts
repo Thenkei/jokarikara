@@ -47,6 +47,8 @@ export interface RunStats {
   stackCount: number;
   perfectCount: number;
   bestStreak: number;
+  /** Points awarded per stack, in order (drives the Daily share trail). */
+  scoreHistory: readonly number[];
 }
 
 /**

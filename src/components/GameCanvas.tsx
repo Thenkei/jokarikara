@@ -104,6 +104,7 @@ const toRunStats = (state: GameState): RunStats => ({
   stackCount: state.stackCount,
   perfectCount: state.perfectCount,
   bestStreak: state.bestStreak,
+  scoreHistory: state.scoreHistory,
 });
 
 /**
