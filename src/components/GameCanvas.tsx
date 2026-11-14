@@ -7,6 +7,7 @@ import {
   createInitialState,
   spawnActiveShape,
   updateActiveShape,
+  advanceClock,
   updateZoom,
   updateShapeRotations,
   updateShapeOpacities,
@@ -322,8 +323,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         return;
       }
 
-      const tapTimeSec = Date.now() / 1000;
-      if (isTapBlockedByFracture(state, tapTimeSec)) {
+      if (isTapBlockedByFracture(state, state.elapsedTime)) {
         miss();
         return;
       }
@@ -492,6 +492,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         }
 
         if (dt > 0 && !wasOver) {
+          state = advanceClock(state, dt);
           state = updateActiveShape(state, dt);
           state = updateZoom(state, dt);
           state = updateShapeRotations(state, dt);
@@ -566,7 +567,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const mechanics = getWorldMechanics(state.world);
         const theme = getWorldTheme(state.world, state.runSeed, reducedFx);
         const timeInSeconds = timeMs / 1000;
-        const fractureOverlay = getFractureOverlay(state, Date.now() / 1000);
+        const fractureOverlay = getFractureOverlay(state, state.elapsedTime);
 
         drawBackground(ctx, width, height, pulse, mechanics, theme);
 
