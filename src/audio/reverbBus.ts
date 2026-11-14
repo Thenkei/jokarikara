@@ -23,6 +23,27 @@ export interface ReverbBus {
   send(db: number): GainNode | null;
 }
 
+/** Runs non-urgent setup work later, off the current (user-gesture) task. */
+export type DeferTask = (task: () => void) => void;
+
+/**
+ * Upper bound before an idle callback is forced: the IR is ~7 ms of CPU, so
+ * a busy main thread still gets the room within a fraction of a second.
+ */
+export const REVERB_BUILD_TIMEOUT_MS = 200;
+
+/**
+ * Default `DeferTask`: an idle callback (with a timeout so it always runs),
+ * falling back to a macrotask where `requestIdleCallback` is missing (Safari).
+ */
+export const deferToIdle: DeferTask = (task) => {
+  if (typeof globalThis.requestIdleCallback === "function") {
+    globalThis.requestIdleCallback(() => task(), { timeout: REVERB_BUILD_TIMEOUT_MS });
+    return;
+  }
+  setTimeout(task, 0);
+};
+
 const safeDisconnect = (...nodes: (AudioNode | null)[]): void => {
   for (const node of nodes) {
     try {

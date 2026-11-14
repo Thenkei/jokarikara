@@ -14,7 +14,8 @@ import type { StackQuality } from "../types";
  * Space: every voice also feeds a shared reverb (procedural 1.5 s room, see
  * `reverb.ts` / `reverbBus.ts`) whose return joins the master *before* the
  * compressor and limiter, so dry + wet are protected together and mute
- * silences the tail. Reverb tail after the dry voices end:
+ * silences the tail. The bus is built on idle after init (IR generation stays
+ * off the first-sound path); sounds before it play dry. Tail after the dry:
  *   PERFECT stack ≈ -52 (rings on), menu click ≈ -59 (near-dry, snappy)
  * Adding the reverb raised the 300 ms RMS by ≤ 0.4 dB on most effects and
  * ≈ 1.2 dB on PERFECT (intended: it should bloom); level up and world up

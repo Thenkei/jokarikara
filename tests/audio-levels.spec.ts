@@ -35,7 +35,7 @@ test("sound effects and music keep their mix relationships", async ({
     const SR = 44100;
     const modulePath = "/jokarikara/src/utils/audioManager.ts";
     const mod = (await import(/* @vite-ignore */ modulePath)) as {
-      createAudioManager: () => Audio;
+      createAudioManager: (options?: { defer?: (task: () => void) => void }) => Audio;
     };
     const measure = async (
       secs: number,
@@ -47,7 +47,9 @@ test("sound effects and music keep their mix relationships", async ({
         ctx = new OfflineAudioContext(2, Math.ceil(SR * secs), SR);
         return ctx;
       };
-      const audio = mod.createAudioManager();
+      // The reverb bus is normally built on idle, after the first sound; run
+      // that deferred build synchronously so every render includes it.
+      const audio = mod.createAudioManager({ defer: (task) => task() });
       audio.init();
       play(audio);
       const data = (await ctx!.startRendering()).getChannelData(0);

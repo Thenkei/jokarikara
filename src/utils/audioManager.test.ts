@@ -6,9 +6,29 @@ import {
 } from "../audio/mockAudioContext.testutil";
 import { MUSIC_VOLUME } from "../audio/soundtrack";
 import { dbToGain, SFX_REVERB_SEND_DB, STACK_REVERB_BOOST_DB } from "../audio/mix";
+import { REVERB_BUILD_TIMEOUT_MS } from "../audio/reverbBus";
 
 describe("audioManager", () => {
   let mock: MockAudioContext;
+  /** Idle callbacks (the deferred reverb build) waiting to run. */
+  let idleQueue: (() => void)[];
+  const flushIdle = () => {
+    for (const task of idleQueue.splice(0)) task();
+  };
+  /**
+   * Manual idle queue: deferred work runs only when a test flushes it, and
+   * never shows up as a timer in the soundtrack timer-count assertions.
+   * Re-applied after `vi.useFakeTimers()`, which fakes requestIdleCallback.
+   */
+  const stubIdle = () => {
+    vi.stubGlobal(
+      "requestIdleCallback",
+      vi.fn((callback: () => void) => {
+        idleQueue.push(callback);
+        return idleQueue.length;
+      }),
+    );
+  };
 
   beforeEach(() => {
     mock = makeMockAudioContext();
@@ -18,6 +38,8 @@ describe("audioManager", () => {
         return mock.ctx;
       }),
     );
+    idleQueue = [];
+    stubIdle();
   });
 
   afterEach(() => {
@@ -100,8 +122,87 @@ describe("audioManager", () => {
       return [...sends].map((send) => send.gain.value);
     };
 
-    it("builds one convolver per context with a calibrated stereo IR", () => {
+    /** Manager whose deferred work runs as soon as it is scheduled. */
+    const eagerAudio = () => createAudioManager({ defer: (task) => task() });
+
+    it("plays the first sound dry and builds the reverb only when idle", () => {
       const audio = createAudioManager();
+      audio.init();
+      audio.playTick(false);
+      // No IR generation (buffer) and no convolver on the first-sound path.
+      expect(mock.ctx.createBuffer).not.toHaveBeenCalled();
+      expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
+      const master = mock.gains[0];
+      mock.gains.slice(2).forEach((gain) => {
+        expect(gain.connect.mock.calls).toEqual([[master]]);
+      });
+
+      // Scheduled as an idle callback that is forced after a short timeout.
+      expect(idleQueue).toHaveLength(1);
+      expect(requestIdleCallback).toHaveBeenCalledWith(expect.any(Function), {
+        timeout: REVERB_BUILD_TIMEOUT_MS,
+      });
+      flushIdle();
+      expect(mock.ctx.createConvolver).toHaveBeenCalledTimes(1);
+
+      const before = mock.gains.length;
+      audio.playStack("PERFECT", 1, 1);
+      expect(sendLevelsOf(mock.gains.slice(before))).toEqual([
+        dbToGain(SFX_REVERB_SEND_DB.stack + STACK_REVERB_BOOST_DB.PERFECT),
+      ]);
+    });
+
+    it("falls back to a macrotask without requestIdleCallback", () => {
+      vi.useFakeTimers();
+      try {
+        vi.stubGlobal("requestIdleCallback", undefined);
+        const audio = createAudioManager();
+        audio.init();
+        expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
+        vi.runAllTimers();
+        expect(mock.ctx.createConvolver).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("schedules the build once, however many sounds play before it", () => {
+      const audio = createAudioManager();
+      audio.init();
+      audio.playTick(false);
+      audio.playUi("select");
+      audio.setMuted(false);
+      expect(idleQueue).toHaveLength(1);
+      flushIdle();
+      audio.setMuted(false);
+      expect(idleQueue).toHaveLength(0);
+      expect(mock.ctx.createConvolver).toHaveBeenCalledTimes(1);
+    });
+
+    it("skips the build if muted meanwhile, and builds after unmute", () => {
+      const audio = createAudioManager();
+      audio.init();
+      audio.setMuted(true);
+      flushIdle();
+      expect(mock.ctx.createBuffer).not.toHaveBeenCalled();
+      expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
+
+      audio.setMuted(false);
+      flushIdle();
+      expect(mock.ctx.createConvolver).toHaveBeenCalledTimes(1);
+    });
+
+    it("skips the build if the context was closed meanwhile", () => {
+      const audio = createAudioManager();
+      audio.init();
+      mock.ctx.state = "closed";
+      flushIdle();
+      expect(mock.ctx.createBuffer).not.toHaveBeenCalled();
+      expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
+    });
+
+    it("builds one convolver per context with a calibrated stereo IR", () => {
+      const audio = eagerAudio();
       audio.init();
       audio.playStack("PERFECT", 1, 1);
       audio.playWorldUp(2);
@@ -118,7 +219,7 @@ describe("audioManager", () => {
     });
 
     it("sends big moments wetter than near-dry UI clicks", () => {
-      const audio = createAudioManager();
+      const audio = eagerAudio();
       audio.init();
       const before = mock.gains.length;
       audio.playUi("select");
@@ -136,7 +237,7 @@ describe("audioManager", () => {
     });
 
     it("reuses send nodes instead of allocating one per sound", () => {
-      const audio = createAudioManager();
+      const audio = eagerAudio();
       audio.init();
       audio.playTick(false);
       const allocated = mock.gains.length;
@@ -145,10 +246,12 @@ describe("audioManager", () => {
       expect(mock.gains.length - allocated).toBe(2);
     });
 
-    it("feeds the soundtrack bus into the reverb", () => {
+    it("feeds the soundtrack bus into the reverb once it exists", () => {
       const audio = createAudioManager();
       audio.init();
       const [master, musicBus] = mock.gains;
+      expect(musicBus.connect.mock.calls).toEqual([[master]]);
+      flushIdle();
       const targets = musicBus.connect.mock.calls.map(([target]) => target);
       expect(targets).toContain(master);
       expect(targets.length).toBe(2);
@@ -158,13 +261,15 @@ describe("audioManager", () => {
       const audio = createAudioManager();
       audio.setMuted(true);
       audio.playStack("PERFECT", 1, 1);
+      flushIdle();
+      expect(idleQueue).toHaveLength(0);
       expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
       expect(mock.ctx.createBuffer).not.toHaveBeenCalled();
     });
 
     it("mixes dry when convolution is unsupported", () => {
       Reflect.deleteProperty(mock.ctx, "createConvolver");
-      const audio = createAudioManager();
+      const audio = eagerAudio();
       expect(() => audio.playStack("PERFECT", 1, 1)).not.toThrow();
       const master = mock.gains[0];
       const voiceGains = mock.gains.slice(2);
@@ -179,7 +284,7 @@ describe("audioManager", () => {
       mock.ctx.createConvolver.mockImplementation(() => {
         throw new Error("not supported");
       });
-      const audio = createAudioManager();
+      const audio = eagerAudio();
       expect(() => audio.playStack("GOOD", 1, 1)).not.toThrow();
       expect(warn).toHaveBeenCalled();
       expect(mock.oscillators.length).toBeGreaterThan(0);
@@ -187,6 +292,18 @@ describe("audioManager", () => {
       mock.nodes
         .filter((node) => node.kind === "filter")
         .forEach((node) => expect(node.disconnect).toHaveBeenCalled());
+    });
+
+    it("stays dry if deferring itself fails", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const audio = createAudioManager({
+        defer: () => {
+          throw new Error("no scheduler");
+        },
+      });
+      expect(() => audio.playStack("GOOD", 1, 1)).not.toThrow();
+      expect(warn).toHaveBeenCalled();
+      expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
     });
   });
 
@@ -200,6 +317,7 @@ describe("audioManager", () => {
 
     beforeEach(() => {
       vi.useFakeTimers();
+      stubIdle();
     });
 
     afterEach(() => {
@@ -317,6 +435,7 @@ describe("audioManager", () => {
     it("does not leak nodes or timers across many runs", () => {
       const audio = createAudioManager();
       audio.init();
+      flushIdle(); // the reverb bus is part of the long-lived graph too
       const longLived = new Set(mock.nodes);
       for (let run = 0; run < 25; run += 1) {
         audio.startMusic(1 + (run % 3));
