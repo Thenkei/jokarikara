@@ -1,7 +1,42 @@
+import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { makeBridge, waitForBridge } from "./bridgeHelpers";
 
 const PERFECT_RATIO = 0.98;
+
+/**
+ * Hit-tests the centre of each selector while an unlock toast is showing, in
+ * one round trip (toasts are on a timer; slow engines must not miss them).
+ * The toast region ignores pointer events so taps reach the game, which also
+ * hides it from hit testing: the probe lifts that while it looks, so a toast
+ * painted over an element does count as covering it.
+ */
+const probeUnderToast = (page: Page, selectors: readonly string[]) =>
+  page.evaluate((targets) => {
+    const region = document.querySelector<HTMLElement>(".achievement-toast-region");
+    const toastShowing = !!region?.querySelector(".achievement-toast");
+    if (!region) return { toastShowing, uncovered: {} as Record<string, boolean> };
+    region.style.pointerEvents = "auto";
+    try {
+      const uncovered: Record<string, boolean> = {};
+      for (const selector of targets) {
+        const element = document.querySelector(selector);
+        if (!element) {
+          uncovered[selector] = false;
+          continue;
+        }
+        const box = element.getBoundingClientRect();
+        const top = document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2,
+        );
+        uncovered[selector] = top === element || element.contains(top);
+      }
+      return { toastShowing, uncovered };
+    } finally {
+      region.style.pointerEvents = "";
+    }
+  }, selectors);
 
 const failRun = async (bridge: ReturnType<typeof makeBridge>) => {
   const state = await bridge.getState();
@@ -92,7 +127,9 @@ test.describe("Achievements", () => {
     await expect(page.locator(".start-btn")).toBeVisible();
   });
 
-  test("unlock toasts never cover RETRY on a small game over screen", async ({ page }) => {
+  test("unlock toasts never cover RETRY or the title on a small game over screen", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto("/");
     await page.click(".start-btn");
@@ -105,20 +142,18 @@ test.describe("Achievements", () => {
     for (let i = 0; i < 12; i += 1) await bridge.forceStack(PERFECT_RATIO);
     await failRun(bridge);
 
-    await expect(page.locator(".gameover-screen")).toBeVisible();
-    await expect(page.locator(".run-achievements li").first()).toBeVisible();
-    await expect(page.locator(".achievement-toast")).toBeVisible();
-
-    const retry = page.locator(".retry-btn");
-    await expect(retry).toBeInViewport({ ratio: 1 });
-    const hit = await retry.evaluate((button) => {
-      const box = button.getBoundingClientRect();
-      const top = document.elementFromPoint(
-        box.left + box.width / 2,
-        box.top + box.height / 2,
-      );
-      return top === button || button.contains(top);
+    const screen = page.locator(".gameover-screen");
+    await expect(screen).toBeVisible();
+    // Probe the settled layout: the entry animation slides the screen up.
+    await screen.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    expect(hit).toBe(true);
+    const probe = await probeUnderToast(page, [".retry-btn", ".gameover-title"]);
+    expect(probe.toastShowing).toBe(true);
+    expect(probe.uncovered).toEqual({ ".retry-btn": true, ".gameover-title": true });
+
+    await expect(page.locator(".run-achievements li").first()).toBeVisible();
+    await expect(page.locator(".retry-btn")).toBeInViewport({ ratio: 1 });
+    await expect(page.locator(".gameover-title")).toBeInViewport({ ratio: 1 });
   });
 });

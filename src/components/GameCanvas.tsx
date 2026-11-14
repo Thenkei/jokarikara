@@ -771,7 +771,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             arenaRadius * state.zoom,
             reach,
             scenePulse,
-            theme.mono,
+            theme.danger,
           );
           drawActive();
           for (let index = state.shapes.length - 1; index >= 0; index -= 1) {
@@ -791,7 +791,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         }
 
         ctx.restore();
-        if (fx.flash.t > 0) drawFlash(ctx, fx, width, height, tint);
+        if (fx.flash.t > 0) {
+          drawFlash(ctx, fx, width, height, tint, theme.danger.flash);
+        }
       },
       [
         audioService,

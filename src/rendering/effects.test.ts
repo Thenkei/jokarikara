@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   createEffects,
+  drawFlash,
   getPunchScale,
   getShakeOffset,
   hasActiveEffects,
@@ -116,5 +117,32 @@ describe("effects", () => {
     expect(s.rings[0].alpha).toBeLessThan(0.5);
     expect(triggerLevelUp(createEffects(), true).punch.t).toBe(0);
     expect(triggerWorldUp(createEffects(), true).punch.t).toBe(0);
+  });
+});
+
+describe("drawFlash", () => {
+  const flashCtx = () =>
+    ({
+      fillRect: vi.fn(),
+      fillStyle: "",
+      globalAlpha: 1,
+    }) as unknown as CanvasRenderingContext2D;
+  const monoTint = (color: string) => `tinted(${color})`;
+
+  it("tints a palette flash but keeps the fail flash on the danger colour", () => {
+    const world = flashCtx();
+    drawFlash(world, triggerWorldUp(createEffects(), false), 10, 10, monoTint, "#ff4a1f");
+    expect(world.fillStyle).toBe("tinted(#ffffff)");
+
+    const fail = flashCtx();
+    drawFlash(fail, triggerFail(createEffects(), false), 10, 10, monoTint, "#ff4a1f");
+    expect(fail.fillStyle).toBe("#ff4a1f");
+    expect(fail.fillRect).toHaveBeenCalledWith(0, 0, 10, 10);
+  });
+
+  it("falls back to the stored colour without a danger colour", () => {
+    const ctx = flashCtx();
+    drawFlash(ctx, triggerFail(createEffects(), false), 10, 10);
+    expect(ctx.fillStyle).toBe("#ff2a2a");
   });
 });

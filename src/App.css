@@ -1,4 +1,7 @@
 .game-container {
+  /* Achievement toast geometry, shared with the game over toast lane. */
+  --achievement-toast-top: max(0.75rem, env(safe-area-inset-top));
+  --achievement-toast-height: 2.4rem;
   width: 100%;
   height: 100%;
   display: flex;
@@ -664,7 +667,14 @@ button:active {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
-  padding: max(1.25rem, env(safe-area-inset-top)) 1rem 1.25rem;
+  /*
+   * The top padding is the achievement toast lane: toasts drop in from the
+   * top here (the action bar owns the bottom edge), so the hero always starts
+   * below them. Reserved even without a toast: the hero, the cards and (on
+   * centred layouts) RETRY never shift when toasts come and go.
+   */
+  padding: calc(var(--achievement-toast-top) + var(--achievement-toast-height) + 0.5rem)
+    1rem 1.25rem;
   /* Fades the last line under the action bar edge while there is more to read. */
   mask-image: linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent);
 }
@@ -1349,7 +1359,10 @@ button:focus-visible {
 
 .achievement-toast {
   max-width: 100%;
-  padding: 0.6rem 1.1rem;
+  /* Fixed height (one line): the game over screen reserves a lane for it. */
+  height: var(--achievement-toast-height);
+  padding: 0 1.1rem;
+  line-height: calc(var(--achievement-toast-height) - 2px);
   border-radius: 999px;
   background: rgba(12, 12, 14, 0.88);
   border: 1px solid rgba(255, 216, 77, 0.45);
@@ -1370,9 +1383,12 @@ button:focus-visible {
   letter-spacing: 0.16em;
 }
 
-/* Game over: the action bar owns the bottom edge, so toasts drop in from the top. */
+/*
+ * Game over: the action bar owns the bottom edge, so toasts drop in from the
+ * top, into the lane reserved above the hero (see .gameover-body).
+ */
 .game-container:has(> .gameover-screen) .achievement-toast-region {
-  top: max(0.75rem, env(safe-area-inset-top));
+  top: var(--achievement-toast-top);
   bottom: auto;
 }
 
@@ -2016,16 +2032,72 @@ button:focus-visible {
  * Mono look. The canvas and the start backdrop get their tint from the theme
  * (src/visual/theme.ts), so the per-frame canvas is never filtered; the DOM
  * layers on top (static or small) share the same phosphor tint via a filter.
+ *
+ * Danger signals (`.danger-signal`, and the HUD's `.critical` badges) keep
+ * their meaning: they are never under the filter and get a hot red-orange
+ * instead (MONO_DANGER_HUE on the canvas). A counter-filter on the element
+ * cannot work: the tint starts with grayscale(1), so once an ancestor is
+ * filtered the hue is gone for good. Instead the filter goes on the largest
+ * subtrees that hold no danger signal:
+ *   1. a top-level layer without one is filtered whole (the common case: one
+ *      filter per layer, as before);
+ *   2. a layer that holds one is not filtered; its children are, recursively,
+ *      except the danger signal and the ancestors leading to it (these are
+ *      layout wrappers with no paint of their own, or HUD rows coloured from
+ *      the Mono theme variables).
+ * Rule 2 can never match inside a filtered subtree (it holds no danger
+ * signal), so nothing is filtered twice.
  */
 .game-container[data-theme="mono"] {
   --bg-color: #010a04;
   /* Tuned by eye against the canvas tint (MONO_HUE, phosphor green). */
   --mono-filter: grayscale(1) sepia(1) hue-rotate(72deg) saturate(2.4);
+  /* Hot red-orange: danger next to phosphor green (MONO_DANGER in theme.ts). */
+  --mono-danger: #ff5a24;
+  --mono-danger-text: #ffa27a;
 }
 
-.game-container[data-theme="mono"] > :not(.game-screen, .start-backdrop, .sr-only),
-.game-container[data-theme="mono"] .game-screen > :not(.canvas-container) {
+.game-container[data-theme="mono"]
+  > :not(
+    .game-screen,
+    .start-backdrop,
+    .sr-only,
+    .danger-signal,
+    .critical,
+    :has(.danger-signal, .critical)
+  ),
+.game-container[data-theme="mono"]
+  .game-screen
+  > :not(.canvas-container, .danger-signal, .critical, :has(.danger-signal, .critical)),
+.game-container[data-theme="mono"]
+  :not(.game-screen):has(.danger-signal, .critical)
+  > :not(.danger-signal, .critical, :has(.danger-signal, .critical)) {
   filter: var(--mono-filter);
+}
+
+.game-container[data-theme="mono"] .gameover-card.end-insight {
+  background: rgba(255, 90, 36, 0.07);
+  border-color: rgba(255, 110, 60, 0.3);
+}
+
+.game-container[data-theme="mono"] .end-insight-title {
+  color: var(--mono-danger-text);
+}
+
+.game-container[data-theme="mono"] .end-insight-tip {
+  color: #d6b3a3;
+}
+
+.game-container[data-theme="mono"] .time-penalty-pop {
+  color: var(--mono-danger-text);
+  text-shadow: 0 0 10px rgba(255, 90, 36, 0.5);
+}
+
+.game-container[data-theme="mono"] .timer-badge.critical,
+.game-container[data-theme="mono"] .lives-badge.critical {
+  color: #fff1ea;
+  background: color-mix(in srgb, var(--mono-danger) 58%, #1f0903 42%);
+  border-color: rgba(255, 130, 80, 0.6);
 }
 
 /* ---------- Game over insights ---------- */

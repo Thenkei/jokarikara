@@ -52,6 +52,32 @@ export interface WorldTheme {
     waveMultiplier: number;
     flashMultiplier: number;
   };
+  /** Danger signals keep their own hue, Mono included (see `DangerColors`). */
+  danger: DangerColors;
+}
+
+/**
+ * Colours of the canvas danger signals: fracture windows (world 3), the
+ * Reverse Stack arena warning (world 9) and the fail flash. They are semantic,
+ * not decorative, so the Mono look does not fold them into its tint: it swaps
+ * them for a hot red-orange that still reads as danger next to the phosphor
+ * green (a brighter green would read as "good"). Precomputed once per look:
+ * the renderer only picks strings, never builds them per frame.
+ */
+export interface DangerColors {
+  fracture: {
+    stroke: string;
+    glow: string;
+    /** Single stroke used with reduced effects (no glow pass). */
+    reduced: string;
+  };
+  /**
+   * Opaque arena rim colours from calm (index 0) to full danger (last index,
+   * `ARENA_RAMP_STEPS`). The renderer applies the rim alpha via `globalAlpha`.
+   */
+  arenaRamp: readonly string[];
+  /** Fill of the fail flash. */
+  flash: string;
 }
 
 type HslColor = {
@@ -366,6 +392,76 @@ export const toMonoColor = (color: string): string => {
 export const monoShade = (lightness: number, saturation = MONO_SATURATION): string =>
   hslToHex({ h: MONO_HUE, s: saturation, l: lightness });
 
+// ---------------------------------------------------------------------------
+// Danger colours
+// ---------------------------------------------------------------------------
+
+/** Resolution of the arena warning ramp (danger 0..1 in this many steps). */
+export const ARENA_RAMP_STEPS = 32;
+
+/**
+ * Hot red-orange for danger in the Mono look: far enough from MONO_HUE to
+ * never read as part of the tint, warm enough to sit with phosphor green.
+ */
+export const MONO_DANGER_HUE = 14;
+
+const buildRamp = (colorAt: (t: number) => string): readonly string[] =>
+  Object.freeze(
+    Array.from({ length: ARENA_RAMP_STEPS + 1 }, (_, i) => colorAt(i / ARENA_RAMP_STEPS)),
+  );
+
+const freezeDanger = (danger: DangerColors): DangerColors =>
+  Object.freeze({ ...danger, fracture: Object.freeze({ ...danger.fracture }) });
+
+/** Regular look: white rim turning red, red fracture windows and flash. */
+export const DEFAULT_DANGER: DangerColors = freezeDanger({
+  fracture: {
+    stroke: "rgba(255, 108, 108, 0.78)",
+    glow: "rgba(255, 90, 90, 0.28)",
+    reduced: "rgba(255, 130, 130, 0.36)",
+  },
+  arenaRamp: buildRamp((t) => {
+    const gb = toInteger(255 - t * 165)
+      .toString(16)
+      .padStart(2, "0");
+    return `#ff${gb}${gb}`;
+  }),
+  flash: "#ff2a2a",
+});
+
+const monoDanger = (lightness: number): string =>
+  hslToHex({ h: MONO_DANGER_HUE, s: 100, l: lightness });
+
+/**
+ * Mono look: the arena rim starts as a pale tint and warms through yellow and
+ * amber to the danger red-orange. The hue is interpolated (an RGB mix would
+ * pass through a muddy olive) with an ease-out, so the rim already reads as
+ * red-orange in the last stretch before the limit, like the regular look's
+ * red, rather than lingering in amber.
+ */
+export const MONO_DANGER: DangerColors = freezeDanger({
+  fracture: {
+    stroke: withAlpha(monoDanger(60), 0.88),
+    glow: withAlpha(monoDanger(55), 0.32),
+    reduced: withAlpha(monoDanger(64), 0.45),
+  },
+  arenaRamp: buildRamp((t) => {
+    const warmth = 1 - (1 - t) * (1 - t);
+    return hslToHex({
+      h: MONO_HUE + (MONO_DANGER_HUE - MONO_HUE) * warmth,
+      s: 100,
+      l: 70 - 12 * warmth,
+    });
+  }),
+  flash: monoDanger(52),
+});
+
+/** Arena rim colour for a danger level in [0, 1] (clamped; no allocation). */
+export const arenaDangerColor = (danger: DangerColors, level: number): string =>
+  danger.arenaRamp[
+    Number.isFinite(level) ? Math.round(clamp(level, 0, 1) * ARENA_RAMP_STEPS) : 0
+  ];
+
 /** Derives the Mono variant of a theme: same structure, one tint. */
 const toMonoTheme = (base: WorldTheme): WorldTheme => {
   const primary = toMonoColor(base.hud.primary);
@@ -396,6 +492,7 @@ const toMonoTheme = (base: WorldTheme): WorldTheme => {
     },
     // Colour shift would rotate shapes out of the tint.
     fx: { ...base.fx, hueShiftMultiplier: 0 },
+    danger: MONO_DANGER,
   };
 };
 
@@ -456,6 +553,7 @@ export const getWorldTheme = (
       waveMultiplier: reducedFx ? 0.6 : 1,
       flashMultiplier: reducedFx ? 0.5 : 1,
     },
+    danger: DEFAULT_DANGER,
   };
 
   cache.set(id, baseTheme);

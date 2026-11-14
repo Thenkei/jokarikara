@@ -2,7 +2,14 @@ import type { Shape } from "../utils/geometry";
 import { getStarVertices } from "../utils/geometry";
 import type { WorldMechanics } from "../constants/game";
 import type { FractureOverlay } from "../gameplay/fracture";
-import { MONO_HUE, toMonoColor, type WorldTheme } from "../visual/theme";
+import {
+  arenaDangerColor,
+  DEFAULT_DANGER,
+  MONO_HUE,
+  toMonoColor,
+  type DangerColors,
+  type WorldTheme,
+} from "../visual/theme";
 
 /**
  * ShapeRenderer - Separates drawing logic from game loop (SRP).
@@ -221,8 +228,10 @@ export const ARENA_WARNING_REACH = 0.8;
 
 /**
  * Outer limit of reverse worlds: a circle the growing shape must not cross.
- * It brightens and turns red as the growing shape approaches it, and breathes
- * with the scene pulse (heartbeat-aware).
+ * It brightens and warms to the danger colour as the growing shape approaches
+ * it (red, or Mono's red-orange), and breathes with the scene pulse
+ * (heartbeat-aware). Colours come from the theme's precomputed ramp and the
+ * alpha goes through `globalAlpha`, so a frame builds no colour string.
  */
 export const drawArena = (
   ctx: CanvasRenderingContext2D,
@@ -231,26 +240,21 @@ export const drawArena = (
   radiusPx: number,
   reach: number,
   pulse: number,
-  mono: boolean = false,
+  danger: DangerColors = DEFAULT_DANGER,
 ): void => {
   if (radiusPx <= 0) return;
-  const danger = Math.min(
+  const level = Math.min(
     1,
     Math.max(0, (reach - ARENA_WARNING_REACH) / (1 - ARENA_WARNING_REACH)),
   );
   ctx.save();
   ctx.beginPath();
   ctx.arc(x, y, radiusPx, 0, Math.PI * 2);
-  // White at rest, shifting to red as the growing shape nears the rim (Mono:
-  // a pale tint that only brightens; the width still grows with the danger).
-  const alpha = 0.22 + danger * 0.55 + pulse * 0.08;
-  const gb = Math.round(255 - danger * 165);
-  ctx.strokeStyle = mono
-    ? `hsla(${MONO_HUE}, 100%, ${Math.round(70 + danger * 22)}%, ${alpha})`
-    : `rgba(255, ${gb}, ${gb}, ${alpha})`;
-  ctx.lineWidth = 2 + danger * 2;
+  ctx.globalAlpha = Math.min(1, 0.22 + level * 0.55 + pulse * 0.08);
+  ctx.strokeStyle = arenaDangerColor(danger, level);
+  ctx.lineWidth = 2 + level * 2;
   if (typeof ctx.setLineDash === "function") {
-    ctx.setLineDash(danger > 0 ? [] : [10, 8]);
+    ctx.setLineDash(level > 0 ? [] : [10, 8]);
   }
   ctx.stroke();
   ctx.restore();
@@ -282,20 +286,6 @@ export const FAUX_GLOW: ReadonlyArray<{ spread: number; alpha: number }> = [
  */
 export const MIN_VISIBLE_OPACITY = 0.01;
 
-/** Fracture windows: red, or the brightest Mono shade (a warning by brightness). */
-const FRACTURE_COLORS = {
-  normal: {
-    reduced: "rgba(255, 130, 130, 0.36)",
-    stroke: "rgba(255, 108, 108, 0.78)",
-    glow: "rgba(255, 90, 90, 0.28)",
-  },
-  mono: {
-    reduced: `hsla(${MONO_HUE}, 100%, 90%, 0.4)`,
-    stroke: `hsla(${MONO_HUE}, 100%, 92%, 0.85)`,
-    glow: `hsla(${MONO_HUE}, 100%, 80%, 0.3)`,
-  },
-} as const;
-
 /** Eclipse container outline (alpha pulses per frame, as before). */
 const eclipseStroke = (alpha: number, mono: boolean): string =>
   mono ? `hsla(${MONO_HUE}, 100%, 88%, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
@@ -306,11 +296,10 @@ const drawFractureOverlay = (
   shapeRotation: number,
   overlay: FractureOverlay,
   reducedFx: boolean,
-  mono: boolean = false,
+  colors: DangerColors["fracture"] = DEFAULT_DANGER.fracture,
 ): void => {
   const radius = size / 2;
   const halfWidth = overlay.widthRad / 2;
-  const colors = mono ? FRACTURE_COLORS.mono : FRACTURE_COLORS.normal;
 
   ctx.save();
   ctx.strokeStyle = reducedFx ? colors.reduced : colors.stroke;
@@ -457,7 +446,7 @@ export const drawShape = (
       shape.rotation,
       fractureOverlay,
       theme?.reducedFx ?? false,
-      mono,
+      theme?.danger.fracture,
     );
   }
 

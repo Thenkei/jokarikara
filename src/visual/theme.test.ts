@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   __resetThemeCacheForTests,
+  ARENA_RAMP_STEPS,
+  arenaDangerColor,
+  DEFAULT_DANGER,
   getWorldPalette,
   getWorldTheme,
+  MONO_DANGER,
+  MONO_DANGER_HUE,
   MONO_HUE,
   toMonoColor,
 } from "./theme";
@@ -151,5 +156,79 @@ describe("mono look", () => {
     const boss = toMonoColor("hsl(12.5, 80%, 60%)");
     expect(boss).toBe(toMonoColor("hsl(250, 80%, 60%)"));
     expect(Math.abs(hueOf(boss) - MONO_HUE)).toBeLessThan(3);
+  });
+});
+
+describe("danger colours", () => {
+  beforeEach(() => {
+    __resetThemeCacheForTests();
+  });
+
+  const parse = (color: string): { r: number; g: number; b: number } => {
+    const rgba = color.match(/^rgba\((\d+), (\d+), (\d+)/);
+    return rgba
+      ? { r: Number(rgba[1]), g: Number(rgba[2]), b: Number(rgba[3]) }
+      : hexToRgb(color);
+  };
+  const hslOf = (color: string) => rgbToHsl(parse(color));
+  /** Red to red-orange, never the Mono green. */
+  const isDangerHue = (color: string) => {
+    const { h, s } = hslOf(color);
+    return s > 60 && (h <= 25 || h >= 345);
+  };
+
+  it("keeps the regular look's red signals", () => {
+    const theme = getWorldTheme(3, 1, false);
+    expect(theme.danger).toBe(DEFAULT_DANGER);
+    expect(theme.danger.flash).toBe("#ff2a2a");
+    expect(isDangerHue(theme.danger.fracture.stroke)).toBe(true);
+    expect(theme.danger.arenaRamp[0]).toBe("#ffffff");
+    expect(isDangerHue(theme.danger.arenaRamp[ARENA_RAMP_STEPS])).toBe(true);
+  });
+
+  it("Mono keeps danger semantically red: a hot red-orange, not the tint", () => {
+    for (const world of [3, 9]) {
+      for (const reducedFx of [false, true]) {
+        const theme = getWorldTheme(world, 4242, reducedFx, true);
+        expect(theme.danger).toBe(MONO_DANGER);
+        const { fracture, flash, arenaRamp } = theme.danger;
+        for (const color of [fracture.stroke, fracture.glow, fracture.reduced, flash]) {
+          expect(isDangerHue(color)).toBe(true);
+          expect(Math.abs(hslOf(color).h - MONO_DANGER_HUE)).toBeLessThan(3);
+        }
+        expect(isDangerHue(arenaRamp[ARENA_RAMP_STEPS])).toBe(true);
+      }
+    }
+  });
+
+  it("Mono arena ramp starts in the tint and warms monotonically to danger", () => {
+    const ramp = MONO_DANGER.arenaRamp;
+    expect(ramp).toHaveLength(ARENA_RAMP_STEPS + 1);
+    expect(Math.abs(hslOf(ramp[0]).h - MONO_HUE)).toBeLessThan(3);
+    const hues = ramp.map((c) => hslOf(c).h);
+    for (let i = 1; i < hues.length; i += 1) {
+      expect(hues[i]).toBeLessThanOrEqual(hues[i - 1] + 0.5);
+    }
+  });
+
+  it("selects ramp colours by danger level without building strings", () => {
+    expect(arenaDangerColor(MONO_DANGER, 0)).toBe(MONO_DANGER.arenaRamp[0]);
+    expect(arenaDangerColor(MONO_DANGER, 1)).toBe(MONO_DANGER.arenaRamp[ARENA_RAMP_STEPS]);
+    expect(arenaDangerColor(MONO_DANGER, 0.5)).toBe(
+      MONO_DANGER.arenaRamp[ARENA_RAMP_STEPS / 2],
+    );
+    // Out of range and invalid levels clamp to a real colour.
+    expect(arenaDangerColor(DEFAULT_DANGER, -1)).toBe(DEFAULT_DANGER.arenaRamp[0]);
+    expect(arenaDangerColor(DEFAULT_DANGER, 7)).toBe(
+      DEFAULT_DANGER.arenaRamp[ARENA_RAMP_STEPS],
+    );
+    expect(arenaDangerColor(DEFAULT_DANGER, Number.NaN)).toBe(DEFAULT_DANGER.arenaRamp[0]);
+  });
+
+  it("danger colours are frozen, shared constants", () => {
+    expect(Object.isFrozen(MONO_DANGER)).toBe(true);
+    expect(Object.isFrozen(MONO_DANGER.fracture)).toBe(true);
+    expect(Object.isFrozen(MONO_DANGER.arenaRamp)).toBe(true);
+    expect(getWorldTheme(9, 1, false, true).danger).toBe(getWorldTheme(3, 2, true, true).danger);
   });
 });
