@@ -21,6 +21,37 @@ import {
 } from "../constants/game";
 import type { GameMode } from "../types";
 import { nextRandomUnit, seedRng } from "../utils/random";
+import {
+  containsPrevious,
+  createReverseSeed,
+  getReverseQualityRatio,
+  getReverseZoom,
+  isReverseWorld,
+  isWithinArena,
+  REVERSE_SPAWN_RATIO,
+} from "../gameplay/reverse";
+import { getBeatPhase, getHeartbeatMultiplier } from "../gameplay/heartbeat";
+
+/** Regular worlds: a new shape starts at this fraction of its container. */
+const NORMAL_SPAWN_RATIO = 0.05;
+
+/** Size a freshly spawned (or reset) growing shape starts at in this world. */
+const getSpawnSize = (world: number, lastShape: Shape | null): number | null =>
+  lastShape
+    ? lastShape.size *
+      (isReverseWorld(world) ? REVERSE_SPAWN_RATIO : NORMAL_SPAWN_RATIO)
+    : null;
+
+/** Camera target for a world/level given the current top of the stack. */
+export const getTargetZoomFor = (
+  world: number,
+  level: number,
+  initialSize: number,
+  lastShape: Shape | undefined,
+): number =>
+  isReverseWorld(world) && lastShape
+    ? getReverseZoom(initialSize, lastShape.size)
+    : getZoomForLevel(level);
 
 const STYLE_SCORE_BY_QUALITY: Record<StackQuality, number> = {
   PERFECT: STYLE_QUALITY_POINTS.perfect,
@@ -140,6 +171,11 @@ export const spawnActiveShape = (
     };
   }
 
+  const spawnSize = getSpawnSize(nextState.world, lastShape);
+  if (spawnSize !== null) {
+    activeShape = { ...activeShape, size: spawnSize };
+  }
+
   const speedRandom = consumeRandom(nextState);
   nextState = speedRandom.state;
   const currentSpeed = generateRandomSpeed(speedRandom.value);
@@ -231,6 +267,10 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
     finalRotationSpeed = 0.5 + Math.min(state.stackCount * 0.05, 1.5);
   }
 
+  const heartbeatMultiplier = mechanics.heartbeat
+    ? getHeartbeatMultiplier(getBeatPhase(time, mechanics.heartbeatBpm))
+    : 1;
+
   const difficultyMultiplier = 1 + state.stackCount * 0.05;
   // Normalize growth speed by initial shape size so gameplay feels consistent across screen sizes
   const sizeNormalization = state.initialSize / REFERENCE_INITIAL_SIZE;
@@ -238,6 +278,7 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
     (state.currentSpeed *
       difficultyMultiplier *
       growthPatternMultiplier *
+      heartbeatMultiplier *
       bossMultiplier *
       sizeNormalization) /
     state.zoom;
@@ -292,6 +333,8 @@ export const advanceClock = (state: GameState, dt: number): GameState =>
  */
 export const checkContainment = (state: GameState): boolean => {
   if (!state.activeShape) return true;
+  // Reverse worlds: the only continuous limit is the arena edge.
+  if (isReverseWorld(state.world)) return isWithinArena(state);
   const lastShape = state.shapes[state.shapes.length - 1];
   const offset = state.activeOffset;
   if (!offset || (offset.x === 0 && offset.y === 0)) {
@@ -301,6 +344,19 @@ export const checkContainment = (state: GameState): boolean => {
   return childVertices.every((v) =>
     isPointInShape({ x: v.x + offset.x, y: v.y + offset.y }, lastShape)
   );
+};
+
+/**
+ * Whether a tap right now would produce a valid stack (ignores fractures).
+ * Regular worlds: the growing shape is inside the container. Reverse worlds:
+ * it contains the previous shape and is still inside the arena.
+ */
+export const isStackValid = (state: GameState): boolean => {
+  if (!state.activeShape) return false;
+  if (isReverseWorld(state.world)) {
+    return isWithinArena(state) && containsPrevious(state);
+  }
+  return checkContainment(state);
 };
 
 /**
@@ -329,7 +385,9 @@ export const stackActiveShape = (
   }
 
   const lastShape = state.shapes[state.shapes.length - 1];
-  const sizeRatio = state.activeShape.size / lastShape.size;
+  const sizeRatio = isReverseWorld(state.world)
+    ? getReverseQualityRatio(state.activeShape.size, lastShape.size)
+    : state.activeShape.size / lastShape.size;
   const quality = getStackQuality(sizeRatio);
   const isPerfect = quality === "PERFECT";
   const awardedScore = STYLE_SCORE_BY_QUALITY[quality];
@@ -357,12 +415,20 @@ export const stackActiveShape = (
   let finalShapes = newShapes;
 
   if (worldUp) {
-    // Reset stack but keep the first shape as base
+    // Reset the stack to a single base. Regular worlds restart from the
+    // full-size base; reverse worlds start from a small central seed.
     const firstShape = newShapes[0];
-    finalShapes = [{ ...firstShape, opacity: 1 }];
+    finalShapes = isReverseWorld(newWorld)
+      ? [createReverseSeed(firstShape, state.initialSize)]
+      : [{ ...firstShape, size: state.initialSize, opacity: 1 }];
   }
 
-  const newTargetZoom = getZoomForLevel(newLevel);
+  const newTargetZoom = getTargetZoomFor(
+    newWorld,
+    newLevel,
+    state.initialSize,
+    finalShapes[finalShapes.length - 1],
+  );
   const styleEnabled = state.mode !== "ZEN";
   const streak = styleEnabled ? state.streak + 1 : state.streak;
   const styleIncrement = styleEnabled
@@ -412,7 +478,10 @@ export const handleMiss = (state: GameState): GameState => {
       zenLivesRemaining: nextLives,
       activeShape: {
         ...state.activeShape,
-        size: state.shapes[state.shapes.length - 1].size * 0.05, // Restart at initial size
+        // Restart at the spawn size for this world.
+        size:
+          getSpawnSize(state.world, state.shapes[state.shapes.length - 1]) ??
+          state.activeShape.size,
       },
       activeOffset: { x: 0, y: 0 },
     };
@@ -462,7 +531,7 @@ export const restartActiveShape = (
   nextState = shapeRandom.state;
   const colorRandom = consumeRandom(nextState);
   nextState = colorRandom.state;
-  const newActiveShape = createActiveShape(
+  const created = createActiveShape(
     nextState.level,
     lastShape,
     nextState.world,
@@ -473,6 +542,9 @@ export const restartActiveShape = (
       colorRoll: colorRandom.value,
     },
   );
+  const spawnSize = getSpawnSize(nextState.world, lastShape);
+  const newActiveShape =
+    spawnSize !== null ? { ...created, size: spawnSize } : created;
   const speedRandom = consumeRandom(nextState);
   nextState = speedRandom.state;
   const currentSpeed = generateRandomSpeed(speedRandom.value);
@@ -502,7 +574,12 @@ export const undoLastStack = (state: GameState): GameState => {
 
   // Recalculate level/world
   const { world: newWorld, level: newLevel } = computeProgression(newStackCount);
-  const newTargetZoom = getZoomForLevel(newLevel);
+  const newTargetZoom = getTargetZoomFor(
+    newWorld,
+    newLevel,
+    state.initialSize,
+    newShapes[newShapes.length - 1],
+  );
 
   return {
     ...state,

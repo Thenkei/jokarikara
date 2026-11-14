@@ -216,6 +216,41 @@ export const drawPerfectGuide = (
   ctx.restore();
 };
 
+/** Arena reach (growing shape radius / arena radius) where the rim warns. */
+export const ARENA_WARNING_REACH = 0.8;
+
+/**
+ * Outer limit of reverse worlds: a circle the growing shape must not cross.
+ * It brightens and turns red as the growing shape approaches it, and breathes
+ * with the scene pulse (heartbeat-aware).
+ */
+export const drawArena = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radiusPx: number,
+  reach: number,
+  pulse: number,
+): void => {
+  if (radiusPx <= 0) return;
+  const danger = Math.min(
+    1,
+    Math.max(0, (reach - ARENA_WARNING_REACH) / (1 - ARENA_WARNING_REACH)),
+  );
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radiusPx, 0, Math.PI * 2);
+  // White at rest, shifting to red as the growing shape nears the rim.
+  const gb = Math.round(255 - danger * 165);
+  ctx.strokeStyle = `rgba(255, ${gb}, ${gb}, ${0.22 + danger * 0.55 + pulse * 0.08})`;
+  ctx.lineWidth = 2 + danger * 2;
+  if (typeof ctx.setLineDash === "function") {
+    ctx.setLineDash(danger > 0 ? [] : [10, 8]);
+  }
+  ctx.stroke();
+  ctx.restore();
+};
+
 /**
  * Convert hex color to HSL and shift hue.
  */

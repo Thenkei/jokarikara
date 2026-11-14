@@ -1,5 +1,6 @@
 import type { GameState } from "../types";
 import { STYLE_QUALITY_THRESHOLDS } from "../constants/game";
+import { isReverseWorld } from "./reverse";
 
 /**
  * PERFECT-zone guide: a teaching aid. Always on in Zen (practice mode), and
@@ -22,10 +23,20 @@ export interface PerfectGuide {
 
 export const getPerfectGuide = (state: GameState): PerfectGuide | null => {
   if (!shouldShowPerfectGuide(state) || !state.activeShape) return null;
-  const container = state.shapes[state.shapes.length - 1];
-  const perfectSize = container.size * STYLE_QUALITY_THRESHOLDS.perfectMinRatio;
-  return {
-    perfectSize,
-    inPerfectBand: state.activeShape.size >= perfectSize,
-  };
+  const last = state.shapes[state.shapes.length - 1];
+  const ratio = STYLE_QUALITY_THRESHOLDS.perfectMinRatio;
+  const size = state.activeShape.size;
+
+  if (isReverseWorld(state.world)) {
+    // Outward: PERFECT means hugging the previous shape, i.e. a *maximum*
+    // size of last / ratio once it is large enough to contain it.
+    const perfectSize = last.size / ratio;
+    return {
+      perfectSize,
+      inPerfectBand: size >= last.size && size <= perfectSize,
+    };
+  }
+
+  const perfectSize = last.size * ratio;
+  return { perfectSize, inPerfectBand: size >= perfectSize };
 };

@@ -159,7 +159,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: worldUpPop 1.4s ease-out forwards;
+  animation: worldUpPop 2.8s ease-out forwards;
+  width: min(92vw, 30rem);
+  text-align: center;
 }
 
 .world-up-title {
@@ -1165,4 +1167,24 @@ button:focus-visible {
   .achievement-item {
     padding: 0.45rem 0.75rem;
   }
+}
+
+/* World intro: name + rule reminder under "WORLD N". */
+.world-up-name {
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+  font-weight: 850;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.world-up-tagline {
+  margin-top: 0.45rem;
+  max-width: 22rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #e6e8f0;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
 }

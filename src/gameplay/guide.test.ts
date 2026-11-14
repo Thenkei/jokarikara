@@ -41,4 +41,23 @@ describe("perfect guide", () => {
     };
     expect(getPerfectGuide(inBand)?.inPerfectBand).toBe(true);
   });
+
+  it("in reverse worlds, sizes the ghost at the largest PERFECT wrap", () => {
+    const state = { ...fresh("ZEN"), world: 9 };
+    const last = state.shapes[state.shapes.length - 1];
+    const guide = getPerfectGuide(state);
+    expect(guide?.perfectSize).toBeCloseTo(
+      last.size / STYLE_QUALITY_THRESHOLDS.perfectMinRatio,
+      10,
+    );
+    const at = (ratio: number) =>
+      getPerfectGuide({
+        ...state,
+        activeShape: { ...state.activeShape!, size: last.size * ratio },
+      })?.inPerfectBand;
+    expect(at(0.9)).toBe(false); // cannot contain yet
+    expect(at(1.01)).toBe(true);
+    expect(at(1.1)).toBe(false); // too loose for PERFECT
+  });
 });
+

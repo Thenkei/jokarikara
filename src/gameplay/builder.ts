@@ -29,6 +29,9 @@ export const DEFAULT_MECHANICS: WorldMechanics = {
   fractureBaseRotationSpeed: 0,
   fractureBandMinRatio: 1,
   fractureDisableOnBoss: true,
+  reverseStacking: false,
+  heartbeat: false,
+  heartbeatBpm: 0,
 };
 
 export class WorldBuilder {
@@ -64,6 +67,11 @@ export class WorldBuilder {
 
   name(name: string): this {
     this.config.name = name;
+    return this;
+  }
+
+  tagline(text: string): this {
+    this.config.tagline = text;
     return this;
   }
 

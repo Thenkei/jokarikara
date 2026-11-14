@@ -34,6 +34,7 @@ export const gameplayConfig = new GameplayBuilder()
   .level(5, { zoom: 12, unlocks: ["rectangle"] })
   .world(1, (w) =>
     w.name("Baseline")
+      .tagline("Tap when the shape fills the space.")
       .mechanics(DEFAULT_MECHANICS)
       .visualProfile({
         hueCenter: 215,
@@ -51,6 +52,7 @@ export const gameplayConfig = new GameplayBuilder()
     w
       .inheritFrom(1)
       .name("Breathing")
+      .tagline("The stack breathes. Trust the outline.")
       .visualProfile({
         hueCenter: 150,
         hueSpread: 30,
@@ -71,6 +73,7 @@ export const gameplayConfig = new GameplayBuilder()
     w
       .inheritFrom(2)
       .name("Accelerating Growth")
+      .tagline("Faster growth. Red rim sectors block taps.")
       .visualProfile({
         hueCenter: 36,
         hueSpread: 42,
@@ -95,6 +98,7 @@ export const gameplayConfig = new GameplayBuilder()
     w
       .inheritFrom(3)
       .name("Wave")
+      .tagline("The stack sways; your shape stays put.")
       .visualProfile({
         hueCenter: 330,
         hueSpread: 55,
@@ -115,6 +119,7 @@ export const gameplayConfig = new GameplayBuilder()
     w
       .inheritFrom(4)
       .name("Color Shift")
+      .tagline("Colours drift. Shapes don't.")
       .visualProfile({
         hueCenter: 290,
         hueSpread: 170,
@@ -135,6 +140,7 @@ export const gameplayConfig = new GameplayBuilder()
     w
       .inheritFrom(5)
       .name("The Eclipse")
+      .tagline("Darkness. Follow the pulsing outline.")
       .visualProfile({
         hueCenter: 205,
         hueSpread: 160,
@@ -154,6 +160,7 @@ export const gameplayConfig = new GameplayBuilder()
     w
       .inheritFrom(6)
       .name("Gravity Drift")
+      .tagline("Your shape sinks as it grows.")
       .visualProfile({
         hueCenter: 128,
         hueSpread: 180,
@@ -173,6 +180,7 @@ export const gameplayConfig = new GameplayBuilder()
     w
       .inheritFrom(7)
       .name("Rotation Inversion")
+      .tagline("Spin flips every other level.")
       .visualProfile({
         hueCenter: 18,
         hueSpread: 180,
@@ -186,6 +194,51 @@ export const gameplayConfig = new GameplayBuilder()
       .mechanics({
         rotationInvertByLevel: true,
         rotationFlipOnBoss: true,
+      }),
+  )
+  .world(9, (w) =>
+    w
+      .inheritFrom(8)
+      .name("Reverse Stack")
+      .tagline("Grow outward: wrap the last shape, stay inside the ring.")
+      .visualProfile({
+        hueCenter: 60,
+        hueSpread: 200,
+        saturationMin: 80,
+        saturationMax: 100,
+        lightnessMin: 46,
+        lightnessMax: 64,
+        neonBias: 0.95,
+        glowIntensity: 0.88,
+      })
+      .mechanics({
+        reverseStacking: true,
+        // Rim fractures and the eclipse are defined around an *inner*
+        // container; they have no meaning when shapes expand outward.
+        fractureWindows: false,
+        eclipseEffect: false,
+      }),
+  )
+  .world(10, (w) =>
+    w
+      .inheritFrom(8)
+      .name("Heartbeat")
+      .tagline("Growth surges on the beat. Tap in rhythm.")
+      .visualProfile({
+        hueCenter: 350,
+        hueSpread: 140,
+        saturationMin: 78,
+        saturationMax: 98,
+        lightnessMin: 44,
+        lightnessMax: 62,
+        neonBias: 1,
+        glowIntensity: 0.9,
+      })
+      .mechanics({
+        heartbeat: true,
+        heartbeatBpm: 90,
+        // Keep the beat readable: no eclipse on top of the pulse.
+        eclipseEffect: false,
       }),
   )
   .boss(5, {

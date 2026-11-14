@@ -51,17 +51,21 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
 - `src/audio/soundtrack.ts` + `src/audio/musicEngine.ts` - Dynamic soundtrack: pure layer/tempo rules and the engine (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
 - `src/rendering/effects.ts` - Pure, dt-based canvas juice (rings, particles, shake, flash); never touches gameplay state
+- `src/gameplay/reverse.ts` - Reverse Stack (world 9): outward containment, arena limit, zoom-out camera
+- `src/gameplay/heartbeat.ts` - Heartbeat (world 10): beat-phase growth multiplier (mean 1) and visual pulse
+- `src/gameplay/guide.ts` - PERFECT ghost guide rules (Zen + first level; reverse-aware)
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
 - `src/utils/storage.ts` - localStorage: per-mode high scores, daily records, settings, achievements (all validated on read)
 - `src/progression/achievements.ts` - Achievement catalogue, named thresholds, pure `evaluate(run, lifetime)` and run/lifetime reducers; `useAchievements.ts` is the React glue (run state in refs, fed by `GameCanvas`'s `onStack`/`onMiss`, re-renders only on unlock)
 
 ### World Mechanics (src/gameplay/config.ts)
-Each world (1-8) introduces cumulative effects:
+Each world (1-10) introduces cumulative effects (each has a `tagline` shown on entry):
 - World 2: Breathing (size oscillation)
 - World 3: Accelerating growth pattern + fracture windows
 - World 4: Wave (horizontal sway)
 - World 5: Color shift (hue rotation)
 - World 6: Eclipse, World 7: Gravity drift, World 8: Rotation inversion
+- World 9: Reverse Stack (outward; arena limit), World 10: Heartbeat (beat-synced growth)
 
 Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 
