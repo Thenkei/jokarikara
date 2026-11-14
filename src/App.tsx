@@ -534,6 +534,47 @@ function App() {
     return best === undefined ? "BEST --" : `BEST ${best}`;
   };
 
+  /**
+   * Preferences live in the pause menu and on the start screen, not in the
+   * in-game HUD: they are not gameplay info, and on phones the extra pills
+   * overflowed the HUD row.
+   */
+  const renderSettings = (variant: "pause" | "start") => (
+    <div
+      className={`settings-row settings-row--${variant}`}
+      role="group"
+      aria-label="Settings"
+    >
+      <button
+        className="fx-toggle-btn"
+        onClick={handleToggleReducedFx}
+        aria-label={
+          reducedFx
+            ? "Visual effects: low. Switch to full"
+            : "Visual effects: full. Switch to low"
+        }
+      >
+        {reducedFx ? "FX: LOW" : "FX: FULL"}
+      </button>
+      <button
+        className="mute-toggle-btn"
+        onClick={handleToggleMute}
+        aria-label="Mute sound"
+        aria-pressed={muted}
+      >
+        {muted ? "SOUND: OFF" : "SOUND: ON"}
+      </button>
+      <button
+        className="music-toggle-btn"
+        onClick={handleToggleMusic}
+        aria-label="Background music"
+        aria-pressed={musicOn}
+      >
+        {musicOn ? "MUSIC: ON" : "MUSIC: OFF"}
+      </button>
+    </div>
+  );
+
   return (
     <div className="game-container">
       {gameState === "START" && showAchievements && (
@@ -597,6 +638,8 @@ function App() {
           >
             ACHIEVEMENTS {unlockedAchievementCount}/{ACHIEVEMENT_COUNT}
           </button>
+
+          {renderSettings("start")}
         </div>
       )}
 
@@ -697,42 +740,6 @@ function App() {
                   </button>
                 </div>
               )}
-              <button
-                className="fx-toggle-btn"
-                onClick={(event) => {
-                  blurTarget(event);
-                  handleToggleReducedFx();
-                }}
-                aria-label={
-                  reducedFx
-                    ? "Visual effects: low. Switch to full"
-                    : "Visual effects: full. Switch to low"
-                }
-              >
-                {reducedFx ? "FX: LOW" : "FX: FULL"}
-              </button>
-              <button
-                className="mute-toggle-btn"
-                onClick={(event) => {
-                  blurTarget(event);
-                  handleToggleMute();
-                }}
-                aria-label="Mute sound"
-                aria-pressed={muted}
-              >
-                {muted ? "SOUND: OFF" : "SOUND: ON"}
-              </button>
-              <button
-                className="music-toggle-btn"
-                onClick={(event) => {
-                  blurTarget(event);
-                  handleToggleMusic();
-                }}
-                aria-label="Background music"
-                aria-pressed={musicOn}
-              >
-                {musicOn ? "MUSIC: ON" : "MUSIC: OFF"}
-              </button>
             </div>
           </div>
 
@@ -760,6 +767,7 @@ function App() {
               <button className="pause-menu-btn menu-btn" onClick={handleMainMenu}>
                 MAIN MENU
               </button>
+              {renderSettings("pause")}
             </div>
           )}
 
