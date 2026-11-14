@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
+import { getWorldPalette } from "../audio/palette";
 import { createAudioManager } from "./audioManager";
 import {
   makeMockAudioContext,
@@ -463,6 +464,175 @@ describe("audioManager", () => {
       expect(audio.getMusicState().playing).toBe(false);
       expect(warn).toHaveBeenCalled();
       expect(() => audio.playStack("GOOD", 1, 1)).not.toThrow();
+    });
+  });
+
+  describe("world sound palettes", () => {
+    type Filter = { kind: "filter"; type: string; frequency: { value: number }; Q: { value: number }; connect: Mock };
+    /** Palette lowpass filters (the reverb bus owns a highpass one). */
+    const filters = () =>
+      (mock.nodes.filter((n) => n.kind === "filter") as unknown as Filter[]).filter(
+        (f) => f.type === "lowpass",
+      );
+    const master = () => mock.gains[0];
+    /** Initialised manager (dry: the reverb is never flushed here). */
+    const ready = () => {
+      const audio = createAudioManager();
+      audio.init();
+      return audio;
+    };
+    const newSince = <T,>(list: T[], before: number) => list.slice(before);
+
+    it("plays world 1 exactly as before: same voices, no extra nodes", () => {
+      const audio = ready();
+      const oscBefore = mock.oscillators.length;
+      const gainBefore = mock.gains.length;
+      audio.playStack("PERFECT", 1, 1);
+      const oscs = newSince(mock.oscillators, oscBefore);
+      expect(oscs.map((o) => o.type)).toEqual(["triangle", "sine", "sine", "sine", "sine", "sine"]);
+      expect(oscs[0].frequency.setValueAtTime).toHaveBeenCalledWith(220, 0);
+      // One gain per voice, each straight into the master; no filter, no LFO.
+      const gains = newSince(mock.gains, gainBefore);
+      expect(gains).toHaveLength(oscs.length);
+      gains.forEach((g) => expect(g.connect.mock.calls).toEqual([[master()]]));
+      expect(filters()).toHaveLength(0);
+      oscs.forEach((o) => {
+        expect(o.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+      });
+    });
+
+    it("routes a filtered world through one lowpass per sound", () => {
+      const audio = ready();
+      const gainBefore = mock.gains.length;
+      audio.playStack("OK", 1, 6);
+      const [filter] = filters();
+      expect(filters()).toHaveLength(1);
+      expect(filter.type).toBe("lowpass");
+      expect(filter.frequency.value).toBe(getWorldPalette(6).lowpassHz);
+      expect(filter.Q.value).toBeCloseTo(Math.SQRT1_2, 6);
+      expect(filter.connect).toHaveBeenCalledWith(master());
+      newSince(mock.gains, gainBefore).forEach((g) =>
+        expect(g.connect.mock.calls).toEqual([[filter]]),
+      );
+    });
+
+    it("sends the filtered chain, not the voices, to the reverb", () => {
+      const audio = createAudioManager({ defer: (task) => task() });
+      audio.init();
+      const gainBefore = mock.gains.length;
+      audio.playLevelUp(6);
+      const [filter] = filters();
+      const targets = filter.connect.mock.calls.map(([t]) => t);
+      expect(targets).toContain(master());
+      expect(targets).toHaveLength(2);
+      newSince(mock.gains, gainBefore)
+        .filter((g) => g !== targets[1])
+        .forEach((g) => expect(g.connect.mock.calls).toEqual([[filter]]));
+    });
+
+    it("breathes with a slow tremolo that only dips (world 2)", () => {
+      const audio = ready();
+      const oscBefore = mock.oscillators.length;
+      const gainBefore = mock.gains.length;
+      audio.playWorldUp(2);
+      const { tremolo } = getWorldPalette(2);
+      const lfo = newSince(mock.oscillators, oscBefore).find(
+        (o) => o.frequency.value === tremolo!.rateHz,
+      )!;
+      expect(lfo).toBeDefined();
+      expect(lfo.start).toHaveBeenCalled();
+      expect(lfo.stop).toHaveBeenCalled();
+      const gains = newSince(mock.gains, gainBefore);
+      const tremoloGain = gains.find((g) => g.gain.value === 1 - tremolo!.depth / 2)!;
+      const depth = gains.find((g) => g.gain.value === tremolo!.depth / 2)!;
+      expect(lfo.connect).toHaveBeenCalledWith(depth);
+      expect(depth.connect).toHaveBeenCalledWith(tremoloGain.gain);
+      expect(tremoloGain.connect).toHaveBeenCalledWith(master());
+    });
+
+    it("adds vibrato to every voice's detune (world 4)", () => {
+      const audio = ready();
+      const oscBefore = mock.oscillators.length;
+      audio.playStack("GOOD", 1, 4);
+      const oscs = newSince(mock.oscillators, oscBefore);
+      const { vibrato } = getWorldPalette(4);
+      const lfo = oscs.find((o) => o.frequency.value === vibrato!.rateHz)!;
+      const depth = lfo.connect.mock.calls[0][0] as { gain: { value: number }; connect: Mock };
+      expect(depth.gain.value).toBe(vibrato!.depth);
+      const voices = oscs.filter((o) => o !== lfo);
+      expect(voices).toHaveLength(3);
+      voices.forEach((o) => expect(depth.connect).toHaveBeenCalledWith(o.detune));
+    });
+
+    it("runs the level-up arpeggio downward in the mirrored world (8)", () => {
+      const audio = ready();
+      const startOf = (o: (typeof mock.oscillators)[number]) =>
+        o.frequency.setValueAtTime.mock.calls[0][1] as number;
+      const freqOf = (o: (typeof mock.oscillators)[number]) =>
+        o.frequency.setValueAtTime.mock.calls[0][0] as number;
+      let before = mock.oscillators.length;
+      audio.playLevelUp(1);
+      const rising = newSince(mock.oscillators, before).sort((a, b) => startOf(a) - startOf(b));
+      expect(rising.map(freqOf)).toEqual([...rising.map(freqOf)].sort((a, b) => a - b));
+      before = mock.oscillators.length;
+      audio.playLevelUp(8);
+      const falling = newSince(mock.oscillators, before)
+        .filter((o) => o.type === "square")
+        .sort((a, b) => startOf(a) - startOf(b));
+      expect(falling).toHaveLength(4);
+      expect(falling.map(freqOf)).toEqual([...falling.map(freqOf)].sort((a, b) => b - a));
+    });
+
+    it("glides the gravity world's notes down", () => {
+      const audio = ready();
+      const before = mock.oscillators.length;
+      audio.playStack("OK", 1, 7);
+      const [lead] = newSince(mock.oscillators, before);
+      const [[target]] = lead.frequency.exponentialRampToValueAtTime.mock.calls;
+      expect(target).toBeLessThan(lead.frequency.setValueAtTime.mock.calls[0][0]);
+    });
+
+    it("allocates nothing while muted, in every world", () => {
+      const audio = createAudioManager();
+      audio.setMuted(true);
+      for (let world = 1; world <= 12; world += 1) {
+        audio.playStack("PERFECT", 3, world);
+        audio.playLevelUp(world);
+        audio.playWorldUp(world);
+      }
+      expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
+      expect(mock.ctx.createGain).not.toHaveBeenCalled();
+      expect(mock.ctx.createBiquadFilter).not.toHaveBeenCalled();
+    });
+
+    it("plays unshaped (never throws) when the palette chain cannot be built", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mock.ctx.createBiquadFilter.mockImplementation(() => {
+        throw new Error("not supported");
+      });
+      const audio = ready();
+      const before = mock.gains.length;
+      expect(() => audio.playStack("PERFECT", 1, 6)).not.toThrow();
+      expect(warn).toHaveBeenCalled();
+      // Voices still sound, straight into the master.
+      const voices = newSince(mock.gains, before).filter((g) =>
+        g.connect.mock.calls.some(([t]) => t === master()),
+      );
+      expect(voices).toHaveLength(6);
+    });
+
+    it("schedules every world's sounds without errors and starts every oscillator", () => {
+      const audio = ready();
+      for (let world = 1; world <= 12; world += 1) {
+        audio.playStack("PERFECT", world, world);
+        audio.playStack("OK", world, world);
+        audio.playLevelUp(world);
+        audio.playWorldUp(world);
+      }
+      mock.oscillators.forEach((o) => {
+        expect(o.start).toHaveBeenCalledTimes(1);
+        expect(o.stop).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

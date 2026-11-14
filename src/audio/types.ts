@@ -3,6 +3,30 @@ import type { StackQuality } from "../types";
 export type UiSoundKind = "select" | "confirm" | "back";
 
 /**
+ * What a voice does in a sound, so a world palette can reshape it: the
+ * `lead` takes the palette's waveform, the `body` (sub-octave) its weight.
+ * Unmarked voices (harmony, sparkle, pads) keep their own waveform.
+ */
+export type VoiceRole = "lead" | "body";
+
+/** One oscillator with an attack/decay envelope, as scheduled by `play()`. */
+export interface Voice {
+  freq: number;
+  type?: OscillatorType;
+  /** Seconds from now. */
+  delay?: number;
+  duration: number;
+  peak: number;
+  /** Seconds to reach `peak` (default `DEFAULT_ATTACK_SECONDS`). */
+  attack?: number;
+  /** Target frequency at the end of the note (glide). */
+  glideTo?: number;
+  /** Cents. */
+  detune?: number;
+  role?: VoiceRole;
+}
+
+/**
  * Soundtrack layers: 0 = drone only, 1 = + bass pulse, 2 = + arpeggio.
  */
 export type MusicIntensity = 0 | 1 | 2;

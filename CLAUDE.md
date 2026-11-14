@@ -62,6 +62,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/modes/runInsights.ts` - Game over insights: why the run ended, stack quality breakdown
 - `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation); `playUi` for menu sounds
 - `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
+- `src/audio/palette.ts` - Per-world sound palettes (timbre, envelope, lowpass, chorus, vibrato/tremolo, glide, mirrored intervals) applied to stack/levelUp/worldUp voices; world 1 is the unshaped baseline, every world kept within ±2 dB of it by `tests/audio-levels.spec.ts`
 - `src/audio/soundtrack.ts` + `src/audio/musicEngine.ts` - Dynamic soundtrack: pure layer/tempo rules and the engine (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
 - `src/audio/reverb.ts` + `src/audio/reverbBus.ts` - Reverb send bus: pure seeded IR generator (stereo damped noise tail) and the convolver send/return into the master; per-effect send amounts in `src/audio/mix.ts`; built on idle after `init()` (sounds before it play dry); degrades to dry
 - `src/audio/mix.ts` - Central gain table for every voice; `tests/audio-levels.spec.ts` guards relative levels
