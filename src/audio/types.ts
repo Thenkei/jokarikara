@@ -60,6 +60,9 @@ export interface IAudioService {
   /** Bonus time gained in Time Attack. */
   playTimeBonus(): void;
 
+  /** Heartbeat worlds: a soft thump on each beat of the growth pulse. */
+  playHeartbeat(): void;
+
   setMuted(muted: boolean): void;
   isMuted(): boolean;
 

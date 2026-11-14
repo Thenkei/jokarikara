@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  crossedBeat,
+  getBeatIndex,
   getBeatPhase,
   getHeartbeatMultiplier,
   getHeartbeatPulse,
@@ -34,3 +36,20 @@ describe("heartbeat", () => {
     expect(getHeartbeatPulse(2)).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("beat crossing", () => {
+  it("indexes beats from the start of the clock", () => {
+    expect(getBeatIndex(0, 90)).toBe(0);
+    expect(getBeatIndex(0.66, 90)).toBe(0);
+    expect(getBeatIndex(0.67, 90)).toBe(1);
+    expect(getBeatIndex(5, 0)).toBe(0);
+  });
+
+  it("fires once when a frame crosses a beat boundary", () => {
+    expect(crossedBeat(0.66, 0.67, 90)).toBe(true);
+    expect(crossedBeat(0.1, 0.2, 90)).toBe(false);
+    expect(crossedBeat(0.5, 0.5, 90)).toBe(false); // no time passed
+    expect(crossedBeat(0.6, 2.1, 90)).toBe(true); // long frame, several beats
+  });
+});
+

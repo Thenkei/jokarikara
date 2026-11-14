@@ -15,6 +15,7 @@ const mockAudioService: IAudioService = {
   playEarlyClickSound: vi.fn(),
   playTick: vi.fn(),
   playTimeBonus: vi.fn(),
+  playHeartbeat: vi.fn(),
   setMuted: vi.fn(),
   isMuted: vi.fn(() => false),
   init: vi.fn(),
@@ -339,6 +340,39 @@ describe("GameCanvas", () => {
       expect(onTimeUpdate.mock.calls.length).toBeLessThanOrEqual(3);
       const displayed = onTimeUpdate.mock.calls.map(([t]) => Math.ceil(t));
       expect(new Set(displayed).size).toBe(displayed.length);
+    });
+
+    it("plays an audible beat in sync with the Heartbeat world's tempo", () => {
+      render(
+        <GameCanvas
+          mode="ZEN"
+          startWorld={10}
+          onScore={vi.fn()}
+          onGameOver={vi.fn()}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          audioService={mockAudioService}
+        />
+      );
+
+      // ~2.1 s at 60 Hz; 90 BPM = a beat every 2/3 s -> 3 beats crossed.
+      runFrames(1000, 128, 1000 / 60);
+      expect(mockAudioService.playHeartbeat).toHaveBeenCalledTimes(3);
+    });
+
+    it("plays no beat outside Heartbeat worlds", () => {
+      render(
+        <GameCanvas
+          mode="ZEN"
+          onScore={vi.fn()}
+          onGameOver={vi.fn()}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          audioService={mockAudioService}
+        />
+      );
+      runFrames(1000, 128, 1000 / 60);
+      expect(mockAudioService.playHeartbeat).not.toHaveBeenCalled();
     });
 
     it("clamps long frame gaps so a background tab cannot auto-fail the run", () => {
