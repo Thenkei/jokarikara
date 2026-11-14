@@ -177,7 +177,7 @@ test("sound effects and music keep their mix relationships", async ({
   expect(levels.cueWindow.rmsDb).toBeLessThan(levels.ok.rmsDb - 3);
   expect(levels.cueWindow.rmsDb).toBeGreaterThan(levels.cue.rmsDb + 1.5);
   // ...but it must still cut through the music bed it plays over.
-  expect(levels.cue.rmsDb).toBeGreaterThan(levels.music.rmsDb + 1);
+  expect(levels.cue.rmsDb).toBeGreaterThan(levels.music.rmsDb + 3);
 
   // The music bed never masks gameplay feedback.
   expect(levels.music.rmsDb).toBeLessThan(levels.ok.rmsDb - 8);

@@ -8,7 +8,7 @@ import type { StackQuality } from "../types";
  *   stack OK ≈ -24 … PERFECT ≈ -18   (quality hierarchy stays audible, < 7 dB)
  *   level up ≈ -18, world up ≈ -17, game over ≈ -19
  *   Zen miss ≈ -25, early tap ≈ -28, countdown tick ≈ -28 / urgent ≈ -26
- *   timing cue ≈ -33 / PERFECT tick ≈ -30: well under any stack, above
+ *   timing cue ≈ -31 / PERFECT tick ≈ -28: well under any stack, ≥ 3 dB above
  *   the music bed so the bed never masks it
  *   music bed ≈ 10 dB under a plain stack, so it never masks feedback
  *   secret chime (start screen) ≈ -21: above menu clicks, under a level up
@@ -61,7 +61,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   chime: -8,
   menu: 0,
   ui: 2.5,
-  cue: 7,
+  cue: 9,
 };
 
 /**
@@ -104,7 +104,7 @@ export const STACK_REVERB_BOOST_DB: Readonly<Record<StackQuality, number>> = {
 /**
  * Soundtrack send (post music bus): a touch of room glues the bed. Its wet
  * adds ~0.3 dB, compensated in `MUSIC_VOLUME` so the bed stays where it was:
- * the timing cue must sit > 1 dB above it, the tightest margin in the mix.
+ * the timing cue must sit ≥ 3 dB above it so phone speakers keep it audible.
  */
 export const MUSIC_REVERB_SEND_DB = -18;
 /** Overall wet level on the return, on top of the unit-energy calibration. */

@@ -849,6 +849,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       const loop = (time: number) => {
         if (cancelled) return;
         loopRef.current = loop;
+        // Manual (test-driven) mode: the bridge steps the simulation itself.
+        // A frame queued before pause() or by an effect re-run must not
+        // advance the game with a real dt behind the test's back.
+        if (manualModeRef.current) return;
         if (!stateRef.current) return;
         if (
           stateRef.current.isGameOver &&
