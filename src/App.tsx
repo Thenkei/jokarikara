@@ -24,6 +24,7 @@ import { getWorldTheme } from "./visual/theme";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
   LEVELS_PER_WORLD,
+  STACKS_PER_LEVEL,
   PERFECT_STACK_TIME_BONUS,
   ZEN_MAX_LIVES,
 } from "./constants/game";
@@ -97,6 +98,8 @@ interface DailyRunResult {
 
 interface LastRun {
   mode: GameMode;
+  /** World a practice run started at; null for regular runs. */
+  practiceWorld: number | null;
   isNewBest: boolean;
   stats: RunStats;
   scores: HighScoresByMode[GameMode];
@@ -138,6 +141,10 @@ const shareText = async (text: string): Promise<ShareStatus> => {
 const isInteractiveTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   target.closest("button, a, input, select, textarea, [role='button']") !== null;
+/** Stacks a regular run has made when it reaches `world`. */
+const stacksBeforeWorld = (world: number): number =>
+  (Math.max(1, world) - 1) * STACKS_PER_LEVEL * LEVELS_PER_WORLD;
+
 const getProgressionScore = (world: number, level: number): number =>
   (world - 1) * LEVELS_PER_WORLD + level;
 
@@ -159,6 +166,10 @@ function App() {
   const [mode, setMode] = useState<GameMode>("CLASSIC");
   /** Date key of the running Daily Challenge, null for a regular run. */
   const [dailyKey, setDailyKey] = useState<string | null>(null);
+  /** Zen practice: world picked on the start screen (1 = regular run). */
+  const [practiceWorld, setPracticeWorld] = useState(1);
+  /** World the current run started at (drives <GameCanvas startWorld>). */
+  const [runStartWorld, setRunStartWorld] = useState(1);
   const [todayRecord, setTodayRecord] = useState(() =>
     getDailyRecord(getLocalDateKey())
   );
@@ -204,6 +215,9 @@ function App() {
     abandonRun: abandonAchievementRun,
   } = useAchievements({ onUnlock: handleAchievementUnlock });
   const unlockedAchievementCount = countUnlocked(achievementRecord.unlocked);
+  const bestWorldReached = achievementRecord.lifetime.bestWorld;
+  // A saved pick can exceed what is unlocked only after storage resets.
+  const pickedWorld = Math.min(practiceWorld, bestWorldReached);
 
   useEffect(() => {
     worldRef.current = world;
@@ -266,9 +280,13 @@ function App() {
     const runMode: GameMode = daily ? "CLASSIC" : selectedMode;
     const initialZenLives = runMode === "ZEN" ? ZEN_MAX_LIVES : null;
     const todayKey = daily ? getLocalDateKey() : null;
+    // Only Zen offers practice from a later world.
+    const startWorld = runMode === "ZEN" && !daily ? pickedWorld : 1;
+    const practice = startWorld > 1;
 
     // Commits a run left from the pause menu (RESTART) before starting anew.
-    beginAchievementRun(runMode, todayKey);
+    beginAchievementRun(runMode, todayKey, { practice });
+    setRunStartWorld(startWorld);
     setShowAchievements(false);
     setMode(runMode);
     setDailyKey(todayKey);
@@ -288,10 +306,15 @@ function App() {
     setLastQuality(null);
     setQualityPulseId(0);
     setLevel(1);
-    setWorld(1);
+    setWorld(startWorld);
     setTimeRemaining(null);
     setGameState("PLAYING");
     revealSecondaryHud();
+    if (practice) {
+      // Practice drops you mid-progression: show the world's rule up front.
+      setShowWorldUp(true);
+      window.setTimeout(() => setShowWorldUp(false), WORLD_INTRO_MS);
+    }
   };
 
   /** Same kind of run again (keeps Daily vs regular). */
@@ -310,7 +333,18 @@ function App() {
         level: finalLevel,
         stats,
       });
-      if (dailyKey) {
+      if (runStartWorld > 1) {
+        // Practice runs never touch leaderboards (they skip early worlds).
+        setLastRun({
+          mode,
+          practiceWorld: runStartWorld,
+          isNewBest: false,
+          stats,
+          scores: allScores[mode],
+          daily: null,
+          achievements,
+        });
+      } else if (dailyKey) {
         // Daily runs have their own per-day record and stay out of the
         // Classic leaderboard (a known seed would skew it).
         const result = saveDailyResult(dailyKey, finalScore);
@@ -322,11 +356,20 @@ function App() {
           scores: allScores[mode],
           daily: { dateKey: dailyKey, best: result.best, attempts: result.attempts },
           achievements,
+          practiceWorld: null,
         });
       } else {
         const { scores, isNewBest } = saveHighScore(finalScore, mode);
         setAllScores((current) => ({ ...current, [mode]: scores }));
-        setLastRun({ mode, isNewBest, stats, scores, daily: null, achievements });
+        setLastRun({
+          mode,
+          practiceWorld: null,
+          isNewBest,
+          stats,
+          scores,
+          daily: null,
+          achievements,
+        });
       }
       setPaused(false);
       setScore(finalScore);
@@ -336,7 +379,14 @@ function App() {
       setShowSecondaryHud(false);
       setGameState("GAMEOVER");
     },
-    [clearSecondaryHudTimeout, mode, dailyKey, allScores, finishAchievementRun]
+    [
+      clearSecondaryHudTimeout,
+      mode,
+      dailyKey,
+      runStartWorld,
+      allScores,
+      finishAchievementRun,
+    ]
   );
 
   const handleScore = useCallback((newScore: number) => {
@@ -610,6 +660,37 @@ function App() {
             {MODE_LABELS[mode].description}
           </p>
 
+          {mode === "ZEN" && bestWorldReached > 1 && (
+            <div className="practice-picker" role="group" aria-label="Practice start world">
+              <button
+                className="practice-prev"
+                onClick={() => setPracticeWorld(Math.max(1, pickedWorld - 1))}
+                disabled={pickedWorld <= 1}
+                aria-label="Previous start world"
+              >
+                ‹
+              </button>
+              <span className="practice-label" aria-live="polite">
+                <span className="practice-world">START AT WORLD {pickedWorld}</span>
+                <span className="practice-name">
+                  {pickedWorld === 1
+                    ? "Full run"
+                    : `Practice · ${getWorldConfig(pickedWorld).name ?? ""}`}
+                </span>
+              </span>
+              <button
+                className="practice-next"
+                onClick={() =>
+                  setPracticeWorld(Math.min(bestWorldReached, pickedWorld + 1))
+                }
+                disabled={pickedWorld >= bestWorldReached}
+                aria-label="Next start world"
+              >
+                ›
+              </button>
+            </div>
+          )}
+
           <button
             className="start-btn"
             onClick={() => startRun({ mode, daily: false })}
@@ -654,6 +735,7 @@ function App() {
               ref={canvasRef}
               mode={mode}
               runSeed={runSeed}
+              startWorld={runStartWorld}
               reducedFx={reducedFx}
               onScore={handleScore}
               onGameOver={handleGameOver}
@@ -813,6 +895,11 @@ function App() {
       {gameState === "GAMEOVER" && (
         <div className="screen gameover-screen">
           <h1 className="title">GAME OVER</h1>
+          {lastRun?.practiceWorld && (
+            <p className="practice-result-label">
+              PRACTICE · FROM WORLD {lastRun.practiceWorld}
+            </p>
+          )}
           {lastRun?.daily && (
             <p className="daily-result-label">
               DAILY · {formatDailyLabel(lastRun.daily.dateKey)}
@@ -834,7 +921,13 @@ function App() {
             <dl className="run-stats">
               <div>
                 <dt>STACKS</dt>
-                <dd className="stat-stacks">{lastRun?.stats.stackCount ?? 0}</dd>
+                <dd className="stat-stacks">
+                  {Math.max(
+                    0,
+                    (lastRun?.stats.stackCount ?? 0) -
+                      stacksBeforeWorld(lastRun?.practiceWorld ?? 1),
+                  )}
+                </dd>
               </div>
               <div>
                 <dt>PERFECT</dt>
@@ -858,7 +951,12 @@ function App() {
               </ul>
             </div>
           )}
-          {lastRun?.daily ? (
+          {lastRun?.practiceWorld ? (
+            <div className="leaderboard practice-summary">
+              <h3>PRACTICE RUN</h3>
+              <p>Practice runs don't count toward scores or achievements.</p>
+            </div>
+          ) : lastRun?.daily ? (
             <div className="leaderboard daily-summary">
               <h3>TODAY</h3>
               <p className="daily-summary-line">

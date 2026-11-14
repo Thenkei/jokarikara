@@ -89,6 +89,8 @@ export interface LifetimeStats {
   bestTimeAttackScore: number;
   /** Distinct Daily Challenge dates played, sorted ascending, bounded. */
   dailyDates: readonly string[];
+  /** Highest world ever reached (any run, practice included). Min 1. */
+  bestWorld: number;
 }
 
 export interface AchievementContext {
@@ -120,6 +122,7 @@ export const EMPTY_LIFETIME_STATS: LifetimeStats = Object.freeze({
   bestZenStacks: 0,
   bestTimeAttackScore: 0,
   dailyDates: Object.freeze([]) as readonly string[],
+  bestWorld: 1,
 });
 
 export const createRunProgress = (
@@ -383,4 +386,18 @@ export const applyRunToLifetime = (
     run.mode === "TIME_ATTACK" ? run.score : 0,
   ),
   dailyDates: mergeDailyDates(lifetime.dailyDates, run.dailyKey),
+  bestWorld: Math.max(lifetime.bestWorld, run.world),
+});
+
+/**
+ * Practice runs (Zen started past world 1) begin with a synthetic stack count,
+ * so they must not feed totals, bests or achievements. They only extend the
+ * set of worlds available for practice.
+ */
+export const applyPracticeRunToLifetime = (
+  lifetime: LifetimeStats,
+  run: RunProgress,
+): LifetimeStats => ({
+  ...lifetime,
+  bestWorld: Math.max(lifetime.bestWorld, run.world),
 });

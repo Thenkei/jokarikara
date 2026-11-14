@@ -112,4 +112,15 @@ describe("achievement storage", () => {
     // The in-memory result is still returned so the session keeps working.
     expect(next.unlocked["first-stack"]).toBe(1);
   });
+
+  it("defaults bestWorld to 1 and rejects invalid values", () => {
+    expect(getAchievementRecord().lifetime.bestWorld).toBe(1);
+    localStorage.setItem(KEY, JSON.stringify({ lifetime: { bestWorld: 0 } }));
+    expect(getAchievementRecord().lifetime.bestWorld).toBe(1);
+    localStorage.setItem(KEY, JSON.stringify({ lifetime: { bestWorld: "9" } }));
+    expect(getAchievementRecord().lifetime.bestWorld).toBe(1);
+    localStorage.setItem(KEY, JSON.stringify({ lifetime: { bestWorld: 7 } }));
+    expect(getAchievementRecord().lifetime.bestWorld).toBe(7);
+  });
 });
+

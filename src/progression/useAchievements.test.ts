@@ -148,4 +148,29 @@ describe("useAchievements", () => {
       }),
     ).toEqual([]);
   });
+
+  it("practice runs unlock nothing and only record the world reached", () => {
+    const { hook, onUnlock } = setup();
+    act(() => hook.result.current.beginRun("ZEN", null, { practice: true }));
+    act(() =>
+      hook.result.current.recordStack(stack(121, { world: 9, streak: 0 })),
+    );
+    let unlocked: readonly string[] = [];
+    act(() => {
+      unlocked = hook.result.current.finishRun({
+        score: 140,
+        world: 9,
+        level: 1,
+        stats: { stackCount: 121, perfectCount: 1, bestStreak: 0, scoreHistory: [140] },
+      });
+    });
+    expect(onUnlock).not.toHaveBeenCalled();
+    expect(unlocked).toEqual([]);
+    const { lifetime, unlocked: stored } = getAchievementRecord();
+    expect(stored).toEqual({});
+    expect(lifetime.totalStacks).toBe(0);
+    expect(lifetime.runsPlayed).toBe(0);
+    expect(lifetime.bestWorld).toBe(9);
+  });
 });
+

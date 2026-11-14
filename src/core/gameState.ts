@@ -6,6 +6,7 @@ import {
   MIN_GROWTH_SPEED,
   MAX_GROWTH_SPEED,
   STACKS_PER_LEVEL,
+  LEVELS_PER_WORLD,
   getZoomForLevel,
   getWorldMechanics,
   type WorldMechanics,
@@ -87,25 +88,36 @@ export const createInitialState = (
   mode: GameMode = "CLASSIC",
   runSeed: number = 0,
   reducedFx: boolean = false,
+  startWorld: number = 1,
 ): GameState => {
-  const initialShape = createInitialShapeForWorld(
+  // Practice runs start at level 1 of a later world. The stack count is set
+  // to that world's first stack so progression, difficulty and bosses match
+  // what a player arriving there naturally would face.
+  const world = Math.max(1, Math.floor(startWorld));
+  const stackCount = (world - 1) * STACKS_PER_LEVEL * LEVELS_PER_WORLD;
+  const baseShape = createInitialShapeForWorld(
     viewportSize,
-    1,
+    world,
     runSeed,
     reducedFx,
   );
+  const initialSize = baseShape.size;
+  const initialShape = isReverseWorld(world)
+    ? createReverseSeed(baseShape, initialSize)
+    : baseShape;
+  const zoom = getTargetZoomFor(world, 1, initialSize, initialShape);
   return {
     shapes: [initialShape],
     activeShape: null,
     activeOffset: { x: 0, y: 0 },
-    world: 1,
+    world,
     score: 0,
-    stackCount: 0,
+    stackCount,
     scoreHistory: [],
     level: 1,
-    zoom: getZoomForLevel(1),
-    targetZoom: getZoomForLevel(1),
-    initialSize: initialShape.size,
+    zoom,
+    targetZoom: zoom,
+    initialSize,
     currentSpeed: MIN_GROWTH_SPEED,
     isGameOver: false,
     mode,
