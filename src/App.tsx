@@ -235,6 +235,16 @@ function App() {
     [recordAchievementMiss, mode],
   );
   const bestWorldReached = achievementRecord.lifetime.bestWorld;
+  /**
+   * First-ever run: nothing played or stacked yet. Lifetime stats commit at
+   * run end, so the in-run flag below hides the hint at the first stack.
+   */
+  const isNewPlayer =
+    achievementRecord.lifetime.runsPlayed === 0 &&
+    achievementRecord.lifetime.totalStacks === 0;
+  const [hasStackedThisRun, setHasStackedThisRun] = useState(false);
+  const showFirstRunHint =
+    isNewPlayer && !hasStackedThisRun && runStartWorld === 1 && !dailyKey;
   // A saved pick can exceed what is unlocked only after storage resets.
   const pickedWorld = Math.min(practiceWorld, bestWorldReached);
 
@@ -325,6 +335,7 @@ function App() {
     setLastQuality(null);
     setQualityPulseId(0);
     setPenaltyPulseId(0);
+    setHasStackedThisRun(false);
     setLevel(1);
     setWorld(startWorld);
     setTimeRemaining(null);
@@ -411,6 +422,7 @@ function App() {
 
   const handleScore = useCallback((newScore: number) => {
     setScore(newScore);
+    setHasStackedThisRun(true);
     revealSecondaryHud();
   }, [revealSecondaryHud]);
 
@@ -870,6 +882,17 @@ function App() {
                 MAIN MENU
               </button>
               {renderSettings("pause")}
+            </div>
+          )}
+
+          {showFirstRunHint && !paused && (
+            <div className="first-run-hint" role="status">
+              <p className="first-run-hint-title">TAP WHEN IT FITS</p>
+              <p className="first-run-hint-body">
+                Let the shape grow, then tap (or press Space) just before it
+                touches the edge. The closer you get, the better:{" "}
+                <span className="first-run-hint-perfect">PERFECT</span>.
+              </p>
             </div>
           )}
 

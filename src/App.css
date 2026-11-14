@@ -1307,3 +1307,57 @@ button:focus-visible {
     animation: timeBonusFade 0.9s linear forwards;
   }
 }
+
+/* ---------- First-run hint ---------- */
+.first-run-hint {
+  position: absolute;
+  left: 50%;
+  bottom: max(2.5rem, calc(env(safe-area-inset-bottom) + 1.5rem));
+  transform: translateX(-50%);
+  width: min(88vw, 24rem);
+  z-index: 60;
+  pointer-events: none; /* never steals the first tap */
+  padding: 0.9rem 1.1rem;
+  border-radius: 1rem;
+  background: rgba(8, 10, 16, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  text-align: center;
+  animation: firstRunHintIn 0.6s ease-out 0.4s both;
+}
+
+.first-run-hint-title {
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #fff;
+  margin-bottom: 0.35rem;
+}
+
+.first-run-hint-body {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #c7cedb;
+}
+
+.first-run-hint-perfect {
+  color: #fff3a8;
+  font-weight: 800;
+}
+
+@keyframes firstRunHintIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0.6rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .first-run-hint {
+    animation: none;
+  }
+}
