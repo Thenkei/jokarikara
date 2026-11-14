@@ -3,9 +3,11 @@ import { test, expect } from "./fixtures";
 /**
  * Mix regression test: renders every effect offline in the real Web Audio
  * implementation and checks loudness relationships (see src/audio/mix.ts).
- * Levels are the loudest 300 ms RMS in dBFS; peaks are sample peaks.
+ * Levels are the loudest 300 ms RMS in dBFS; peaks are sample peaks; the
+ * optional tail is the RMS of a window after every dry voice has ended, i.e.
+ * pure reverb.
  */
-type Level = { peakDb: number; rmsDb: number };
+type Level = { peakDb: number; rmsDb: number; tailDb: number };
 
 test("sound effects and music keep their mix relationships", async ({
   page,
@@ -35,7 +37,11 @@ test("sound effects and music keep their mix relationships", async ({
     const mod = (await import(/* @vite-ignore */ modulePath)) as {
       createAudioManager: () => Audio;
     };
-    const measure = async (secs: number, play: (a: Audio) => void) => {
+    const measure = async (
+      secs: number,
+      play: (a: Audio) => void,
+      tail?: [fromSecs: number, toSecs: number],
+    ) => {
       let ctx: OfflineAudioContext | null = null;
       (window as unknown as { AudioContext: unknown }).AudioContext = function () {
         ctx = new OfflineAudioContext(2, Math.ceil(SR * secs), SR);
@@ -56,13 +62,22 @@ test("sound effects and music keep their mix relationships", async ({
         if (i >= win - 1) best = Math.max(best, acc / win);
       }
       const db = (x: number) => (x > 0 ? 20 * Math.log10(x) : -200);
-      return { peakDb: db(peak), rmsDb: db(Math.sqrt(best)) };
+      let tailMeanSquare = 0;
+      if (tail) {
+        const from = Math.floor(SR * tail[0]);
+        const to = Math.min(data.length, Math.floor(SR * tail[1]));
+        for (let i = from; i < to; i += 1) tailMeanSquare += data[i] * data[i];
+        tailMeanSquare /= Math.max(1, to - from);
+      }
+      return { peakDb: db(peak), rmsDb: db(Math.sqrt(best)), tailDb: db(Math.sqrt(tailMeanSquare)) };
     };
     return {
       ok: await measure(1.2, (a) => a.playStack("OK", 1, 1)),
       good: await measure(1.2, (a) => a.playStack("GOOD", 1, 1)),
       great: await measure(1.2, (a) => a.playStack("GREAT", 1, 1)),
-      perfect: await measure(1.2, (a) => a.playStack("PERFECT", 1, 1)),
+      // Tail windows start after the last dry voice has stopped (PERFECT:
+      // ~0.76 s, menu select: ~0.16 s), so they hold reverb only.
+      perfect: await measure(1.2, (a) => a.playStack("PERFECT", 1, 1), [0.85, 1.15]),
       levelUp: await measure(1.5, (a) => a.playLevelUp(1)),
       worldUp: await measure(2.5, (a) => a.playWorldUp(2)),
       fail: await measure(1.2, (a) => a.playFailSound()),
@@ -73,7 +88,7 @@ test("sound effects and music keep their mix relationships", async ({
       timeBonus: await measure(1, (a) => a.playTimeBonus()),
       heartbeat: await measure(0.6, (a) => a.playHeartbeat()),
       combo: await measure(1.2, (a) => a.playComboMilestone(5, 1)),
-      uiSelect: await measure(0.5, (a) => a.playUi("select")),
+      uiSelect: await measure(0.5, (a) => a.playUi("select"), [0.25, 0.5]),
       uiConfirm: await measure(0.5, (a) => a.playUi("confirm")),
       uiBack: await measure(0.5, (a) => a.playUi("back")),
       worst: await measure(2.5, (a) => {
@@ -119,4 +134,11 @@ test("sound effects and music keep their mix relationships", async ({
 
   // The music bed never masks gameplay feedback.
   expect(levels.music.rmsDb).toBeLessThan(levels.ok.rmsDb - 8);
+
+  // Reverb is really there: a PERFECT stack rings on after its last voice
+  // (a dry mix renders exact silence, -200), while a menu click stays
+  // near-dry and its (younger) tail is still well under the PERFECT's.
+  expect(levels.perfect.tailDb).toBeGreaterThan(-60);
+  expect(levels.uiSelect.tailDb).toBeLessThan(-55);
+  expect(levels.perfect.tailDb).toBeGreaterThan(levels.uiSelect.tailDb + 5);
 });

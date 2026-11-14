@@ -62,6 +62,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation); `playUi` for menu sounds
 - `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
 - `src/audio/soundtrack.ts` + `src/audio/musicEngine.ts` - Dynamic soundtrack: pure layer/tempo rules and the engine (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
+- `src/audio/reverb.ts` + `src/audio/reverbBus.ts` - Reverb send bus: pure seeded IR generator (stereo damped noise tail) and the convolver send/return into the master; per-effect send amounts in `src/audio/mix.ts`; degrades to dry
 - `src/audio/mix.ts` - Central gain table for every voice; `tests/audio-levels.spec.ts` guards relative levels
 - `src/utils/haptics.ts` - Vibration helper (respects the haptics setting)
 - `src/utils/storage.ts` - localStorage: per-mode top-5 high scores, daily records, settings, achievements (all validated on read)

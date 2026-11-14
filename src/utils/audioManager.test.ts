@@ -5,6 +5,7 @@ import {
   type MockAudioContext,
 } from "../audio/mockAudioContext.testutil";
 import { MUSIC_VOLUME } from "../audio/soundtrack";
+import { dbToGain, SFX_REVERB_SEND_DB, STACK_REVERB_BOOST_DB } from "../audio/mix";
 
 describe("audioManager", () => {
   let mock: MockAudioContext;
@@ -82,6 +83,113 @@ describe("audioManager", () => {
     expect(mock.ctx.resume).toHaveBeenCalled();
   });
 
+  describe("reverb send bus", () => {
+    /** Levels of the reverb sends that newly created voices feed (besides the master). */
+    const sendLevelsOf = (created: typeof mock.gains) => {
+      const master = mock.gains[0];
+      const voices = created.filter((gain) =>
+        gain.connect.mock.calls.some(([target]) => target === master),
+      );
+      const sends = new Set(
+        voices.flatMap((voice) =>
+          voice.connect.mock.calls
+            .map(([target]) => target as (typeof mock.gains)[number])
+            .filter((target) => target !== master),
+        ),
+      );
+      return [...sends].map((send) => send.gain.value);
+    };
+
+    it("builds one convolver per context with a calibrated stereo IR", () => {
+      const audio = createAudioManager();
+      audio.init();
+      audio.playStack("PERFECT", 1, 1);
+      audio.playWorldUp(2);
+      expect(mock.ctx.createConvolver).toHaveBeenCalledTimes(1);
+      const [convolver] = mock.convolvers;
+      // Level is calibrated by us, not the browser's normalisation.
+      expect(convolver.normalize).toBe(false);
+      expect(convolver.buffer?.numberOfChannels).toBe(2);
+      expect(convolver.buffer!.length).toBeGreaterThan(44100);
+      // Return lands in the master, so mute and the limiter cover the tail.
+      const master = mock.gains[0];
+      const returnGain = convolver.connect.mock.calls[0][0] as (typeof mock.gains)[number];
+      expect(returnGain.connect).toHaveBeenCalledWith(master);
+    });
+
+    it("sends big moments wetter than near-dry UI clicks", () => {
+      const audio = createAudioManager();
+      audio.init();
+      const before = mock.gains.length;
+      audio.playUi("select");
+      const uiSends = sendLevelsOf(mock.gains.slice(before));
+
+      const mid = mock.gains.length;
+      audio.playStack("PERFECT", 1, 1);
+      const perfectSends = sendLevelsOf(mock.gains.slice(mid));
+
+      expect(uiSends).toEqual([dbToGain(SFX_REVERB_SEND_DB.menu)]);
+      expect(perfectSends).toEqual([
+        dbToGain(SFX_REVERB_SEND_DB.stack + STACK_REVERB_BOOST_DB.PERFECT),
+      ]);
+      expect(perfectSends[0]).toBeGreaterThan(uiSends[0] * 4);
+    });
+
+    it("reuses send nodes instead of allocating one per sound", () => {
+      const audio = createAudioManager();
+      audio.init();
+      audio.playTick(false);
+      const allocated = mock.gains.length;
+      audio.playTick(false);
+      // Only the tick's own per-voice gains are new.
+      expect(mock.gains.length - allocated).toBe(2);
+    });
+
+    it("feeds the soundtrack bus into the reverb", () => {
+      const audio = createAudioManager();
+      audio.init();
+      const [master, musicBus] = mock.gains;
+      const targets = musicBus.connect.mock.calls.map(([target]) => target);
+      expect(targets).toContain(master);
+      expect(targets.length).toBe(2);
+    });
+
+    it("allocates no reverb while muted", () => {
+      const audio = createAudioManager();
+      audio.setMuted(true);
+      audio.playStack("PERFECT", 1, 1);
+      expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
+      expect(mock.ctx.createBuffer).not.toHaveBeenCalled();
+    });
+
+    it("mixes dry when convolution is unsupported", () => {
+      Reflect.deleteProperty(mock.ctx, "createConvolver");
+      const audio = createAudioManager();
+      expect(() => audio.playStack("PERFECT", 1, 1)).not.toThrow();
+      const master = mock.gains[0];
+      const voiceGains = mock.gains.slice(2);
+      expect(voiceGains.length).toBeGreaterThan(0);
+      voiceGains.forEach((gain) => {
+        expect(gain.connect.mock.calls).toEqual([[master]]);
+      });
+    });
+
+    it("mixes dry and keeps playing if building the reverb throws", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mock.ctx.createConvolver.mockImplementation(() => {
+        throw new Error("not supported");
+      });
+      const audio = createAudioManager();
+      expect(() => audio.playStack("GOOD", 1, 1)).not.toThrow();
+      expect(warn).toHaveBeenCalled();
+      expect(mock.oscillators.length).toBeGreaterThan(0);
+      // The partially built graph is released.
+      mock.nodes
+        .filter((node) => node.kind === "filter")
+        .forEach((node) => expect(node.disconnect).toHaveBeenCalled());
+    });
+  });
+
   it("degrades silently when Web Audio is unavailable", () => {
     vi.stubGlobal("AudioContext", undefined);
     const audio = createAudioManager();
@@ -98,13 +206,9 @@ describe("audioManager", () => {
       vi.useRealTimers();
     });
 
-    /** Master, compressor and music bus are long-lived; everything else is per-session. */
-    const sessionNodes = () => {
-      const [master, musicBus] = mock.gains;
-      return mock.nodes.filter(
-        (node) => node !== master && node !== musicBus && node.kind !== "compressor",
-      );
-    };
+    /** The bus graph built by init() is long-lived; everything else is per-session. */
+    const sessionNodes = (longLived: ReadonlySet<unknown>) =>
+      mock.nodes.filter((node) => !longLived.has(node));
 
     it("routes music through its own bus into the master, below SFX", () => {
       const audio = createAudioManager();
@@ -212,6 +316,8 @@ describe("audioManager", () => {
 
     it("does not leak nodes or timers across many runs", () => {
       const audio = createAudioManager();
+      audio.init();
+      const longLived = new Set(mock.nodes);
       for (let run = 0; run < 25; run += 1) {
         audio.startMusic(1 + (run % 3));
         audio.setMusicIntensity(2);
@@ -225,7 +331,7 @@ describe("audioManager", () => {
       expect(vi.getTimerCount()).toBe(0);
       mock.oscillators.forEach((osc) => expect(osc.stop).toHaveBeenCalled());
       mock.endStoppedOscillators();
-      sessionNodes().forEach((node) => expect(node.disconnect).toHaveBeenCalled());
+      sessionNodes(longLived).forEach((node) => expect(node.disconnect).toHaveBeenCalled());
     });
 
     it("keeps gameplay alive if the music graph cannot be built", () => {
