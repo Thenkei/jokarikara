@@ -85,6 +85,8 @@ export const GLOW_LAYER_DEPTH = 5;
 interface GameCanvasProps {
   mode?: GameMode;
   runSeed?: number;
+  /** Practice: start at level 1 of this world (default 1). */
+  startWorld?: number;
   reducedFx?: boolean;
   onScore: (score: number) => void;
   onGameOver: (
@@ -151,6 +153,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     {
       mode = "CLASSIC",
       runSeed = 0,
+      startWorld = 1,
       reducedFx = false,
       onScore,
       onGameOver,
@@ -199,6 +202,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         mode,
         runSeed,
         reducedFxRef.current,
+        startWorld,
       );
       stateRef.current = spawnActiveShape(initialState, reducedFxRef.current);
       lastReportedSecondRef.current = null;
@@ -208,7 +212,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           ? (stateRef.current.zenLivesRemaining ?? null)
           : null,
       );
-    }, [mode, runSeed, onZenLivesChange]);
+    }, [mode, runSeed, startWorld, onZenLivesChange]);
 
     useEffect(
       () => () => {

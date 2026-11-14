@@ -6,6 +6,7 @@ import {
   type AchievementRecord,
 } from "../utils/storage";
 import {
+  applyPracticeRunToLifetime,
   applyRunToLifetime,
   applyStack,
   breakPerfectRun,
@@ -29,6 +30,8 @@ interface ActiveRun {
   unlockedThisRun: readonly AchievementId[];
   /** Lifetime stats already include this run. */
   committed: boolean;
+  /** Practice run: no unlocks, only `bestWorld` is recorded. */
+  practice: boolean;
 }
 
 export interface FinishRunInput {
@@ -49,7 +52,11 @@ export interface UseAchievementsOptions {
 
 export interface AchievementsApi {
   record: AchievementRecord;
-  beginRun: (mode: GameMode, dailyKey: string | null) => void;
+  beginRun: (
+    mode: GameMode,
+    dailyKey: string | null,
+    options?: { practice?: boolean },
+  ) => void;
   recordStack: (event: StackEvent) => void;
   recordMiss: (terminal: boolean) => void;
   recordUndo: () => void;
@@ -108,7 +115,7 @@ export function useAchievements(options: UseAchievementsOptions = {}): Achieveme
   /** Evaluates the active run and persists/announces any new unlock. */
   const evaluateRun = useCallback(() => {
     const run = runRef.current;
-    if (!run) return;
+    if (!run || run.practice) return;
     const already = new Set(
       Object.keys(recordRef.current.unlocked) as AchievementId[],
     );
@@ -135,22 +142,34 @@ export function useAchievements(options: UseAchievementsOptions = {}): Achieveme
     if (!run || run.committed) return;
     const next = updateAchievementRecord((current) => ({
       ...current,
-      lifetime: applyRunToLifetime(current.lifetime, run.progress),
+      lifetime: run.practice
+        ? applyPracticeRunToLifetime(current.lifetime, run.progress)
+        : applyRunToLifetime(current.lifetime, run.progress),
     }));
     runRef.current = { ...run, committed: true };
     publish(next);
   }, [publish]);
 
   const beginRun = useMemo(
-    () => guarded("beginRun", undefined, (mode: GameMode, dailyKey: string | null) => {
-      commitRun();
-      runRef.current = {
-        progress: createRunProgress(mode, dailyKey),
-        stopwatch: startStopwatch(monotonicNow()),
-        unlockedThisRun: [],
-        committed: false,
-      };
-    }),
+    () =>
+      guarded(
+        "beginRun",
+        undefined,
+        (
+          mode: GameMode,
+          dailyKey: string | null,
+          options: { practice?: boolean } = {},
+        ) => {
+          commitRun();
+          runRef.current = {
+            progress: createRunProgress(mode, dailyKey),
+            stopwatch: startStopwatch(monotonicNow()),
+            unlockedThisRun: [],
+            committed: false,
+            practice: options.practice ?? false,
+          };
+        },
+      ),
     [commitRun, monotonicNow],
   );
 

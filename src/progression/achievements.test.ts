@@ -13,6 +13,7 @@ import {
   TIME_LORD_SCORE,
   UNBROKEN_COMBO,
   ZEN_MASTER_STACKS,
+  applyPracticeRunToLifetime,
   applyRunToLifetime,
   applyStack,
   breakPerfectRun,
@@ -375,3 +376,22 @@ describe("stopwatch", () => {
     expect(elapsedSeconds(startStopwatch(5_000), 1_000)).toBe(0);
   });
 });
+
+describe("best world reached", () => {
+  it("starts at world 1 and keeps the highest world of any run", () => {
+    expect(lifetime().bestWorld).toBe(1);
+    const reached = applyRunToLifetime(lifetime(), run({ world: 4 }));
+    expect(reached.bestWorld).toBe(4);
+    expect(applyRunToLifetime(reached, run({ world: 2 })).bestWorld).toBe(4);
+  });
+
+  it("practice runs only extend bestWorld, never totals or bests", () => {
+    const before = lifetime({ totalStacks: 50, runsPlayed: 3, bestWorld: 8 });
+    const after = applyPracticeRunToLifetime(
+      before,
+      run({ mode: "ZEN", world: 9, stackCount: 130, perfectCount: 9, score: 900 }),
+    );
+    expect(after).toEqual({ ...before, bestWorld: 9 });
+  });
+});
+

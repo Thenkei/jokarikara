@@ -136,3 +136,32 @@ describe("Heartbeat world", () => {
     expect(a.activeShape!.size).toBeCloseTo(b.activeShape!.size, 6);
   });
 });
+
+describe("practice start world", () => {
+  it("starts at level 1 of the chosen world with matching progression", () => {
+    const state = createInitialState(1000, "ZEN", 3, false, 4);
+    expect(state.world).toBe(4);
+    expect(state.level).toBe(1);
+    expect(state.stackCount).toBe(3 * STACKS_PER_WORLD);
+    expect(state.score).toBe(0);
+    expect(state.shapes).toHaveLength(1);
+    expect(state.shapes[0].size).toBeCloseTo(state.initialSize, 9);
+    expect(state.zoom).toBe(getZoomForLevel(1));
+  });
+
+  it("starts a reverse world from its seed with the reverse camera", () => {
+    const state = createInitialState(1000, "ZEN", 3, false, 9);
+    expect(state.world).toBe(9);
+    expect(state.shapes[0].size).toBeCloseTo(state.initialSize * REVERSE_SEED_RATIO, 9);
+    expect(state.zoom).toBeCloseTo(
+      getReverseZoom(state.initialSize, state.shapes[0].size),
+      9,
+    );
+  });
+
+  it("treats invalid start worlds as world 1", () => {
+    expect(createInitialState(1000, "ZEN", 3, false, 0).world).toBe(1);
+    expect(createInitialState(1000, "ZEN", 3, false, 2.7).world).toBe(2);
+  });
+});
+

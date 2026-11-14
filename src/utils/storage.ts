@@ -280,6 +280,7 @@ const parseLifetime = (value: unknown): LifetimeStats => {
     bestZenStacks: toCount(value.bestZenStacks),
     bestTimeAttackScore: toCount(value.bestTimeAttackScore),
     dailyDates: parseDailyDates(value.dailyDates),
+    bestWorld: Math.max(1, toCount(value.bestWorld)),
   };
 };
 
