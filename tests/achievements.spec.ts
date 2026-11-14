@@ -91,4 +91,34 @@ test.describe("Achievements", () => {
     await page.click(".achievements-back-btn");
     await expect(page.locator(".start-btn")).toBeVisible();
   });
+
+  test("unlock toasts never cover RETRY on a small game over screen", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+    await page.click(".start-btn");
+    await waitForBridge(page);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+
+    // Several unlocks (First Stack, Giant Slayer, Perfect Alignment...) queue
+    // toasts that are still showing when the run ends.
+    for (let i = 0; i < 12; i += 1) await bridge.forceStack(PERFECT_RATIO);
+    await failRun(bridge);
+
+    await expect(page.locator(".gameover-screen")).toBeVisible();
+    await expect(page.locator(".run-achievements li").first()).toBeVisible();
+    await expect(page.locator(".achievement-toast")).toBeVisible();
+
+    const retry = page.locator(".retry-btn");
+    await expect(retry).toBeInViewport({ ratio: 1 });
+    const hit = await retry.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      const top = document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2,
+      );
+      return top === button || button.contains(top);
+    });
+    expect(hit).toBe(true);
+  });
 });

@@ -27,11 +27,7 @@ import { haptic, isHapticsSupported, setHapticsEnabled } from "./utils/haptics";
 import { StartBackdrop } from "./components/StartBackdrop";
 import { getTimeBonus } from "./core/gameState";
 import { getComboTier, isComboMilestone } from "./gameplay/combo";
-import {
-  getEndInsight,
-  getQualityBreakdown,
-  QUALITY_ORDER,
-} from "./modes/runInsights";
+import { getEndInsight, getQualityBreakdown } from "./modes/runInsights";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
   LEVELS_PER_WORLD,
@@ -52,7 +48,6 @@ import { buildRunShareText } from "./modes/share";
 import {
   ACHIEVEMENT_COUNT,
   countUnlocked,
-  getAchievement,
   type AchievementId,
 } from "./progression/achievements";
 import { useAchievements } from "./progression/useAchievements";
@@ -62,6 +57,11 @@ import {
   type AchievementToasterHandle,
 } from "./components/AchievementToaster";
 import { AchievementsPanel } from "./components/AchievementsPanel";
+import {
+  GameOverScreen,
+  type GameOverRun,
+  type ShareStatus,
+} from "./components/GameOverScreen";
 import "./App.css";
 
 const isE2eMode = (): boolean =>
@@ -108,26 +108,6 @@ const MODE_LABELS: Record<GameMode, { label: string; aria: string; description: 
   },
 };
 
-interface DailyRunResult {
-  dateKey: string;
-  best: number;
-  attempts: number;
-}
-
-interface LastRun {
-  mode: GameMode;
-  /** World a practice run started at; null for regular runs. */
-  practiceWorld: number | null;
-  isNewBest: boolean;
-  stats: RunStats;
-  scores: HighScoresByMode[GameMode];
-  daily: DailyRunResult | null;
-  /** Unlocked during this run (live and at game over). */
-  achievements: readonly AchievementId[];
-}
-
-type ShareStatus = "idle" | "copied" | "shared" | "failed";
-
 const EMPTY_STATS: RunStats = {
   stackCount: 0,
   perfectCount: 0,
@@ -163,9 +143,6 @@ const isInteractiveTarget = (target: EventTarget | null): boolean =>
 const stacksBeforeWorld = (world: number): number =>
   (Math.max(1, world) - 1) * STACKS_PER_LEVEL * LEVELS_PER_WORLD;
 
-const getProgressionScore = (world: number, level: number): number =>
-  (world - 1) * LEVELS_PER_WORLD + level;
-
 function App() {
   const [gameState, setGameState] = useState<"START" | "PLAYING" | "GAMEOVER">(
     "START"
@@ -178,7 +155,7 @@ function App() {
   const [allScores, setAllScores] = useState<HighScoresByMode>(() =>
     getAllHighScores()
   );
-  const [lastRun, setLastRun] = useState<LastRun | null>(null);
+  const [lastRun, setLastRun] = useState<GameOverRun | null>(null);
   const [paused, setPaused] = useState(false);
   const [runId, setRunId] = useState(0);
   const [mode, setMode] = useState<GameMode>("CLASSIC");
@@ -809,23 +786,10 @@ function App() {
 
   const endInsight = lastRun ? getEndInsight(lastRun.stats.endReason, world) : null;
   const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
-  const breakdownTotal = QUALITY_ORDER.reduce((sum, q) => sum + breakdown[q], 0);
   /** Stacks made this run (a practice run starts with earlier worlds "done"). */
   const runStackCount = Math.max(
     0,
     (lastRun?.stats.stackCount ?? 0) - stacksBeforeWorld(lastRun?.practiceWorld ?? 1),
-  );
-  const shareControls = (
-    <>
-      <button className="share-btn" data-ui-sound="confirm" onClick={handleShare}>
-        SHARE RESULT
-      </button>
-      <p className="share-status" role="status">
-        {shareStatus === "copied" && "Copied to clipboard"}
-        {shareStatus === "shared" && "Shared!"}
-        {shareStatus === "failed" && "Sharing unavailable"}
-      </p>
-    </>
   );
 
   /**
@@ -1163,132 +1127,22 @@ function App() {
       )}
 
       {gameState === "GAMEOVER" && (
-        <div className="screen gameover-screen">
-          <h1 className="title">GAME OVER</h1>
-          {lastRun?.practiceWorld && (
-            <p className="practice-result-label">
-              PRACTICE · FROM WORLD {lastRun.practiceWorld}
-            </p>
-          )}
-          {lastRun?.daily && (
-            <p className="daily-result-label">
-              DAILY · {formatDailyLabel(lastRun.daily.dateKey)}
-            </p>
-          )}
-          {lastRun?.isNewBest && (
-            <div className="new-best-badge" role="status">
-              NEW BEST
-            </div>
-          )}
-          <div className="final-stats">
-            <p className="final-level">
-              World {world} - Level {level}
-            </p>
-            <p className="score-display">Total Score: {score}</p>
-            <p className="progression-score">
-              Progression: {getProgressionScore(world, level)}
-            </p>
-            <dl className="run-stats">
-              <div>
-                <dt>STACKS</dt>
-                <dd className="stat-stacks">{runStackCount}</dd>
-              </div>
-              <div>
-                <dt>PERFECT</dt>
-                <dd className="stat-perfect">{lastRun?.stats.perfectCount ?? 0}</dd>
-              </div>
-              {mode !== "ZEN" && (
-                <div>
-                  <dt>BEST COMBO</dt>
-                  <dd className="stat-combo">x{lastRun?.stats.bestStreak ?? 0}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-          {endInsight && (
-            <div className="end-insight" role="status">
-              <p className="end-insight-title">{endInsight.title}</p>
-              <p className="end-insight-tip">{endInsight.tip}</p>
-            </div>
-          )}
-          {breakdownTotal > 0 && (
-            <div className="quality-breakdown" aria-label="Stack quality breakdown">
-              <div className="quality-breakdown-bar" aria-hidden="true">
-                {QUALITY_ORDER.map((q) =>
-                  breakdown[q] > 0 ? (
-                    <span
-                      key={q}
-                      className={`quality-segment quality-segment--${q.toLowerCase()}`}
-                      style={{ flexGrow: breakdown[q] }}
-                    />
-                  ) : null,
-                )}
-              </div>
-              <ul className="quality-breakdown-legend">
-                {QUALITY_ORDER.map((q) => (
-                  <li key={q} className={`quality-legend--${q.toLowerCase()}`}>
-                    {q} <strong>{breakdown[q]}</strong>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {lastRun && lastRun.achievements.length > 0 && (
-            <div className="run-achievements">
-              <h3>UNLOCKED THIS RUN</h3>
-              <ul>
-                {lastRun.achievements.map((id) => (
-                  <li key={id}>{getAchievement(id).title}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {lastRun?.practiceWorld ? (
-            <div className="leaderboard practice-summary">
-              <h3>PRACTICE RUN</h3>
-              <p>Practice runs don't count toward scores or achievements.</p>
-            </div>
-          ) : lastRun?.daily ? (
-            <div className="leaderboard daily-summary">
-              <h3>TODAY</h3>
-              <p className="daily-summary-line">
-                BEST <strong>{lastRun.daily.best}</strong> ·{" "}
-                {lastRun.daily.attempts}{" "}
-                {lastRun.daily.attempts === 1 ? "TRY" : "TRIES"}
-              </p>
-              {shareControls}
-            </div>
-          ) : (
-          <div className="leaderboard">
-            <h3>TOP SCORES - {MODE_LABELS[mode].label}</h3>
-            {allScores[mode].length === 0 ? (
-              <p>No high scores yet!</p>
-            ) : (
-              <ul>
-                {allScores[mode].map((hs, idx) => (
-                  <li
-                    key={idx}
-                    className={
-                      lastRun?.isNewBest && idx === 0 ? "current-best" : undefined
-                    }
-                  >
-                    <span>#{idx + 1}</span>
-                    <span>{hs.score}</span>
-                    <span>{hs.date}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          )}
-          {lastRun && !lastRun.daily && <div className="run-share">{shareControls}</div>}
-          <button className="retry-btn" data-ui-sound="confirm" onClick={restartRun}>
-            RETRY
-          </button>
-          <button className="menu-btn" data-ui-sound="back" onClick={handleMainMenu}>
-            MAIN MENU
-          </button>
-        </div>
+        <GameOverScreen
+          run={lastRun}
+          mode={mode}
+          modeLabel={MODE_LABELS[mode].label}
+          score={score}
+          world={world}
+          level={level}
+          topScores={allScores[mode]}
+          stackCount={runStackCount}
+          endInsight={endInsight}
+          breakdown={breakdown}
+          shareStatus={shareStatus}
+          onShare={handleShare}
+          onRetry={restartRun}
+          onMenu={handleMainMenu}
+        />
       )}
 
       <AchievementToaster ref={toasterRef} onShow={playAchievementCue} />

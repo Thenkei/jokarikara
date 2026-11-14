@@ -71,6 +71,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/progression/achievements.ts` - Achievement catalogue, named thresholds, pure `evaluate(run, lifetime)` and run/lifetime reducers; `useAchievements.ts` is the React glue (run state in refs, fed by `GameCanvas`'s `onStack`/`onMiss`, re-renders only on unlock)
 - `src/progression/stats.ts` - Pure `LifetimeStats` → ordered display rows (perfect rate, daily streak from an injected "today"), shown in the achievements panel
 - `src/components/StartBackdrop.tsx` - Animated start screen backdrop; layer data lives in `startBackdropLayers.ts` (non-component exports stay out of component modules for Fast Refresh)
+- `src/components/GameOverScreen.tsx` - Presentational game over: score hero, run cards in a scrolling body, and an action bar (RETRY / share / menu) that never scrolls away; achievement toasts move to the top while it is shown
 
 ### localStorage keys
 Bump the version suffix on any incompatible schema change and migrate from the previous key (see `LEGACY_STORAGE_KEY`):
