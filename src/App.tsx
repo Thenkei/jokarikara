@@ -14,6 +14,7 @@ import { installAudioTestBridge } from "./utils/testBridge";
 import {
   GAME_MODES,
   getAllHighScores,
+  getHighScores,
   saveHighScore,
   getSettings,
   saveSettings,
@@ -45,6 +46,13 @@ import {
   qualitiesFromScoreHistory,
 } from "./modes/daily";
 import { buildRunShareText } from "./modes/share";
+import {
+  advancePersonalBest,
+  createPersonalBestState,
+  getPersonalBestAnnouncement,
+  selectPreviousBest,
+  type PersonalBestState,
+} from "./modes/personalBest";
 import {
   ACHIEVEMENT_COUNT,
   SECRET_ACHIEVEMENT_ID,
@@ -213,9 +221,30 @@ function App() {
    * changes on every stack and would flood the live region.
    */
   const [announcement, setAnnouncement] = useState({ text: "", id: 0 });
+  /**
+   * Messages announced in the same task are joined into one: a single stack
+   * can beat the personal best, hit a combo milestone and level up at once,
+   * and separate updates in one React batch would keep only the last one.
+   */
+  const pendingAnnouncementsRef = useRef<string[]>([]);
   const announce = useCallback((text: string) => {
-    setAnnouncement((current) => ({ text, id: current.id + 1 }));
+    const pending = pendingAnnouncementsRef.current;
+    pending.push(text);
+    if (pending.length > 1) return;
+    queueMicrotask(() => {
+      const joined = pending.splice(0).join(". ");
+      setAnnouncement((current) => ({ text: joined, id: current.id + 1 }));
+    });
   }, []);
+  /**
+   * Personal best race (Classic, Time Attack, Daily). The ref follows every
+   * score; React state changes only at run start and on the one stack that
+   * beats the previous best.
+   */
+  const personalBestRef = useRef<PersonalBestState>(createPersonalBestState(null));
+  /** Previous best this run races against (HUD target); null = no race. */
+  const [personalBestTarget, setPersonalBestTarget] = useState<number | null>(null);
+  const [personalBestPassed, setPersonalBestPassed] = useState(false);
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -390,6 +419,18 @@ function App() {
 
     // Commits a run left from the pause menu (RESTART) before starting anew.
     beginAchievementRun(runMode, todayKey, { practice });
+    // Read fresh (not from state): another tab or yesterday's Daily may have
+    // moved the records since this screen was rendered.
+    const previousBest = selectPreviousBest({
+      mode: runMode,
+      dailyKey: todayKey,
+      practice,
+      modeBest: getHighScores(runMode)[0]?.score,
+      dailyRecord: todayKey ? getDailyRecord(todayKey) : null,
+    });
+    personalBestRef.current = createPersonalBestState(previousBest);
+    setPersonalBestTarget(previousBest);
+    setPersonalBestPassed(false);
     setRunStartWorld(startWorld);
     setShowAchievements(false);
     setMode(runMode);
@@ -506,7 +547,19 @@ function App() {
     setScore(newScore);
     setHasStackedThisRun(true);
     revealSecondaryHud();
-  }, [revealSecondaryHud]);
+
+    const step = advancePersonalBest(personalBestRef.current, newScore);
+    if (!step.crossed || step.state.target === null) return;
+    personalBestRef.current = step.state;
+    // One-time record moment: banner + score pill accent (state), cue, haptic.
+    setPersonalBestPassed(true);
+    announce(getPersonalBestAnnouncement(step.state.target, dailyKey !== null));
+    audioManager.playRecord(worldRef.current);
+    // GameCanvas vibrates for the stack (and level up) right after reporting
+    // the score, and a new vibrate() call cancels the running pattern: queue
+    // ours behind that synchronous work so the bigger moment is the one felt.
+    queueMicrotask(() => haptic("record"));
+  }, [revealSecondaryHud, announce, dailyKey]);
 
   // Last progression announced; undo re-reports the current level/world and
   // must not be re-announced.
@@ -1031,8 +1084,17 @@ function App() {
           </button>
 
           <div className="hud">
-            <div className="hud-row hud-primary">
+            <div
+              className={`hud-row hud-primary ${
+                personalBestPassed ? `is-record${reducedFx ? " reduced-fx" : ""}` : ""
+              }`}
+            >
               <span className="score score-readout">{score}</span>
+              {personalBestTarget !== null && !personalBestPassed && (
+                <span className="pb-target" data-testid="pb-target">
+                  BEST {personalBestTarget}
+                </span>
+              )}
               <span className="world-badge">W {world}</span>
               <span className="level-badge">L {level}</span>
               {dailyKey && <span className="daily-badge">DAILY</span>}
@@ -1182,6 +1244,20 @@ function App() {
               role="status"
             >
               COMBO ×{comboBanner.streak}
+            </div>
+          )}
+
+          {personalBestPassed && personalBestTarget !== null && (
+            // Decorative: the live region announces it (no double read-out).
+            <div
+              className={`record-milestone ${reducedFx ? "reduced-fx" : ""}`}
+              data-testid="record-banner"
+              aria-hidden="true"
+            >
+              <span className="record-milestone-title">
+                {dailyKey ? "NEW DAILY BEST" : "NEW BEST"}
+              </span>
+              <span className="record-milestone-sub">PAST {personalBestTarget}</span>
             </div>
           )}
 

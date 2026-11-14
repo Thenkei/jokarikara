@@ -104,6 +104,13 @@ export interface IAudioService {
   /** Start screen secret found: a short sparkling bell cascade. */
   playChime(): void;
 
+  /**
+   * Personal best beaten mid-run: a short "ta-da" in the world's key (a
+   * pickup note, then a held bright chord with a bell partial). Starts a
+   * beat after the stack note it plays over, so both read.
+   */
+  playRecord(world: number): void;
+
   setMuted(muted: boolean): void;
   isMuted(): boolean;
 

@@ -60,6 +60,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
 - `src/modes/share.ts` - Share text for regular runs (mode, score, proportional emoji quality bar, game URL); reuses the Daily emoji legend
 - `src/modes/runInsights.ts` - Game over insights: why the run ended, stack quality breakdown
+- `src/modes/personalBest.ts` - "Chase your best": pure previous-best selection (mode top score; today's Daily best for a Daily; none for Zen/practice or a best of 0) and the one-shot crossing (strictly above); App keeps it in a ref, shows the HUD `BEST n` target, and on the crossing shows the banner, gold score pill, `playRecord` cue, `record` haptic and announcement once per run
 - `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation); `playUi` for menu sounds
 - `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
 - `src/audio/palette.ts` - Per-world sound palettes (timbre, envelope, lowpass, chorus, vibrato/tremolo, glide, mirrored intervals) applied to stack/levelUp/worldUp voices; world 1 is the unshaped baseline, every world kept within ±2 dB of it by `tests/audio-levels.spec.ts`
