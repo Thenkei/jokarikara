@@ -55,6 +55,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/gameplay/reverse.ts` - Reverse Stack (world 9): outward containment, arena limit, zoom-out camera
 - `src/gameplay/heartbeat.ts` - Heartbeat (world 10): beat-phase growth multiplier (mean 1) and visual pulse
 - `src/gameplay/guide.ts` - PERFECT ghost guide rules (Zen + first level; reverse-aware)
+- `src/gameplay/timingCue.ts` - Opt-in timing cue (setting `timingCue`): pure reading/curve/stepper on the game clock, ticks via `playCue`; off in Heartbeat (its beat is the cue)
 - `src/gameplay/combo.ts` - Combo milestones (fanfare, banner, haptics)
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
 - `src/modes/share.ts` - Share text for regular runs (mode, score, proportional emoji quality bar, game URL); reuses the Daily emoji legend
@@ -67,12 +68,13 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/utils/haptics.ts` - Vibration helper (respects the haptics setting)
 - `src/utils/storage.ts` - localStorage: per-mode top-5 high scores, daily records, settings, achievements (all validated on read)
 - `src/progression/achievements.ts` - Achievement catalogue, named thresholds, pure `evaluate(run, lifetime)` and run/lifetime reducers; `useAchievements.ts` is the React glue (run state in refs, fed by `GameCanvas`'s `onStack`/`onMiss`, re-renders only on unlock)
+- `src/progression/stats.ts` - Pure `LifetimeStats` → ordered display rows (perfect rate, daily streak from an injected "today"), shown in the achievements panel
 - `src/components/StartBackdrop.tsx` - Animated start screen backdrop; layer data lives in `startBackdropLayers.ts` (non-component exports stay out of component modules for Fast Refresh)
 
 ### localStorage keys
 Bump the version suffix on any incompatible schema change and migrate from the previous key (see `LEGACY_STORAGE_KEY`):
 - `shape-stack-high-scores-v3` (per-mode top 5; migrates from v2)
-- `shape-stack-settings` (`reducedFx`, `muted`, `music`, haptics, ...)
+- `shape-stack-settings` (`reducedFx`, `muted`, `music`, `haptics`, `timingCue`, ...)
 - `shape-stack-daily-v1`
 - `shape-stack-achievements-v1`
 

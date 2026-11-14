@@ -446,7 +446,8 @@ button:active {
 .fx-toggle-btn,
 .mute-toggle-btn,
 .music-toggle-btn,
-.haptics-toggle-btn {
+.haptics-toggle-btn,
+.timing-cue-toggle-btn {
   background: rgba(255, 255, 255, 0.06);
   color: var(--world-hud-text);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -460,7 +461,8 @@ button:active {
 .fx-toggle-btn:hover,
 .mute-toggle-btn:hover,
 .music-toggle-btn:hover,
-.haptics-toggle-btn:hover {
+.haptics-toggle-btn:hover,
+.timing-cue-toggle-btn:hover {
   background: color-mix(in srgb, var(--world-hud-primary) 24%, rgba(255, 255, 255, 0.06));
 }
 
@@ -567,6 +569,7 @@ button:active {
   .mute-toggle-btn,
   .music-toggle-btn,
   .haptics-toggle-btn,
+  .timing-cue-toggle-btn,
   .restart-btn,
   .undo-btn {
     font-size: 0.6rem;
@@ -1021,6 +1024,56 @@ button:focus-visible {
   padding: 0.85rem 2.6rem;
 }
 
+/* Lifetime stats: compact two-column grid above the achievement list. */
+.lifetime-stats {
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
+}
+
+.lifetime-stats-heading {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #8a93a6;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.lifetime-stats-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+/* <div> wrappers inside <dl> are valid HTML and keep each pair a grid cell. */
+.lifetime-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
+}
+
+.lifetime-stat-label {
+  font-size: 0.7rem;
+  color: #a3abbb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lifetime-stat-value {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
 .run-achievements {
   width: 100%;
   max-width: 300px;
@@ -1171,6 +1224,10 @@ button:focus-visible {
   .achievement-item {
     padding: 0.45rem 0.75rem;
   }
+
+  .lifetime-stat {
+    padding: 0.4rem 0.75rem;
+  }
 }
 
 /* World intro: name + rule reminder under "WORLD N". */
@@ -1210,7 +1267,8 @@ button:focus-visible {
 .settings-row .fx-toggle-btn,
 .settings-row .mute-toggle-btn,
 .settings-row .music-toggle-btn,
-.settings-row .haptics-toggle-btn {
+.settings-row .haptics-toggle-btn,
+.settings-row .timing-cue-toggle-btn {
   padding: 0.5rem 0.85rem;
   font-size: 0.68rem;
   min-height: 2.25rem; /* comfortable touch target */

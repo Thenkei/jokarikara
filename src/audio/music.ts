@@ -62,3 +62,21 @@ export const QUALITY_HARMONY: Record<StackQuality, readonly number[]> = {
 export const LEVEL_UP_ARPEGGIO = [0, 4, 7, 12] as const;
 /** Sustained add9 chord (semitones) for a new world. */
 export const WORLD_UP_CHORD = [0, 4, 7, 14, 19] as const;
+
+/**
+ * Timing cue pitches. Deliberately world-independent: the cue is a reference
+ * the player learns once ("the high ding means now"), so it must not move
+ * with the per-world key. Approach ticks climb the first pentatonic steps
+ * from A5 (A5 B5 C#6 E6: a fifth overall, a slight rise that adds urgency
+ * without turning into a melody); the PERFECT tick lands an octave above the
+ * root (A6) so it reads as the arrival.
+ */
+export const CUE_ROOT_HZ = 880;
+/** Highest approach step that keeps the rise "slight" (E6). */
+export const CUE_MAX_STEP = 3;
+
+export const getCueNoteHz = (step: number, inWindow: boolean): number =>
+  inWindow
+    ? CUE_ROOT_HZ * 2
+    : CUE_ROOT_HZ *
+      semitonesToRatio(pentatonicSemitones(Math.min(Math.max(step, 0), CUE_MAX_STEP)));

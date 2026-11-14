@@ -33,6 +33,8 @@ export interface GameSettings {
   music: boolean;
   /** Vibration feedback on supported devices. */
   haptics: boolean;
+  /** Audio ticks that speed up towards the PERFECT window (opt-in aid). */
+  timingCue: boolean;
 }
 
 const prefersReducedMotion = (): boolean => {
@@ -53,6 +55,7 @@ const getDefaultSettings = (): GameSettings => ({
   muted: false,
   music: true,
   haptics: true,
+  timingCue: false,
 });
 
 const byScoreDesc = (a: HighScore, b: HighScore) => b.score - a.score;
@@ -145,6 +148,11 @@ export const getSettings = (): GameSettings => {
         typeof parsed.haptics === "boolean"
           ? parsed.haptics
           : getDefaultSettings().haptics,
+      // Absent in settings saved before the cue existed: stays off.
+      timingCue:
+        typeof parsed.timingCue === "boolean"
+          ? parsed.timingCue
+          : getDefaultSettings().timingCue,
     };
   } catch (e) {
     console.error("Failed to load settings", e);

@@ -18,6 +18,7 @@ const mockAudioService: IAudioService = {
   playHeartbeat: vi.fn(),
   playComboMilestone: vi.fn(),
   playUi: vi.fn(),
+  playCue: vi.fn(),
   setMuted: vi.fn(),
   isMuted: vi.fn(() => false),
   init: vi.fn(),
@@ -375,6 +376,74 @@ describe("GameCanvas", () => {
       );
       runFrames(1000, 128, 1000 / 60);
       expect(mockAudioService.playHeartbeat).not.toHaveBeenCalled();
+    });
+
+    describe("timing cue", () => {
+      const renderZen = (props: { timingCue?: boolean; startWorld?: number } = {}) =>
+        render(
+          <GameCanvas
+            mode="ZEN"
+            onScore={vi.fn()}
+            onGameOver={vi.fn()}
+            onLevelUp={vi.fn()}
+            onWorldUp={vi.fn()}
+            audioService={mockAudioService}
+            {...props}
+          />
+        );
+      // ~10 s of 60 Hz frames: the first shape grows through the approach.
+      const growThrough = () => runFrames(1000, 600, 1000 / 60);
+
+      it("ticks towards the PERFECT band when enabled", () => {
+        renderZen({ timingCue: true });
+        growThrough();
+        const calls = vi.mocked(mockAudioService.playCue).mock.calls;
+        expect(calls.length).toBeGreaterThan(5);
+        expect(calls.some(([, inWindow]) => !inWindow)).toBe(true);
+      });
+
+      it("is silent when disabled (the default)", () => {
+        renderZen();
+        growThrough();
+        expect(mockAudioService.playCue).not.toHaveBeenCalled();
+      });
+
+      it("is silent while muted", () => {
+        vi.mocked(mockAudioService.isMuted).mockReturnValue(true);
+        try {
+          renderZen({ timingCue: true });
+          growThrough();
+          expect(mockAudioService.playCue).not.toHaveBeenCalled();
+        } finally {
+          vi.mocked(mockAudioService.isMuted).mockReturnValue(false);
+        }
+      });
+
+      it("is silent while paused", () => {
+        const ref = { current: null as GameCanvasHandle | null };
+        render(
+          <GameCanvas
+            ref={ref}
+            mode="ZEN"
+            timingCue
+            onScore={vi.fn()}
+            onGameOver={vi.fn()}
+            onLevelUp={vi.fn()}
+            onWorldUp={vi.fn()}
+            audioService={mockAudioService}
+          />
+        );
+        act(() => ref.current?.setPaused(true));
+        growThrough();
+        expect(mockAudioService.playCue).not.toHaveBeenCalled();
+      });
+
+      it("leaves the Heartbeat world to its own beat", () => {
+        renderZen({ timingCue: true, startWorld: 10 });
+        growThrough();
+        expect(mockAudioService.playHeartbeat).toHaveBeenCalled();
+        expect(mockAudioService.playCue).not.toHaveBeenCalled();
+      });
     });
 
     it("clamps long frame gaps so a background tab cannot auto-fail the run", () => {

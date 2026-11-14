@@ -8,6 +8,8 @@ import type { StackQuality } from "../types";
  *   stack OK ≈ -24 … PERFECT ≈ -18   (quality hierarchy stays audible, < 7 dB)
  *   level up ≈ -18, world up ≈ -17, game over ≈ -19
  *   Zen miss ≈ -25, early tap ≈ -28, countdown tick ≈ -28 / urgent ≈ -26
+ *   timing cue ≈ -33 / PERFECT tick ≈ -30: well under any stack, above
+ *   the music bed so the bed never masks it
  *   music bed ≈ 10 dB under a plain stack, so it never masks feedback
  *   worst simultaneous burst: peak ≤ -1 dBFS (measured ≈ -4.7, no clipping)
  *
@@ -34,7 +36,8 @@ export type SfxId =
   | "heartbeat"
   | "combo"
   | "menu"
-  | "ui";
+  | "ui"
+  | "cue";
 
 /** Gain applied before the bus processing (linear). */
 export const MASTER_VOLUME = 1;
@@ -53,6 +56,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   combo: 0,
   menu: 0,
   ui: 2.5,
+  cue: 7,
 };
 
 /**
@@ -78,6 +82,8 @@ export const SFX_REVERB_SEND_DB: Readonly<Record<SfxId, number>> = {
   combo: -12,
   menu: -42,
   ui: -26,
+  // Timing cue is a rhythm aid: a tail would smear where the beat lands.
+  cue: -40,
 };
 
 /** Extra stack send by quality: a PERFECT placement rings out. */

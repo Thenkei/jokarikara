@@ -113,6 +113,7 @@ Effects are **cumulative**, and visual distortions only apply to stacked shapes,
   - `SOUND: ON/OFF`.
   - `MUSIC: ON/OFF` (background soundtrack only).
   - `HAPTICS: ON/OFF` (shown on devices that can vibrate).
+  - `TIMING CUE: ON/OFF` (off by default): soft ticks that speed up and rise slightly as the shape nears the PERFECT size, a brighter tick inside the PERFECT window, silence once it has passed. Not used in the Heartbeat world, whose beat already is the rhythm cue.
   - `FX: FULL/LOW`. LOW removes shake and particles and tones down glow. It defaults to LOW when your OS asks for reduced motion.
 
 ## 🏆 Achievements

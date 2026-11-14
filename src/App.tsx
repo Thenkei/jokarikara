@@ -56,6 +56,7 @@ import {
   type AchievementId,
 } from "./progression/achievements";
 import { useAchievements } from "./progression/useAchievements";
+import { isFirstEverProfile } from "./progression/stats";
 import {
   AchievementToaster,
   type AchievementToasterHandle,
@@ -210,6 +211,7 @@ function App() {
     return initial;
   });
   const hapticsSupported = useMemo(() => isHapticsSupported(), []);
+  const [timingCueOn, setTimingCueOn] = useState(() => getSettings().timingCue);
   const [styleScore, setStyleScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
@@ -267,9 +269,7 @@ function App() {
    * First-ever run: nothing played or stacked yet. Lifetime stats commit at
    * run end, so the in-run flag below hides the hint at the first stack.
    */
-  const isNewPlayer =
-    achievementRecord.lifetime.runsPlayed === 0 &&
-    achievementRecord.lifetime.totalStacks === 0;
+  const isNewPlayer = isFirstEverProfile(achievementRecord.lifetime);
   const [hasStackedThisRun, setHasStackedThisRun] = useState(false);
   const showFirstRunHint =
     isNewPlayer && !hasStackedThisRun && runStartWorld === 1 && !dailyKey;
@@ -600,6 +600,16 @@ function App() {
     if (next) haptic("tap");
   };
 
+  const handleToggleTimingCue = () => {
+    const next = !timingCueOn;
+    setTimingCueOn(next);
+    saveSettings({ timingCue: next });
+    // Turning it on previews the PERFECT tick instead of the generic click
+    // (the button opts out of the delegated menu sound to avoid a double hit).
+    if (next) audioManager.playCue(0, true);
+    else audioManager.playUi("select");
+  };
+
   const handleShare = async () => {
     if (!lastRun) return;
     const text = lastRun.daily
@@ -786,6 +796,14 @@ function App() {
           {hapticsOn ? "HAPTICS: ON" : "HAPTICS: OFF"}
         </button>
       )}
+      <button
+        className="timing-cue-toggle-btn" data-ui-sound="none"
+        onClick={handleToggleTimingCue}
+        aria-label="Timing cue: ticks that speed up towards the perfect moment"
+        aria-pressed={timingCueOn}
+      >
+        {timingCueOn ? "TIMING CUE: ON" : "TIMING CUE: OFF"}
+      </button>
     </div>
   );
 
@@ -953,6 +971,7 @@ function App() {
               runSeed={runSeed}
               startWorld={runStartWorld}
               reducedFx={reducedFx}
+              timingCue={timingCueOn}
               onScore={handleScore}
               onGameOver={handleGameOver}
               onLevelUp={handleLevelUp}

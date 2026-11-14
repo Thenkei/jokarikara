@@ -43,9 +43,14 @@ export type GameTestBridge = {
   hideDiagnostics: () => void;
 };
 
+export type CueCall = { step: number; inWindow: boolean };
+
 /** E2E-only, read-only view of the audio service (outlives GameCanvas). */
 export type AudioTestBridge = {
   getMusicState: () => MusicState;
+  /** Every `playCue` call the audio service received, oldest first. */
+  getCueCalls: () => CueCall[];
+  clearCueCalls: () => void;
 };
 
 type InstallArgs = {
@@ -242,8 +247,23 @@ export const installAudioTestBridge = (
   audio: IAudioService,
 ): (() => void) | undefined => {
   if (!isE2eMode()) return undefined;
-  window.__GAME_AUDIO__ = { getMusicState: () => audio.getMusicState() };
+  // Record timing cue calls at the service boundary (a test cannot hear
+  // them); the real method still runs, so audio behaviour is unchanged.
+  const cueCalls: CueCall[] = [];
+  const playCue = audio.playCue;
+  audio.playCue = (step, inWindow) => {
+    cueCalls.push({ step, inWindow });
+    playCue.call(audio, step, inWindow);
+  };
+  window.__GAME_AUDIO__ = {
+    getMusicState: () => audio.getMusicState(),
+    getCueCalls: () => cueCalls.slice(),
+    clearCueCalls: () => {
+      cueCalls.length = 0;
+    },
+  };
   return () => {
+    audio.playCue = playCue;
     delete window.__GAME_AUDIO__;
   };
 };

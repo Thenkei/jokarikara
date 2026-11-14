@@ -19,11 +19,24 @@ export interface PerfectGuide {
   perfectSize: number;
   /** True once the active shape has reached the PERFECT band. */
   inPerfectBand: boolean;
+  /** Size at which the growing shape enters the PERFECT band. */
+  bandEntrySize: number;
+  /**
+   * Size past which a stack is no longer PERFECT. Infinity in regular worlds,
+   * where the container itself (an overflow miss) ends the band.
+   */
+  bandExitSize: number;
 }
 
-export const getPerfectGuide = (state: GameState): PerfectGuide | null => {
-  if (!shouldShowPerfectGuide(state) || !state.activeShape) return null;
+/**
+ * PERFECT target for the current active shape, regardless of whether the
+ * ghost guide is shown. Shared by the ghost guide and the audio timing cue
+ * so both always agree on where PERFECT is.
+ */
+export const getPerfectTarget = (state: GameState): PerfectGuide | null => {
+  if (state.isGameOver || !state.activeShape) return null;
   const last = state.shapes[state.shapes.length - 1];
+  if (!last) return null;
   const ratio = STYLE_QUALITY_THRESHOLDS.perfectMinRatio;
   const size = state.activeShape.size;
 
@@ -34,9 +47,19 @@ export const getPerfectGuide = (state: GameState): PerfectGuide | null => {
     return {
       perfectSize,
       inPerfectBand: size >= last.size && size <= perfectSize,
+      bandEntrySize: last.size,
+      bandExitSize: perfectSize,
     };
   }
 
   const perfectSize = last.size * ratio;
-  return { perfectSize, inPerfectBand: size >= perfectSize };
+  return {
+    perfectSize,
+    inPerfectBand: size >= perfectSize,
+    bandEntrySize: perfectSize,
+    bandExitSize: Number.POSITIVE_INFINITY,
+  };
 };
+
+export const getPerfectGuide = (state: GameState): PerfectGuide | null =>
+  shouldShowPerfectGuide(state) ? getPerfectTarget(state) : null;
