@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures";
 import { getMusicState, makeBridge, waitForBridge } from "./bridgeHelpers";
+import { flipSetting, openSettings, settingSwitch, settingsDialog } from "./settingsHelpers";
 
 // The soundtrack itself is inaudible to a test, so these assert on the audio
 // service's reconciled state: `playing` means oscillators and scheduler are
@@ -73,34 +74,40 @@ test.describe("Dynamic soundtrack", () => {
     const bridge = makeBridge(page);
     await bridge.pause();
 
-    const openPause = async () => {
+    /** Pause menu -> settings sheet (the run stays paused underneath). */
+    const openPauseSettings = async () => {
       await page.click(".pause-btn");
       await expect(page.locator(".pause-overlay")).toBeVisible();
+      await openSettings(page);
     };
-    const resume = async () => {
+    /** First Escape closes only the sheet, the second one resumes. */
+    const closeAndResume = async () => {
+      await page.keyboard.press("Escape");
+      await expect(settingsDialog(page)).toBeHidden();
+      await expect(page.locator(".pause-overlay")).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(page.locator(".pause-overlay")).toBeHidden();
     };
 
-    const mute = page.locator(".pause-overlay .mute-toggle-btn");
-    await openPause();
-    await mute.click();
-    await expect(mute).toHaveText("SOUND: OFF");
-    await resume();
+    const sound = settingSwitch(page, "Sound");
+    await openPauseSettings();
+    await flipSetting(page, "Sound");
+    await expect(sound).toHaveAttribute("aria-checked", "false");
+    await closeAndResume();
     expect((await getMusicState(page))?.playing).toBe(false);
 
-    await openPause();
-    await mute.click();
-    await expect(mute).toHaveText("SOUND: ON");
-    await resume();
+    await openPauseSettings();
+    await flipSetting(page, "Sound");
+    await expect(sound).toHaveAttribute("aria-checked", "true");
+    await closeAndResume();
     expect((await getMusicState(page))?.playing).toBe(true);
 
-    const music = page.locator(".pause-overlay .music-toggle-btn");
-    await openPause();
-    await expect(music).toHaveText("MUSIC: ON");
+    const music = settingSwitch(page, "Music");
+    await openPauseSettings();
+    await expect(music).toHaveAttribute("aria-checked", "true");
     await music.click();
-    await expect(music).toHaveText("MUSIC: OFF");
-    await resume();
+    await expect(music).toHaveAttribute("aria-checked", "false");
+    await closeAndResume();
     expect(await getMusicState(page)).toMatchObject({ enabled: false, playing: false });
     expect(
       await page.evaluate(() => window.localStorage.getItem("shape-stack-settings")),
@@ -114,10 +121,11 @@ test.describe("Dynamic soundtrack", () => {
     await waitForBridge(page);
     expect(await getMusicState(page)).toMatchObject({ active: true, playing: false });
     await makeBridge(page).pause();
-    await openPause();
-    await expect(music).toHaveText("MUSIC: OFF");
+    await openPauseSettings();
+    await expect(music).toHaveAttribute("aria-checked", "false");
     await music.click();
-    await resume();
+    await expect(music).toHaveAttribute("aria-checked", "true");
+    await closeAndResume();
     expect((await getMusicState(page))?.playing).toBe(true);
   });
 });

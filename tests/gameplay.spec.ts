@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures";
 import { makeBridge, waitForBridge } from "./bridgeHelpers";
+import { closeSettings, openSettings, settingSwitch } from "./settingsHelpers";
 
 const stackOnce = async (
   bridge: ReturnType<typeof makeBridge>,
@@ -303,11 +304,13 @@ test.describe("Gameplay Deterministic", () => {
   test("reduced fx toggle persists between runs", async ({ page }) => {
     await page.goto("/");
 
-    // Settings live on the start screen and in the pause menu, not the HUD.
-    const fxToggle = page.locator(".start-screen .fx-toggle-btn");
-    await expect(fxToggle).toHaveText("FX: FULL");
+    // Settings open from the start screen and the pause menu, not the HUD.
+    await openSettings(page);
+    const fxToggle = settingSwitch(page, "Visual effects");
+    await expect(fxToggle).toHaveAttribute("aria-checked", "true");
     await fxToggle.click();
-    await expect(fxToggle).toHaveText("FX: LOW");
+    await expect(fxToggle).toHaveAttribute("aria-checked", "false");
+    await closeSettings(page);
 
     const stored = await page.evaluate(() =>
       window.localStorage.getItem("shape-stack-settings"),
@@ -316,7 +319,7 @@ test.describe("Gameplay Deterministic", () => {
 
     await page.click(".start-btn");
     await waitForBridge(page);
-    await expect(page.locator(".hud .fx-toggle-btn")).toHaveCount(0);
+    await expect(page.locator(".hud [role='switch']")).toHaveCount(0);
 
     const bridge = makeBridge(page);
     await bridge.pause();
@@ -329,6 +332,10 @@ test.describe("Gameplay Deterministic", () => {
     await waitForBridge(page);
     await makeBridge(page).pause();
     await page.click(".pause-btn");
-    await expect(page.locator(".pause-overlay .fx-toggle-btn")).toHaveText("FX: LOW");
+    await openSettings(page);
+    await expect(settingSwitch(page, "Visual effects")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 });

@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures";
 import { waitForBridge } from "./bridgeHelpers";
+import { closeSettings, openSettings, settingSwitch } from "./settingsHelpers";
 
 test.describe("Haptics setting", () => {
   test.beforeEach(async ({ page }) => {
@@ -24,14 +25,17 @@ test.describe("Haptics setting", () => {
 
   test("turning haptics off persists and silences vibration", async ({ page }) => {
     await page.goto("/");
-    const toggle = page.locator(".start-screen .haptics-toggle-btn");
-    await expect(toggle).toHaveText("HAPTICS: ON");
+    await openSettings(page);
+    const toggle = settingSwitch(page, "Haptics");
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
 
     await toggle.click();
-    await expect(toggle).toHaveText("HAPTICS: OFF");
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
     expect(
       await page.evaluate(() => localStorage.getItem("shape-stack-settings")),
     ).toContain('"haptics":false');
+    await closeSettings(page);
 
     await page.click(".start-btn");
     await waitForBridge(page);

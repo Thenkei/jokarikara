@@ -1,6 +1,12 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { clearCueCalls, getCueCalls, makeBridge, waitForBridge } from "./bridgeHelpers";
+import {
+  closeSettings,
+  flipSetting,
+  openSettings,
+  settingSwitch,
+} from "./settingsHelpers";
 
 /**
  * Timing cue: the ticks are inaudible to a test, so these assert on the calls
@@ -47,15 +53,21 @@ const walk = (page: Page, from: number, to: number, seconds: number) =>
 test.describe("Timing cue setting", () => {
   test("is off by default and toggles from the start screen", async ({ page }) => {
     await page.goto("/");
-    const toggle = page.locator(".start-screen .timing-cue-toggle-btn");
-    await expect(toggle).toHaveText("TIMING CUE: OFF");
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await openSettings(page);
+    const toggle = settingSwitch(page, "Timing cue");
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await clearCueCalls(page);
 
     await toggle.click();
-    await expect(toggle).toHaveText("TIMING CUE: ON");
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
     expect(
       await page.evaluate(() => localStorage.getItem("shape-stack-settings")),
     ).toContain('"timingCue":true');
+    // Turning it on previews the PERFECT tick.
+    expect(await getCueCalls(page)).toEqual([
+      expect.objectContaining({ inWindow: true }),
+    ]);
+    await closeSettings(page);
   });
 
   test("with the setting on, ticks speed up and land on the PERFECT tick", async ({
@@ -63,9 +75,9 @@ test.describe("Timing cue setting", () => {
   }) => {
     await seedSettings(page, { timingCue: true });
     await page.goto("/");
-    await expect(page.locator(".start-screen .timing-cue-toggle-btn")).toHaveText(
-      "TIMING CUE: ON",
-    );
+    await openSettings(page);
+    await expect(settingSwitch(page, "Timing cue")).toHaveAttribute("aria-checked", "true");
+    await closeSettings(page);
     const bridge = await startPaused(page);
 
     // Far from the band: silent.
@@ -117,16 +129,18 @@ test.describe("Timing cue setting", () => {
     expect(await getCueCalls(page)).toEqual([]);
 
     const resumeStepping = async () => {
+      await closeSettings(page);
       await page.keyboard.press("Escape");
       await expect(page.locator(".pause-overlay")).toBeHidden();
       await bridge.pause();
       await clearCueCalls(page);
     };
 
-    // Muted from the pause menu: the approach stays silent.
-    const mute = page.locator(".pause-overlay .mute-toggle-btn");
-    await mute.click();
-    await expect(mute).toHaveText("SOUND: OFF");
+    // Muted from the pause menu's settings: the approach stays silent.
+    const sound = settingSwitch(page, "Sound");
+    await openSettings(page);
+    await flipSetting(page, "Sound");
+    await expect(sound).toHaveAttribute("aria-checked", "false");
     await resumeStepping();
     await walk(page, 0.6, 0.95, 2);
     expect(await getCueCalls(page)).toEqual([]);
@@ -134,8 +148,9 @@ test.describe("Timing cue setting", () => {
 
     // Control: the very same approach ticks once sound is back.
     await page.click(".pause-btn");
-    await mute.click();
-    await expect(mute).toHaveText("SOUND: ON");
+    await openSettings(page);
+    await flipSetting(page, "Sound");
+    await expect(sound).toHaveAttribute("aria-checked", "true");
     await resumeStepping();
     await walk(page, 0.6, 0.95, 2);
     expect((await getCueCalls(page)).length).toBeGreaterThan(3);
