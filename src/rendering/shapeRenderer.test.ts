@@ -5,6 +5,8 @@ import {
   drawBackground,
   clearCanvas,
   drawShapeStack,
+  drawPerfectGuide,
+  PERFECT_GUIDE_ALPHA,
 } from "./shapeRenderer";
 import type { Shape } from "../utils/geometry";
 import { getWorldMechanics } from "../constants/game";
@@ -511,5 +513,55 @@ describe("shapeRenderer", () => {
       );
       expect(ctx.fillStyle).toBe("hsl(180, 100%, 50%)");
     });
+  });
+});
+
+describe("drawPerfectGuide", () => {
+  const active: Shape = {
+    type: "square",
+    size: 10,
+    rotation: 0.5,
+    color: "#ffffff",
+    opacity: 1,
+  };
+  const ctxWithDash = () => {
+    const ctx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      stroke: vi.fn(),
+      setLineDash: vi.fn(),
+      globalAlpha: 1,
+      strokeStyle: "",
+      lineWidth: 0,
+    };
+    return ctx as unknown as CanvasRenderingContext2D & typeof ctx;
+  };
+
+  it("strokes a dashed ghost of the active shape at the perfect size", () => {
+    const ctx = ctxWithDash();
+    drawPerfectGuide(ctx, active, 97, 50, 60, 2, false);
+    expect(ctx.translate).toHaveBeenCalledWith(50, 60);
+    expect(ctx.rotate).toHaveBeenCalledWith(0.5);
+    expect(ctx.rect).toHaveBeenCalledWith(-97, -97, 194, 194);
+    expect(ctx.setLineDash).toHaveBeenCalledWith([6, 6]);
+    expect(ctx.globalAlpha).toBe(PERFECT_GUIDE_ALPHA.idle);
+    expect(ctx.stroke).toHaveBeenCalled();
+  });
+
+  it("turns solid and brighter inside the perfect band", () => {
+    const ctx = ctxWithDash();
+    drawPerfectGuide(ctx, active, 97, 0, 0, 1, true);
+    expect(ctx.setLineDash).toHaveBeenCalledWith([]);
+    expect(ctx.globalAlpha).toBe(PERFECT_GUIDE_ALPHA.active);
+  });
+
+  it("draws nothing for a non-positive size", () => {
+    const ctx = ctxWithDash();
+    drawPerfectGuide(ctx, active, 0, 0, 0, 1, false);
+    expect(ctx.stroke).not.toHaveBeenCalled();
   });
 });

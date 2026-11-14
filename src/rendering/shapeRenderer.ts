@@ -141,6 +141,82 @@ const hexToHsl = (hexColor: string): Hsl => {
 };
 
 /**
+ * Trace the path of a shape of the given type centred at the origin.
+ * Caller is responsible for transforms, fill and stroke.
+ */
+export const traceShapePath = (
+  ctx: CanvasRenderingContext2D,
+  type: Shape["type"],
+  size: number,
+): void => {
+  switch (type) {
+    case "circle":
+      drawCirclePath(ctx, size);
+      break;
+    case "square":
+      drawSquarePath(ctx, size);
+      break;
+    case "triangle":
+      drawRegularPolygonPath(ctx, 3, size);
+      break;
+    case "rectangle":
+      drawRectanglePath(ctx, size);
+      break;
+    case "pentagon":
+      drawRegularPolygonPath(ctx, 5, size);
+      break;
+    case "hexagon":
+      drawRegularPolygonPath(ctx, 6, size);
+      break;
+    case "octagon":
+      drawRegularPolygonPath(ctx, 8, size);
+      break;
+    case "diamond":
+      drawDiamondPath(ctx, size);
+      break;
+    case "star":
+      drawStarPath(ctx, size);
+      break;
+  }
+
+};
+
+/** Visual weight of the PERFECT guide: idle vs. while inside the band. */
+export const PERFECT_GUIDE_ALPHA = { idle: 0.22, active: 0.75 } as const;
+
+/**
+ * Ghost outline of the active shape at the size that would score PERFECT.
+ * It rotates with the active shape, so when it pokes outside the container the
+ * player can see a PERFECT is not reachable at the current angle.
+ */
+export const drawPerfectGuide = (
+  ctx: CanvasRenderingContext2D,
+  active: Shape,
+  perfectSize: number,
+  x: number,
+  y: number,
+  zoom: number,
+  inPerfectBand: boolean,
+  color: string = "#ffffff",
+): void => {
+  if (perfectSize <= 0) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(active.rotation);
+  traceShapePath(ctx, active.type, perfectSize * zoom);
+  ctx.globalAlpha = inPerfectBand
+    ? PERFECT_GUIDE_ALPHA.active
+    : PERFECT_GUIDE_ALPHA.idle;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = inPerfectBand ? 2.5 : 1.5;
+  if (typeof ctx.setLineDash === "function") {
+    ctx.setLineDash(inPerfectBand ? [] : [6, 6]);
+  }
+  ctx.stroke();
+  ctx.restore();
+};
+
+/**
  * Convert hex color to HSL and shift hue.
  */
 const shiftHue = (hexColor: string, hueShift: number): string => {
@@ -264,35 +340,7 @@ export const drawShape = (
 
   const size = shape.size * zoom * sizeMultiplier;
 
-  switch (shape.type) {
-    case "circle":
-      drawCirclePath(ctx, size);
-      break;
-    case "square":
-      drawSquarePath(ctx, size);
-      break;
-    case "triangle":
-      drawRegularPolygonPath(ctx, 3, size);
-      break;
-    case "rectangle":
-      drawRectanglePath(ctx, size);
-      break;
-    case "pentagon":
-      drawRegularPolygonPath(ctx, 5, size);
-      break;
-    case "hexagon":
-      drawRegularPolygonPath(ctx, 6, size);
-      break;
-    case "octagon":
-      drawRegularPolygonPath(ctx, 8, size);
-      break;
-    case "diamond":
-      drawDiamondPath(ctx, size);
-      break;
-    case "star":
-      drawStarPath(ctx, size);
-      break;
-  }
+  traceShapePath(ctx, shape.type, size);
 
   ctx.fill();
 
