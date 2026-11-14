@@ -31,6 +31,8 @@ export interface GameSettings {
   muted: boolean;
   /** Background soundtrack (independent from `muted`, which silences all). */
   music: boolean;
+  /** Vibration feedback on supported devices. */
+  haptics: boolean;
 }
 
 const prefersReducedMotion = (): boolean => {
@@ -50,6 +52,7 @@ const getDefaultSettings = (): GameSettings => ({
   reducedFx: prefersReducedMotion(),
   muted: false,
   music: true,
+  haptics: true,
 });
 
 const byScoreDesc = (a: HighScore, b: HighScore) => b.score - a.score;
@@ -138,6 +141,10 @@ export const getSettings = (): GameSettings => {
         typeof parsed.muted === "boolean" ? parsed.muted : getDefaultSettings().muted,
       music:
         typeof parsed.music === "boolean" ? parsed.music : getDefaultSettings().music,
+      haptics:
+        typeof parsed.haptics === "boolean"
+          ? parsed.haptics
+          : getDefaultSettings().haptics,
     };
   } catch (e) {
     console.error("Failed to load settings", e);

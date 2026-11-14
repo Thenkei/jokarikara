@@ -101,13 +101,13 @@ describe("storage", () => {
 
   describe("getSettings", () => {
     it("returns the default settings when nothing is stored", () => {
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true });
     });
 
     it("returns stored settings with reducedFx: true", () => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ reducedFx: true }));
 
-      expect(getSettings()).toEqual({ reducedFx: true, muted: false, music: true });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: false, music: true, haptics: true });
     });
 
     it("falls back to the default for reducedFx when the stored value is not a boolean", () => {
@@ -128,7 +128,7 @@ describe("storage", () => {
     it("returns the default settings when JSON is corrupted", () => {
       localStorage.setItem(SETTINGS_KEY, "{{bad");
 
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true });
     });
   });
 
@@ -150,7 +150,7 @@ describe("storage", () => {
       saveSettings({ reducedFx: true, muted: true });
       saveSettings({ music: false });
 
-      expect(getSettings()).toEqual({ reducedFx: true, muted: true, music: false });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: true, music: false, haptics: true });
     });
 
     it("does not throw when localStorage.setItem throws", () => {
@@ -275,5 +275,20 @@ describe("daily records", () => {
       JSON.stringify({ "2026-11-14": { best: "x", attempts: -1 } }),
     );
     expect(getDailyRecord("2026-11-14")).toEqual({ best: 0, attempts: 0 });
+  });
+});
+
+describe("haptics setting", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to on and persists independently", () => {
+    expect(getSettings().haptics).toBe(true);
+    saveSettings({ haptics: false });
+    expect(getSettings()).toMatchObject({ haptics: false, muted: false, music: true });
+  });
+
+  it("ignores a non-boolean stored value", () => {
+    localStorage.setItem("shape-stack-settings", JSON.stringify({ haptics: "no" }));
+    expect(getSettings().haptics).toBe(true);
   });
 });

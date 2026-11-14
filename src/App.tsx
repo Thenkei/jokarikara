@@ -23,6 +23,7 @@ import {
 import type { HighScoresByMode } from "./utils/storage";
 import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
 import { getWorldPalette, getWorldTheme } from "./visual/theme";
+import { haptic, isHapticsSupported, setHapticsEnabled } from "./utils/haptics";
 import { StartBackdrop } from "./components/StartBackdrop";
 import { getTimeBonus } from "./core/gameState";
 import { getComboTier, isComboMilestone } from "./gameplay/combo";
@@ -202,6 +203,12 @@ function App() {
     audioManager.setMusicEnabled(initial);
     return initial;
   });
+  const [hapticsOn, setHapticsOn] = useState(() => {
+    const initial = getSettings().haptics;
+    setHapticsEnabled(initial);
+    return initial;
+  });
+  const hapticsSupported = useMemo(() => isHapticsSupported(), []);
   const [styleScore, setStyleScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
@@ -583,6 +590,15 @@ function App() {
     revealSecondaryHud();
   };
 
+  const handleToggleHaptics = () => {
+    const next = !hapticsOn;
+    setHapticsOn(next);
+    setHapticsEnabled(next);
+    saveSettings({ haptics: next });
+    // Let the player feel what they just turned on.
+    if (next) haptic("tap");
+  };
+
   const handleShare = async () => {
     if (!lastRun?.daily) return;
     const text = buildDailyShareText({
@@ -748,6 +764,16 @@ function App() {
       >
         {musicOn ? "MUSIC: ON" : "MUSIC: OFF"}
       </button>
+      {hapticsSupported && (
+        <button
+          className="haptics-toggle-btn"
+          onClick={handleToggleHaptics}
+          aria-label="Vibration feedback"
+          aria-pressed={hapticsOn}
+        >
+          {hapticsOn ? "HAPTICS: ON" : "HAPTICS: OFF"}
+        </button>
+      )}
     </div>
   );
 

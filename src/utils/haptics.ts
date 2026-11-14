@@ -18,6 +18,10 @@ export const setHapticsEnabled = (value: boolean): void => {
   enabled = value;
 };
 
+/** Whether this device can vibrate at all (the toggle is hidden otherwise). */
+export const isHapticsSupported = (): boolean =>
+  typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+
 export const haptic = (pattern: HapticPattern): void => {
   if (!enabled) return;
   if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function")
