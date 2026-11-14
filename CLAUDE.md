@@ -47,14 +47,19 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/utils/geometry.ts` - Containment logic using vertex-in-polygon and ray casting algorithms
 - `src/rendering/shapeRenderer.ts` - Pure drawing functions (no state mutation)
 - `src/constants/game.ts` - Game balance constants, world mechanics, boss configurations, shape unlocks
-- `src/utils/audioManager.ts` - Web Audio API wrapper for procedural sound
+- `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation)
+- `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)
+- `src/rendering/effects.ts` - Pure, dt-based canvas juice (rings, particles, shake, flash); never touches gameplay state
+- `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
+- `src/utils/storage.ts` - localStorage: per-mode high scores, daily records, settings (all validated on read)
 
-### World Mechanics (src/constants/game.ts)
-Each world (1-5) introduces cumulative effects:
+### World Mechanics (src/gameplay/config.ts)
+Each world (1-8) introduces cumulative effects:
 - World 2: Breathing (size oscillation)
-- World 3: Accelerating growth pattern
+- World 3: Accelerating growth pattern + fracture windows
 - World 4: Wave (horizontal sway)
 - World 5: Color shift (hue rotation)
+- World 6: Eclipse, World 7: Gravity drift, World 8: Rotation inversion
 
 Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 
@@ -62,8 +67,15 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 - **CLASSIC**: Standard fail-on-miss gameplay
 - **ZEN**: No fail state, restart/undo buttons available
 - **TIME_ATTACK**: 60-second timer, perfect stacks add bonus time
+- **Daily Challenge**: not a `GameMode` but a run variant (CLASSIC rules, date-derived `runSeed`), handled in `App.tsx`
+
+### Loop invariants
+- Simulation is time-based: every per-frame change must scale with `dt` (clamped to `MAX_FRAME_DT`).
+- Keep React state updates out of the per-frame path (e.g. the Time Attack timer only reports when the displayed second changes).
+- The loop effect must stay single-instance (per-effect `cancelled` flag + `rafIdRef`).
 
 ### Testing Strategy
 - **Unit tests** (Vitest + jsdom): Core logic in `src/**/*.test.ts` - geometry, game state, rendering
 - **E2E tests** (Playwright): Visual regression and gameplay flows in `tests/*.spec.ts`
 - Canvas mocking via `vitest-canvas-mock`
+- E2E drives the game through `window.__GAME_TEST__` (src/utils/testBridge.ts), only installed when `VITE_E2E=true`

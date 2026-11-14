@@ -1,84 +1,115 @@
 # Jokarikara - Gameplay Guide
 
-Welcome to **Jokarikara**, a minimalist shape-stacking challenge. This guide explains the rules, mechanics, and progression of the game.
+Welcome to **Shape Stack** (codename _Jokarikara_), a minimalist shape-stacking timing game. This guide explains the rules, modes, mechanics and progression.
 
 ## 🕹️ Core Objective
 
-The goal is simple: **stack geometric shapes as high as you can.**
+**Stack geometric shapes inside each other for as long as you can.**
 
-Each successful stack increases your score. The game ends the moment a shape is placed even slightly outside the boundaries of the shape below it.
+A new shape grows from the centre of the screen. Tap while it is as large as possible but still **fully contained** inside the shape below it. The closer you get to the edge, the more points you earn.
 
-## 🎮 How to Play
+## 🎮 Controls
 
-1.  **The Starting Shape**: Every game begins with a large base circle in the center of the screen.
-2.  **Growth**: A new "Active Shape" will appear at the center and begin to grow automatically from a tiny size.
-3.  **The Tap**: You must tap the screen (or click) at the precise moment the active shape is large enough to be challenging, but still **completely contained** within the perimeter of the shape directly beneath it.
-4.  **Success**: If the active shape is fully contained, it enters the stack, and a new shape begins to grow.
-5.  **Failure**: If any part of the active shape's boundary falls outside the previous shape, the game ends.
+| Action | Touch / Mouse | Keyboard |
+| --- | --- | --- |
+| Stack the growing shape | Tap / left click (registers on press, not release) | `Space` or `Enter` |
+| Pause / resume | `PAUSE` button | `Esc` or `P` |
+| Start / retry from a menu | Buttons | `Enter` |
 
-## ⚙️ Game Mechanics
+The game pauses automatically when you switch tabs or the window loses focus, and it never resumes on its own.
 
-### 📏 Automatic Growth
+## 🧭 Game Modes
 
-Each shape grows at a unique, randomized speed between **25 and 90 units per second**. Some shapes will require quick reflexes, while others will test your patience.
+| Mode | Rules |
+| --- | --- |
+| **Classic** | One miss ends the run. |
+| **Zen** | 10 lives; each miss costs one life and resets the growing shape. `UNDO` and `RESTART` are available. Taps before the shape reaches 30% of the container are ignored, with a soft cue. |
+| **Time Attack** | 60 seconds on the clock. Every **PERFECT** stack adds **+5 s**. The timer turns red at 10 s, and the last 5 seconds tick audibly. |
+| **Daily Challenge** | Classic rules on a **seed derived from today's date**, so everyone gets the same sequence of shapes, colours and speeds. Your best score and number of tries are kept per day, and **SHARE RESULT** copies a spoiler-free summary (score plus quality trail). Daily scores stay out of the Classic leaderboard. |
+
+Best scores are tracked separately for Classic, Zen and Time Attack (top 5 each).
+
+## ⭐ Scoring
+
+Each stack is graded by its size relative to the container:
+
+| Quality | Size ratio | Points |
+| --- | --- | --- |
+| PERFECT | ≥ 97% | 140 |
+| GREAT | ≥ 92% | 90 |
+| GOOD | ≥ 82% | 50 |
+| OK | below 82% | 25 |
+
+Outside Zen, consecutive stacks build a **combo**. The **style score** adds a streak bonus on top of the quality points, and a miss resets the combo.
+
+## ⚙️ Mechanics
+
+### 📏 Growth
+
+Each shape grows at a random speed between **35 and 80 units per second**. Growth is normalised to your screen size, and it gets slightly faster as the stack gets taller.
 
 ### 🔄 Rotation
 
-To add to the challenge, shapes rotate as they grow.
-
-- **Dynamic Speed**: The rotation speed starts slow and increases as your score goes up, capped at a maximum difficulty level.
-- **Post-Stack Motion**: Even after being placed, shapes in the stack continue to rotate slowly, creating a living, breathing tower.
+Growing shapes rotate, faster as your stack count rises (with a cap). Stacked shapes keep drifting slowly, alternating direction layer by layer. All motion is time-based, so 60 Hz and 120 Hz screens play identically.
 
 ### 🔍 Dynamic Zoom
 
-As you level up, the camera smoothly zooms in. This keeps the active shapes at a playable size relative to the screen, even as the stack grows narrower and more precise.
+The camera zooms in with each level so the shapes stay playable as the stack narrows.
 
-### 🎨 Visual Feedback
+### 🌫️ Fading
 
-- **Colors**: The game cycles through a vibrant palette of colors (Blue, Emerald, Amber, Red, Violet, and Pink).
-- **Fading**: To maintain clarity and performance, shapes older than 10 layers deep will gradually fade out.
+Layers more than 10 deep slowly fade out to keep the scene readable.
 
-## 📈 Progression & Levels
+## 📈 Progression
 
-### 🆙 Leveling Up
-
-For every **5 successful stacks**, you reach a new level. Leveling up is signaled by a distinct audio cue and a camera zoom adjustment.
+- A new **level** every **3 stacks**, and a new **world** every **5 levels** (15 stacks).
+- On a world change the stack resets to its base shape. Each world gets its own seeded palette and musical key.
 
 ### 🔷 Shape Unlocks
 
-New levels unlock more complex geometric shapes, increasing the difficulty of containment:
+| Level | Unlocks |
+| --- | --- |
+| 1 | Circle, Octagon |
+| 2 | Pentagon, Hexagon |
+| 3 | Square |
+| 4 | Triangle (sharp vertices!) |
+| 5 | Rectangle |
 
-- **Level 1**: Circle, Octagon
-- **Level 2**: Pentagon, Hexagon
-- **Level 3**: Square
-- **Level 4**: Triangle (challenging vertices!)
-- **Level 5**: Rectangle
+### 👑 Boss Stacks
+
+Some stacks are boss shapes: they are white, cycle through hues, grow faster and spin harder.
+
+| Stack # | Boss | Twist |
+| --- | --- | --- |
+| 5 | Hexagon | Pulsing growth |
+| 10 | Octagon | Erratic rotation |
+| 15 | Diamond | Pulsing growth |
+| 20 | Star | Pulsing + erratic rotation |
 
 ### 🌍 World Mechanics
 
-After completing level 5, you advance to **World 2**, resetting the level counter but introducing new visual and gameplay effects. Each subsequent world adds cumulative mechanics:
+Effects are **cumulative**, and visual distortions only apply to stacked shapes, never to the shape you are timing.
 
-| World | Effect                 | Description                                                                    |
-| ----- | ---------------------- | ------------------------------------------------------------------------------ |
-| **1** | Baseline               | No special effects                                                             |
-| **2** | 🫁 Breathing           | Stacked shapes subtly pulse in size                                            |
-| **3** | 🚀 Growth + 🧨 Fractures | Active shape grows faster per stack, and rotating unsafe boundary sectors appear in Classic/Time modes. |
-| **4** | 🌊 Wave                | Stacked shapes sway horizontally (active shape stays stable for fair gameplay) |
-| **5** | 🌈 Color Shift         | Stacked shapes cycle through rainbow hues                                      |
-| **6** | 🌑 The Eclipse         | Background turns black; the container shape is invisible and pulses light.     |
-| **7** | 🧲 Gravity Drift       | The active shape slowly drifts downward while growing.                         |
-| **8** | ↔️ Rotation Inversion  | Stack rotation direction flips by level and during boss levels.                |
+| World | Effect | Description |
+| --- | --- | --- |
+| **1** | Baseline | No special effects. |
+| **2** | 🫁 Breathing | Stacked shapes gently pulse in size. |
+| **3** | 🚀 Acceleration + 🧨 Fractures | Growth speeds up within each level. Rotating unsafe sectors on the container's rim block taps near the edge (Classic/Time/Daily only; disabled on boss stacks). |
+| **4** | 🌊 Wave | Stacked shapes sway horizontally. |
+| **5** | 🌈 Color Shift | Stacked shapes cycle through hues. |
+| **6** | 🌑 The Eclipse | Near-black scene; the container is almost invisible except for a pulsing outline. |
+| **7** | 🧲 Gravity Drift | The growing shape slowly drifts downward. |
+| **8** | ↔️ Rotation Inversion | Stack rotation flips on even levels and during boss stacks. |
 
-> **Note**: Effects are additive. World 5 includes all previous effects: breathing + accelerating growth + wave + color shift.
-> **Fracture Windows**: Fractures are checked only at tap time, are disabled during boss stacks, and do not change score multipliers.
+## 🎵 Audio & Feel
 
-## 🎵 Dynamic Audio
-
-The game features a procedural audio engine:
-
-- **Stacking**: Each successful placement produces a musical note that rises in pitch as your stack grows.
-- **Level Up**: A high-pitched chime reward.
-- **Game Over**: A descending "buzz" sound.
+- **Stacks** play notes of a major pentatonic scale in the current world's key. The melody climbs with your combo, and better quality adds richer harmony (PERFECT adds a bell sparkle).
+- **Level up** plays an arpeggio, a **new world** plays a sustained chord, a **Zen miss** plays a soft drop and **game over** plays a low buzz.
+- **Visual feedback**: rings and particles on PERFECT/GREAT stacks, screen shake and a red flash on failure, a zoom punch on level up and a flash on a new world.
+- **Haptics** on supported phones.
+- **Settings** (saved):
+  - `SOUND: ON/OFF`.
+  - `FX: FULL/LOW`. LOW removes shake and particles and tones down glow. It defaults to LOW when your OS asks for reduced motion.
 
 ---
 
@@ -86,19 +117,20 @@ _Master the rhythm, time your taps, and build the ultimate shape stack!_
 
 ## Developer Notes: Extending Gameplay
 
-Gameplay configuration now lives in `src/gameplay/config.ts` and is built with
-`GameplayBuilder`. Add new worlds or levels by extending that builder chain.
-
-Example:
+Gameplay configuration lives in `src/gameplay/config.ts` and is built with
+`GameplayBuilder`. Add new worlds, levels or bosses by extending that builder chain.
 
 ```ts
 // src/gameplay/config.ts
-builder.world(7, (w) =>
-  w.name("New World").mechanics({
-    breathingEffect: true,
-    breathingAmplitude: 0.04,
-    breathingSpeed: 2.5,
-  }),
+builder.world(9, (w) =>
+  w
+    .inheritFrom(8)
+    .name("New World")
+    .mechanics({
+      breathingEffect: true,
+      breathingAmplitude: 0.04,
+      breathingSpeed: 2.5,
+    }),
 );
 
 builder.level(6, { zoom: 16, unlocks: ["star"] });
