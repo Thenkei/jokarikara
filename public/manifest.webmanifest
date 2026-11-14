@@ -1,0 +1,14 @@
+{
+  "name": "Shape Stack",
+  "short_name": "Shape Stack",
+  "description": "A minimalist rhythm game: tap to stack shapes inside each other.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0c0c0e",
+  "theme_color": "#0c0c0e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
