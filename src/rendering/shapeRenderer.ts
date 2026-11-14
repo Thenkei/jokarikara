@@ -260,6 +260,18 @@ const shiftHue = (hexColor: string, hueShift: number): string => {
 };
 
 /**
+ * Glow without shadowBlur. A Gaussian shadow blur is a full convolution of
+ * the stroke area on every frame: measured with 4x CPU throttling on a
+ * world-5 stack, it dropped the game to 8-15 FPS versus 61 FPS without it.
+ * Two wider translucent strokes under the outline read as a glow at a
+ * fraction of the cost (plain path rasterisation).
+ */
+export const FAUX_GLOW: ReadonlyArray<{ spread: number; alpha: number }> = [
+  { spread: 0.6, alpha: 0.12 },
+  { spread: 0.25, alpha: 0.28 },
+];
+
+/**
  * Below this alpha a shape contributes nothing visible; skipping it saves a
  * full path + fill + blurred stroke.
  */
@@ -279,9 +291,8 @@ const drawFractureOverlay = (
   ctx.strokeStyle = reducedFx
     ? "rgba(255, 130, 130, 0.36)"
     : "rgba(255, 108, 108, 0.78)";
-  ctx.lineWidth = reducedFx ? Math.max(4, size * 0.03) : Math.max(6, size * 0.045);
-  ctx.shadowBlur = reducedFx ? 0 : Math.max(10, size * 0.07);
-  ctx.shadowColor = reducedFx ? "rgba(0, 0, 0, 0)" : "rgba(255, 90, 90, 0.82)";
+  const lineWidth = reducedFx ? Math.max(4, size * 0.03) : Math.max(6, size * 0.045);
+  ctx.lineCap = "round";
 
   for (const center of overlay.centers) {
     const correctedCenter = center - shapeRotation;
@@ -293,6 +304,14 @@ const drawFractureOverlay = (
       correctedCenter - halfWidth,
       correctedCenter + halfWidth,
     );
+    if (!reducedFx) {
+      // Faux glow (wide faint stroke) instead of shadowBlur; see FAUX_GLOW.
+      ctx.strokeStyle = "rgba(255, 90, 90, 0.28)";
+      ctx.lineWidth = lineWidth + Math.max(10, size * 0.07);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255, 108, 108, 0.78)";
+    }
+    ctx.lineWidth = lineWidth;
     ctx.stroke();
   }
 
@@ -310,8 +329,8 @@ const drawFractureOverlay = (
  * @param time - Time in seconds (for animations)
  * @param isStacked - Whether this is a stacked shape (vs active)
  * @param stackIndex - Index of shape in stack (for phase offsets)
- * @param glow - Apply the theme glow (shadowBlur). Shadow blur is by far the
- *   most expensive canvas op here, so callers disable it for deep layers.
+ * @param glow - Apply the theme glow. Rendered as a "faux glow" (wider,
+ *   translucent strokes) rather than shadowBlur: see FAUX_GLOW.
  */
 export const drawShape = (
   ctx: CanvasRenderingContext2D,
@@ -392,8 +411,16 @@ export const drawShape = (
   }
 
   if (glow) {
-    ctx.shadowBlur = theme?.shape.glowBlur ?? 15;
-    ctx.shadowColor = theme?.shape.glow ?? "rgba(0, 0, 0, 0.5)";
+    const spread = theme?.shape.glowBlur ?? 15;
+    const baseAlpha = ctx.globalAlpha;
+    ctx.lineJoin = "round"; // wide strokes must not grow spiky miters
+    ctx.strokeStyle = theme?.shape.glow ?? "rgba(0, 0, 0, 0.5)";
+    for (const pass of FAUX_GLOW) {
+      ctx.globalAlpha = baseAlpha * pass.alpha;
+      ctx.lineWidth = lineWidth + spread * pass.spread;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = baseAlpha;
   }
   ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = lineWidth;

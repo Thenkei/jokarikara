@@ -8,6 +8,7 @@ import {
   drawPerfectGuide,
   PERFECT_GUIDE_ALPHA,
   drawArena,
+  FAUX_GLOW,
 } from "./shapeRenderer";
 import type { Shape } from "../utils/geometry";
 import { getWorldMechanics } from "../constants/game";
@@ -80,10 +81,13 @@ describe("shapeRenderer", () => {
       expect(ctx.fill).not.toHaveBeenCalled();
     });
 
-    it("applies shadow blur glow by default", () => {
+    it("draws a faux glow (extra wide strokes), never shadow blur", () => {
       const ctx = createMockContext();
       drawShape(ctx, shape, 0, 0, 1, defaultMechanics);
-      expect(ctx.shadowBlur).toBeGreaterThan(0);
+      expect(ctx.shadowBlur).toBe(0);
+      // FAUX_GLOW passes + the outline itself.
+      expect(ctx.stroke).toHaveBeenCalledTimes(FAUX_GLOW.length + 1);
+      expect(ctx.globalAlpha).toBe(1); // restored after the glow passes
     });
 
     it("does not set shadow blur when glow is disabled", () => {
@@ -104,7 +108,7 @@ describe("shapeRenderer", () => {
         false,
       );
       expect(ctx.shadowBlur).toBe(0);
-      expect(ctx.stroke).toHaveBeenCalled();
+      expect(ctx.stroke).toHaveBeenCalledTimes(1);
     });
   });
 
