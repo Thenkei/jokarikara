@@ -5,6 +5,9 @@ import {
   saveHighScore,
   getSettings,
   saveSettings,
+  getDailyRecord,
+  saveDailyResult,
+  MAX_DAILY_RECORDS,
 } from "./storage";
 
 const SCORES_KEY = "shape-stack-high-scores-v2";
@@ -212,5 +215,52 @@ describe("storage", () => {
       mockMatchMedia(false);
       expect(getSettings().reducedFx).toBe(false);
     });
+  });
+});
+
+describe("daily records", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("returns an empty record for an unplayed day", () => {
+    expect(getDailyRecord("2026-11-14")).toEqual({ best: 0, attempts: 0 });
+  });
+
+  it("counts attempts and keeps the best score", () => {
+    expect(saveDailyResult("2026-11-14", 300)).toEqual({
+      best: 300,
+      attempts: 1,
+      isNewBest: true,
+    });
+    expect(saveDailyResult("2026-11-14", 120)).toEqual({
+      best: 300,
+      attempts: 2,
+      isNewBest: false,
+    });
+    expect(getDailyRecord("2026-11-14")).toEqual({ best: 300, attempts: 2 });
+  });
+
+  it("never flags a zero score as a new best", () => {
+    expect(saveDailyResult("2026-11-14", 0).isNewBest).toBe(false);
+  });
+
+  it("prunes the oldest days beyond the retention window", () => {
+    for (let day = 1; day <= MAX_DAILY_RECORDS + 5; day += 1) {
+      const key = `2026-01-${String(day).padStart(2, "0")}`;
+      saveDailyResult(key, day);
+    }
+    expect(getDailyRecord("2026-01-01")).toEqual({ best: 0, attempts: 0 });
+    expect(getDailyRecord(`2026-01-${MAX_DAILY_RECORDS + 5}`).attempts).toBe(1);
+  });
+
+  it("ignores corrupted daily storage", () => {
+    localStorage.setItem("shape-stack-daily-v1", "{nope");
+    expect(getDailyRecord("2026-11-14")).toEqual({ best: 0, attempts: 0 });
+    localStorage.setItem(
+      "shape-stack-daily-v1",
+      JSON.stringify({ "2026-11-14": { best: "x", attempts: -1 } }),
+    );
+    expect(getDailyRecord("2026-11-14")).toEqual({ best: 0, attempts: 0 });
   });
 });
