@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
 import { getRegularPolygonVertices } from "../utils/geometry";
+import { BACKDROP_LAYERS } from "./startBackdropLayers";
 
 /**
  * Decorative "attract" stack behind the start screen: nested shapes slowly
@@ -7,25 +8,6 @@ import { getRegularPolygonVertices } from "../utils/geometry";
  * page. Pure SVG + CSS transforms (compositor-only, no canvas, no JS per
  * frame); motion is disabled under prefers-reduced-motion via CSS.
  */
-
-interface Layer {
-  /** Regular polygon side count; 0 = circle. */
-  sides: number;
-  /** Circumradius in viewBox units (viewBox is 100 wide). */
-  radius: number;
-  /** Seconds per revolution; negative spins counter-clockwise. */
-  period: number;
-}
-
-/** Outside-in, mirroring how a run unlocks shapes. */
-export const BACKDROP_LAYERS: readonly Layer[] = [
-  { sides: 0, radius: 48, period: 0 },
-  { sides: 8, radius: 44, period: 90 },
-  { sides: 6, radius: 37, period: -70 },
-  { sides: 5, radius: 30, period: 55 },
-  { sides: 4, radius: 23, period: -45 },
-  { sides: 3, radius: 17, period: 35 },
-];
 
 const toPoints = (sides: number, radius: number): string =>
   getRegularPolygonVertices(sides, radius * 2, 0)
