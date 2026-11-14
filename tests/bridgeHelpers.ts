@@ -10,6 +10,10 @@ export const waitForBridge = async (page: Page) => {
 export const getMusicState = (page: Page) =>
   page.evaluate(() => window.__GAME_AUDIO__?.getMusicState() as MusicState | undefined);
 
+/** AudioContext state (`null` before audio is first used; installed by <App/>). */
+export const getAudioContextState = (page: Page) =>
+  page.evaluate(() => window.__GAME_AUDIO__?.getContextState() ?? null);
+
 /** Timing cue calls recorded at the audio service (installed by <App/>). */
 export const getCueCalls = (page: Page) =>
   page.evaluate(() => (window.__GAME_AUDIO__?.getCueCalls() ?? []) as CueCall[]);

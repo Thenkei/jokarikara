@@ -25,6 +25,7 @@ const mockAudioService: IAudioService = {
   isMuted: vi.fn(() => false),
   init: vi.fn(),
   resume: vi.fn(),
+  getContextState: vi.fn(() => null),
   startMusic: vi.fn(),
   setMusicIntensity: vi.fn(),
   setMusicWorld: vi.fn(),

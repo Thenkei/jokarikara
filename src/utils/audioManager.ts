@@ -57,6 +57,11 @@ import {
   type DeferTask,
   type ReverbBus,
 } from "../audio/reverbBus";
+import {
+  extendAudibleUntil,
+  IDLE_SUSPEND_GRACE_SECONDS,
+  secondsUntilIdle,
+} from "../audio/idle";
 
 export interface AudioManagerOptions {
   /**
@@ -64,7 +69,20 @@ export interface AudioManagerOptions {
    * offline renders and tests inject a synchronous or manual one.
    */
   defer?: DeferTask;
+  /**
+   * Suspend the context once nothing is audible (see `audio/idle.ts`).
+   * Default true. Always off for offline contexts: their suspend() has
+   * render-time semantics and they start via startRendering, not resume.
+   */
+  idleSuspend?: boolean;
 }
+
+/** Margin so an idle check never fires a hair before its audio-clock deadline. */
+const IDLE_TIMER_SLACK_MS = 50;
+
+/** An OfflineAudioContext (or a stand-in): rendered, never idle-suspended or resumed. */
+const isOfflineContext = (ctx: BaseAudioContext): boolean => "startRendering" in ctx;
+
 /** Exponential ramps cannot target 0; this is effectively silence. */
 const SILENCE = 0.0001;
 
@@ -107,9 +125,17 @@ class AudioManager implements IAudioService {
   /** Deferred reverb build: not scheduled, scheduled, or settled (built or given up). */
   private reverbBuild: "idle" | "pending" | "done" = "idle";
   private readonly defer: DeferTask;
+  private readonly idleSuspend: boolean;
+  /** The single pending idle check (`null` when none is armed). */
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Audio clock time when everything scheduled so far, tails included, is silent. */
+  private audibleUntil = -Infinity;
+  /** We suspended the context for idleness and have not resumed it since. */
+  private idleSuspended = false;
 
   constructor(options: AudioManagerOptions = {}) {
     this.defer = options.defer ?? deferToIdle;
+    this.idleSuspend = options.idleSuspend ?? true;
   }
   private music: MusicEngine | null = null;
   private muted = false;
@@ -174,6 +200,9 @@ class AudioManager implements IAudioService {
     // The dry graph above is all the first sound needs; the reverb (IR
     // generation is several ms, more on low-end phones) follows when idle.
     this.scheduleReverb();
+    // A context nothing ends up playing on must not run forever either, but
+    // gets the grace: init follows a gesture that usually plays something.
+    this.noteAudible(this.ctx.currentTime, 0);
   }
 
   /**
@@ -220,6 +249,8 @@ class AudioManager implements IAudioService {
     }
     this.reconcileMusic(MUTE_FADE_SECONDS);
     if (!muted) this.scheduleReverb();
+    // reconcileMusic re-ran the idle check: muted, the context suspends as
+    // soon as anything in flight has rung out.
   }
 
   isMuted(): boolean {
@@ -227,8 +258,115 @@ class AudioManager implements IAudioService {
   }
 
   resume(): void {
-    if (this.ctx && this.ctx.state === "suspended") {
-      void this.ctx.resume();
+    const ctx = this.ctx;
+    if (!ctx) return;
+    // Called from user gestures: this resume is what unlocks the context on
+    // iOS. Muted, the idle check suspends it again right away (unlocked);
+    // otherwise the gesture counts as activity and gets the grace.
+    this.wake(ctx);
+    this.noteAudible(ctx.currentTime, 0);
+  }
+
+  getContextState(): AudioContextState | null {
+    return this.ctx?.state ?? null;
+  }
+
+  // --- Idle suspension (rules in audio/idle.ts) --------------------------
+
+  private canIdleSuspend(ctx: AudioContext): boolean {
+    return this.idleSuspend && typeof ctx.suspend === "function" && !isOfflineContext(ctx);
+  }
+
+  /**
+   * Audio stays live whatever is scheduled while the soundtrack runs or a run
+   * is in progress (music off included): rhythm feedback such as the timing
+   * cue must never wait for a resume.
+   */
+  private keepAwake(): boolean {
+    if (this.muted) return false;
+    const { active, paused } = this.musicIntent;
+    return (active && !paused) || (this.music?.isRunning() ?? false);
+  }
+
+  /**
+   * Resume a context we (or the autoplay policy) suspended, before scheduling
+   * on it. Its clock is frozen meanwhile, so voices scheduled at
+   * `currentTime` right after this play as soon as it runs again. A resume
+   * queued behind a still-pending suspend wins: the calls apply in order.
+   */
+  private wake(ctx: AudioContext): void {
+    if (isOfflineContext(ctx)) return;
+    if (!this.idleSuspended && ctx.state !== "suspended") return;
+    this.idleSuspended = false;
+    const failed = (error: unknown) => console.warn("Audio resume failed", error);
+    try {
+      ctx.resume().catch(failed);
+    } catch (error) {
+      failed(error);
+    }
+  }
+
+  /**
+   * Audio is scheduled on the context until `end` (audio clock, dry;
+   * `tailSeconds` 0 for plain activity, e.g. a gesture that plays nothing yet).
+   */
+  private noteAudible(end: number, tailSeconds?: number): void {
+    this.audibleUntil = extendAudibleUntil(this.audibleUntil, end, tailSeconds);
+    this.checkIdle();
+  }
+
+  /**
+   * (Re)arm the one idle timer, or suspend now when already idle. Runs on
+   * sound, music, mute and resume events only, never per frame. Muted,
+   * nothing can play: no grace, and no timer unless audio is still in flight
+   * (suspending mid-tail would freeze it and replay the rest on unmute).
+   */
+  private checkIdle(clockAtLeast = -Infinity): void {
+    if (this.idleTimer !== null) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+    const ctx = this.ctx;
+    if (!ctx || this.idleSuspended || ctx.state === "closed" || !this.canIdleSuspend(ctx)) {
+      return;
+    }
+    const now = Math.max(ctx.currentTime, clockAtLeast);
+    const wait = secondsUntilIdle({
+      now,
+      audibleUntil: this.audibleUntil,
+      keepAwake: this.keepAwake(),
+      graceSeconds: this.muted ? 0 : IDLE_SUSPEND_GRACE_SECONDS,
+    });
+    if (wait === null) return;
+    if (wait === 0) {
+      this.suspendForIdle(ctx);
+      return;
+    }
+    // The wall-clock wait is a lower bound for the audio clock on fire: a
+    // "running" context whose clock stalls (no output device) renders
+    // nothing either, and must not re-arm forever.
+    const due = now + wait;
+    this.idleTimer = setTimeout(
+      () => this.onIdleTimer(due),
+      Math.ceil(wait * 1000) + IDLE_TIMER_SLACK_MS,
+    );
+  }
+
+  private onIdleTimer(due: number): void {
+    this.idleTimer = null;
+    // Suspended or interrupted by the browser: nothing to save, and its
+    // frozen clock must not re-arm us. The next sound wakes it and re-arms.
+    if (this.ctx?.state !== "running") return;
+    this.checkIdle(due);
+  }
+
+  private suspendForIdle(ctx: AudioContext): void {
+    this.idleSuspended = true;
+    const failed = (error: unknown) => console.warn("Audio idle suspend failed", error);
+    try {
+      ctx.suspend().catch(failed);
+    } catch (error) {
+      failed(error);
     }
   }
 
@@ -297,11 +435,20 @@ class AudioManager implements IAudioService {
     const shouldPlay = active && !paused && !this.muted && this.musicEnabled;
     try {
       if (!shouldPlay) {
+        const fading = this.music?.isRunning() ?? false;
         this.music?.stop(fadeSeconds);
+        // Never suspend mid-fade: the bed (and its reverb) rings out first.
+        if (fading && this.ctx) {
+          this.audibleUntil = extendAudibleUntil(
+            this.audibleUntil,
+            this.ctx.currentTime + fadeSeconds,
+          );
+        }
         return;
       }
       if (!this.ctx) this.init();
       if (!this.ctx || !this.musicGain) return;
+      this.wake(this.ctx);
       this.music ??= new MusicEngine(this.ctx, this.musicGain);
       this.music.start(world, intensity);
     } catch (error) {
@@ -312,6 +459,8 @@ class AudioManager implements IAudioService {
         // Engine is already unusable; drop it below.
       }
       this.music = null;
+    } finally {
+      this.checkIdle();
     }
   }
 
@@ -386,6 +535,7 @@ class AudioManager implements IAudioService {
   ): void {
     const ctx = this.ready();
     if (!ctx) return;
+    this.wake(ctx);
     const now = ctx.currentTime;
     const trim = dbToGain(SFX_TRIM_DB[sfx]);
     const reverbSend =
@@ -434,6 +584,7 @@ class AudioManager implements IAudioService {
       osc.start(start);
       osc.stop(end + 0.02);
     }
+    this.noteAudible(now + lastEnd + 0.02);
   }
 
   playStack(quality: StackQuality, streak: number, world: number): void {

@@ -114,8 +114,18 @@ export interface IAudioService {
   setMuted(muted: boolean): void;
   isMuted(): boolean;
 
-  /** Resume the audio context if suspended (required by browsers). */
+  /**
+   * Resume the audio context if suspended (required by browsers; call it from
+   * a user gesture). Sounds and music also resume an idle-suspended context
+   * by themselves before scheduling.
+   */
   resume(): void;
+
+  /**
+   * State of the underlying context (`null` before it exists). The service
+   * suspends it once nothing is audible (see audio/idle.ts); diagnostics/E2E.
+   */
+  getContextState(): AudioContextState | null;
 
   /**
    * Start the ambient soundtrack for a new run (drone only, in the world's
