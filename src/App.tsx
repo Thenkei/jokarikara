@@ -56,6 +56,7 @@ import {
   type AchievementId,
 } from "./progression/achievements";
 import { useAchievements } from "./progression/useAchievements";
+import { isFirstEverProfile } from "./progression/stats";
 import {
   AchievementToaster,
   type AchievementToasterHandle,
@@ -267,9 +268,7 @@ function App() {
    * First-ever run: nothing played or stacked yet. Lifetime stats commit at
    * run end, so the in-run flag below hides the hint at the first stack.
    */
-  const isNewPlayer =
-    achievementRecord.lifetime.runsPlayed === 0 &&
-    achievementRecord.lifetime.totalStacks === 0;
+  const isNewPlayer = isFirstEverProfile(achievementRecord.lifetime);
   const [hasStackedThisRun, setHasStackedThisRun] = useState(false);
   const showFirstRunHint =
     isNewPlayer && !hasStackedThisRun && runStartWorld === 1 && !dailyKey;
