@@ -40,11 +40,21 @@ import {
 } from "./constants/game";
 import {
   buildDailyShareText,
-  formatDailyLabel,
   getDailySeed,
   getLocalDateKey,
   qualitiesFromScoreHistory,
 } from "./modes/daily";
+import {
+  DAILY_COUNTDOWN_TICK_MS,
+  describeDailyButton,
+  describeNextDaily,
+  getDailyEndTime,
+  getDailyStreakLabel,
+  type DailyDayRecord,
+  type DailyStreakLabel,
+} from "./modes/dailyStreak";
+import { useWallClock } from "./modes/useWallClock";
+import { StreakChip } from "./components/StreakChip";
 import { buildRunShareText } from "./modes/share";
 import {
   advancePersonalBest,
@@ -75,6 +85,7 @@ import {
 import {
   GameOverScreen,
   type GameOverRun,
+  type NextDailyStatus,
   type ShareStatus,
 } from "./components/GameOverScreen";
 import "./App.css";
@@ -156,6 +167,20 @@ const shareText = async (text: string): Promise<ShareStatus> => {
 const isInteractiveTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   target.closest("button, a, input, select, textarea, [role='button']") !== null;
+
+interface KnownDailyRecord {
+  readonly dateKey: string;
+  readonly record: DailyDayRecord;
+}
+
+const NO_DAILY_RECORD: DailyDayRecord = Object.freeze({ best: 0, attempts: 0 });
+
+/** Fresh read (another tab may have played): used on mount and back to menu. */
+const readDailyRecordForToday = (): KnownDailyRecord => {
+  const dateKey = getLocalDateKey();
+  return { dateKey, record: getDailyRecord(dateKey) };
+};
+
 /** Stacks a regular run has made when it reaches `world`. */
 const stacksBeforeWorld = (world: number): number =>
   (Math.max(1, world) - 1) * STACKS_PER_LEVEL * LEVELS_PER_WORLD;
@@ -182,9 +207,11 @@ function App() {
   const [practiceWorld, setPracticeWorld] = useState(1);
   /** World the current run started at (drives <GameCanvas startWorld>). */
   const [runStartWorld, setRunStartWorld] = useState(1);
-  const [todayRecord, setTodayRecord] = useState(() =>
-    getDailyRecord(getLocalDateKey())
-  );
+  /**
+   * Last Daily record read or saved, with its day. Keyed so the start screen
+   * never shows yesterday's result once the wall clock passes midnight.
+   */
+  const [knownDailyRecord, setKnownDailyRecord] = useState(readDailyRecordForToday);
   const [shareStatus, setShareStatus] = useState<ShareStatus>("idle");
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [runSeed, setRunSeed] = useState(0);
@@ -293,6 +320,51 @@ function App() {
     [recordAchievementMiss, mode],
   );
   const bestWorldReached = achievementRecord.lifetime.bestWorld;
+
+  /**
+   * Daily habit loop. Once a Daily is played, the start screen button and the
+   * game over card count down to the next one: the wall clock ticks once a
+   * minute only while that countdown is on screen and stops at midnight, when
+   * the button flips to the new day's NOT PLAYED. Screen changes refresh it.
+   */
+  const countdownDay =
+    gameState === "START" && !showAchievements && knownDailyRecord.record.attempts > 0
+      ? knownDailyRecord.dateKey
+      : gameState === "GAMEOVER"
+        ? (lastRun?.daily?.dateKey ?? null)
+        : null;
+  const countdownEnd = countdownDay === null ? null : getDailyEndTime(countdownDay);
+  const nowMs = useWallClock(
+    countdownEnd,
+    DAILY_COUNTDOWN_TICK_MS,
+    `${gameState}:${showAchievements}`,
+  );
+  const dailyNow = useMemo(() => new Date(nowMs), [nowMs]);
+  const dailyDates = achievementRecord.lifetime.dailyDates;
+  const dailyButton = useMemo(() => {
+    const todayKey = getLocalDateKey(dailyNow);
+    return describeDailyButton({
+      now: dailyNow,
+      record:
+        knownDailyRecord.dateKey === todayKey ? knownDailyRecord.record : NO_DAILY_RECORD,
+      dailyDates,
+    });
+  }, [dailyNow, knownDailyRecord, dailyDates]);
+  const gameOverDaily = useMemo((): {
+    streak: DailyStreakLabel | null;
+    next: NextDailyStatus | null;
+  } => {
+    if (!lastRun?.daily) return { streak: null, next: null };
+    const end = getDailyEndTime(lastRun.daily.dateKey);
+    return {
+      streak: getDailyStreakLabel(dailyDates, dailyNow),
+      next:
+        end !== null && dailyNow.getTime() < end
+          ? { kind: "countdown", countdown: describeNextDaily(dailyNow) }
+          : { kind: "ready" },
+    };
+  }, [lastRun, dailyDates, dailyNow]);
+
   /**
    * First-ever run: nothing played or stacked yet. Lifetime stats commit at
    * run end, so the in-run flag below hides the hint at the first stack.
@@ -497,7 +569,11 @@ function App() {
         // Daily runs have their own per-day record and stay out of the
         // Classic leaderboard (a known seed would skew it).
         const result = saveDailyResult(dailyKey, finalScore);
-        setTodayRecord({ best: result.best, attempts: result.attempts });
+        // Keyed by the run's day: a run that crossed midnight is yesterday's.
+        setKnownDailyRecord({
+          dateKey: dailyKey,
+          record: { best: result.best, attempts: result.attempts },
+        });
         setLastRun({
           mode,
           isNewBest: result.isNewBest,
@@ -752,7 +828,7 @@ function App() {
     setPaused(false);
     setShowSettings(false);
     setDailyKey(null);
-    setTodayRecord(getDailyRecord(getLocalDateKey()));
+    setKnownDailyRecord(readDailyRecordForToday());
     clearSecondaryHudTimeout();
     setShowSecondaryHud(false);
     setZenLives(null);
@@ -1022,15 +1098,20 @@ function App() {
           <button
             className="daily-btn" data-ui-sound="confirm"
             onClick={() => startRun({ mode: "CLASSIC", daily: true })}
-            aria-label={`Daily challenge for ${formatDailyLabel(getLocalDateKey())}. Same shapes for everyone today.`}
+            aria-label={dailyButton.ariaLabel}
           >
             <span className="daily-btn-title">DAILY CHALLENGE</span>
-            <span className="daily-btn-meta">
-              {formatDailyLabel(getLocalDateKey())} ·{" "}
-              {todayRecord.attempts > 0
-                ? `BEST ${todayRecord.best} · ${todayRecord.attempts} ${todayRecord.attempts === 1 ? "TRY" : "TRIES"}`
-                : "NOT PLAYED"}
-            </span>
+            <span className="daily-btn-meta">{dailyButton.meta}</span>
+            {(dailyButton.streak || dailyButton.next) && (
+              <span className="daily-btn-extra">
+                {dailyButton.streak && <StreakChip label={dailyButton.streak} />}
+                {dailyButton.next && (
+                  <span className="daily-next">
+                    NEXT CHALLENGE IN <strong>{dailyButton.next.text}</strong>
+                  </span>
+                )}
+              </span>
+            )}
           </button>
 
           <button
@@ -1294,6 +1375,8 @@ function App() {
           endInsight={endInsight}
           breakdown={breakdown}
           shareStatus={shareStatus}
+          dailyStreak={gameOverDaily.streak}
+          nextDaily={gameOverDaily.next}
           onShare={handleShare}
           onRetry={restartRun}
           onMenu={handleMainMenu}

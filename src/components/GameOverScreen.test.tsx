@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GameOverScreen, type GameOverRun } from "./GameOverScreen";
 import { ACHIEVEMENT_IDS } from "../progression/achievements";
+import { selectStreakLabel } from "../modes/dailyStreak";
 
 const RUN: GameOverRun = {
   mode: "CLASSIC",
@@ -107,5 +108,49 @@ describe("GameOverScreen", () => {
     // Share lives in the action bar, not inside the daily card.
     expect(container.querySelector(".daily-summary .share-btn")).toBeNull();
     expect(container.querySelector(".gameover-actions .share-btn")).not.toBeNull();
+  });
+
+  it("shows the streak and the countdown to the next Daily on the TODAY card", () => {
+    const { container } = renderScreen({
+      run: { ...RUN, daily: { dateKey: "2026-11-14", best: 3300, attempts: 1 } },
+      dailyStreak: selectStreakLabel(4, true),
+      nextDaily: {
+        kind: "countdown",
+        countdown: { text: "7h 12m", spoken: "7 hours 12 minutes" },
+      },
+    });
+    const card = container.querySelector(".daily-summary") as HTMLElement;
+    const next = card.querySelector(".daily-next") as HTMLElement;
+    // Visible compact text is hidden from AT, which gets the spoken wording.
+    expect(next.querySelector("[aria-hidden='true']")?.textContent).toBe(
+      "NEXT CHALLENGE IN 7h 12m",
+    );
+    expect(next.querySelector(".visually-hidden")?.textContent).toBe(
+      "Next challenge in 7 hours 12 minutes.",
+    );
+    expect(card.querySelector(".streak-chip")?.textContent).toBe("4-DAY STREAK");
+    expect(card.querySelector(".daily-summary-streak .visually-hidden")?.textContent).toBe(
+      "4-day streak.",
+    );
+  });
+
+  it("says the next Daily is ready once the run's day is over", () => {
+    const { container } = renderScreen({
+      run: { ...RUN, daily: { dateKey: "2026-11-14", best: 3300, attempts: 1 } },
+      nextDaily: { kind: "ready" },
+    });
+    expect(container.querySelector(".daily-next")?.textContent).toBe(
+      "NEXT CHALLENGE IS READY",
+    );
+    expect(container.querySelector(".streak-chip")).toBeNull();
+  });
+
+  it("shows no Daily extras for a regular run", () => {
+    const { container } = renderScreen({
+      nextDaily: { kind: "ready" },
+      dailyStreak: selectStreakLabel(4, true),
+    });
+    expect(container.querySelector(".daily-next")).toBeNull();
+    expect(container.querySelector(".streak-chip")).toBeNull();
   });
 });
