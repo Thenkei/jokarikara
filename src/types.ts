@@ -42,6 +42,24 @@ export interface GameState {
   lastStackQuality: StackQuality | null;
 }
 
+/**
+ * Emitted after every successful stack, with the post-stack values. Feeds
+ * progression bookkeeping (achievements); fired per tap, never per frame.
+ */
+export interface StackEvent {
+  quality: StackQuality;
+  stackCount: number;
+  perfectCount: number;
+  score: number;
+  world: number;
+  /** Level within the current world. */
+  level: number;
+  /** Combo streak (always 0 in Zen). */
+  streak: number;
+  /** The shape just stacked was a boss shape. */
+  wasBoss: boolean;
+}
+
 /** End-of-run summary handed to the UI. */
 export interface RunStats {
   stackCount: number;
