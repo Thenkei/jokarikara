@@ -42,7 +42,7 @@ export default defineConfig({
   /* One retry on CI: enough to absorb infra noise without hiding real flakes. */
   retries: process.env.CI ? 1 : 0,
   /* GitHub runners have 4 vCPUs; tests are independent (fresh page + storage). */
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 4 : undefined,
   ignoreSnapshots: IGNORE_SNAPSHOTS,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "html",

@@ -36,18 +36,42 @@ jobs:
       - run: npm run build
       - run: npm run test
 
+  playwright-version:
+    name: Resolve Playwright version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      version: ${{ steps.pw.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: package-lock.json
+          sparse-checkout-cone-mode: false
+      - id: pw
+        # Read the locked version so the container image always matches the
+        # installed @playwright/test (a mismatch fails with missing browsers).
+        run: echo "version=$(jq -r '.packages["node_modules/@playwright/test"].version' package-lock.json)" >> "$GITHUB_OUTPUT"
+
   e2e:
-    name: E2E (${{ matrix.scope }})
+    name: E2E (${{ matrix.scope }} ${{ matrix.shard }}/2)
+    needs: playwright-version
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Official image: browsers + system deps preinstalled (no apt, no cache).
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.version }}-noble
+      options: --ipc=host
     strategy:
       fail-fast: false
       matrix:
         # PRs: Chromium runs everything, other engines only @cross-browser specs.
         # main / manual full run: every spec on every project.
         scope: ${{ (github.event_name == 'push' || inputs.full_matrix) && fromJSON('["full"]') || fromJSON('["targeted"]') }}
+        shard: [1, 2]
     env:
       E2E_FULL: ${{ matrix.scope == 'full' && '1' || '' }}
+      # Firefox refuses to run as root under a different $HOME owner.
+      HOME: /root
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,26 +79,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Resolve Playwright version
-        id: pw
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
-      - name: Install browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium firefox webkit
-      - name: Install system deps (browsers cached)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium firefox webkit
-      - run: npx playwright test
+      - run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.scope }}
+          name: playwright-report-${{ matrix.scope }}-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7

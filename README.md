@@ -65,7 +65,7 @@ npm run test:e2e:full      # every spec on all 5 projects
 Gameplay E2E specs drive deterministic state through the test bridge, so they run on Chromium only. Specs tagged `@cross-browser` (canvas rendering, responsive layout) run on every engine.
 
 CI (`.github/workflows/ci.yml`):
-- **Pull requests**: lint, build, unit tests and the targeted E2E matrix, with Playwright browsers cached.
+- **Pull requests**: lint, build, unit tests and the targeted E2E matrix, sharded over 2 jobs in the official Playwright container. The image version comes from `package-lock.json`, so browsers always match.
 - **Pushes to `main`**: the full matrix; GitHub Pages deploys only after CI passes.
 - Visual snapshot baselines are macOS-only, so CI on Linux skips those assertions.
 
