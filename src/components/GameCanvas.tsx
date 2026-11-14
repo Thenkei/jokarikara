@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
+import { getMusicIntensity } from "../audio/soundtrack";
 import type { GameState, RunStats, StyleUpdate } from "../types";
 import {
   createInitialState,
@@ -146,6 +147,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     // Last whole second reported to onTimeUpdate. The HUD only shows
     // Math.ceil(time), so reporting every frame re-rendered <App/> ~60x/s.
     const lastReportedSecondRef = useRef<number | null>(null);
+    // Zen has no combo streak: the soundtrack follows stacks since the last
+    // miss instead. UI/audio-only bookkeeping, deliberately not in GameState.
+    const zenCleanStacksRef = useRef(0);
 
     useEffect(() => {
       reducedFxRef.current = reducedFx;
@@ -175,6 +179,29 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
       },
       [],
+    );
+
+    // Soundtrack lifecycle follows the run: a new run (mode/seed) starts a
+    // fresh drone; unmounting (main menu, game-over screen, restart) stops it.
+    useEffect(() => {
+      zenCleanStacksRef.current = 0;
+      audioService.startMusic(stateRef.current?.world ?? 1);
+      return () => audioService.stopMusic();
+    }, [audioService, mode, runSeed]);
+
+    /** Push the run's momentum and key to the soundtrack. */
+    const syncMusic = useCallback(
+      (state: GameState) => {
+        audioService.setMusicWorld(state.world);
+        audioService.setMusicIntensity(
+          getMusicIntensity({
+            mode: state.mode,
+            streak: state.streak,
+            zenCleanStacks: zenCleanStacksRef.current,
+          }),
+        );
+      },
+      [audioService],
     );
 
     /** Delay the callback so fail feedback is visible; state is already over. */
@@ -209,10 +236,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           // Drop the stale timestamp so the first frame after resume is a
           // baseline frame (dt = 0) instead of one huge delta.
           lastTimeRef.current = 0;
+          // No-op after game over: stopMusic already cleared the intent.
+          if (paused) audioService.pauseMusic();
+          else audioService.resumeMusic();
         },
         tap: () => handleTapRef.current(),
       }),
-      [],
+      [audioService],
     );
 
     const setManualMode = useCallback((manual: boolean) => {
@@ -241,6 +271,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       );
 
       if (stateRef.current.isGameOver && !wasGameOver) {
+        audioService.stopMusic();
         audioService.playFailSound();
         haptic("fail");
         effectsRef.current = triggerFail(effectsRef.current, reducedFxRef.current);
@@ -251,7 +282,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           toRunStats(stateRef.current),
         );
       } else {
-        // Zen: a life is lost but the run continues.
+        // Zen: a life is lost but the run continues; momentum resets.
+        zenCleanStacksRef.current = 0;
+        syncMusic(stateRef.current);
         audioService.playMissSound();
         haptic("miss");
         effectsRef.current = triggerFail(
@@ -260,7 +293,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           true,
         );
       }
-    }, [notifyGameOver, onStyleUpdate, onZenLivesChange, audioService]);
+    }, [notifyGameOver, onStyleUpdate, onZenLivesChange, audioService, syncMusic]);
 
     const handleTap = useCallback(() => {
       if (
@@ -346,6 +379,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         }
       }
 
+      if (result.state.mode === "ZEN") zenCleanStacksRef.current += 1;
+      syncMusic(result.state);
+
       // Spawn next active shape
       stateRef.current = spawnActiveShape(stateRef.current, reducedFx);
     }, [
@@ -356,6 +392,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       miss,
       reducedFx,
       audioService,
+      syncMusic,
     ]);
 
     useEffect(() => {
@@ -393,9 +430,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           }
         }
 
+        // Mirror real play so the soundtrack can be exercised end to end.
+        if (result.state.mode === "ZEN") zenCleanStacksRef.current += 1;
+        syncMusic(result.state);
+
         stateRef.current = spawnActiveShape(stateRef.current, reducedFx);
       },
-      [onScore, onLevelUp, onWorldUp, onStyleUpdate, reducedFx],
+      [onScore, onLevelUp, onWorldUp, onStyleUpdate, reducedFx, syncMusic],
     );
 
     const tick = useCallback(
@@ -445,6 +486,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           onLevelUp(state.level);
           onWorldUp(state.world);
           audioService.playStackSound(state.stackCount);
+          // Undo can step back into the previous world's key.
+          zenCleanStacksRef.current = Math.max(0, zenCleanStacksRef.current - 1);
+          syncMusic(state);
         }
 
         if (dt > 0 && !wasOver) {
@@ -475,6 +519,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             }
             if (state.isGameOver) {
               stateRef.current = state;
+              audioService.stopMusic();
               audioService.playFailSound();
               effectsRef.current = triggerFail(
                 effectsRef.current,
@@ -579,6 +624,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         onTimeUpdate,
         onWorldUp,
         reducedFx,
+        syncMusic,
       ],
     );
 

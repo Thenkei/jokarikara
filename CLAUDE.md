@@ -48,6 +48,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/rendering/shapeRenderer.ts` - Pure drawing functions (no state mutation)
 - `src/constants/game.ts` - Game balance constants, world mechanics, boss configurations, shape unlocks
 - `src/utils/audioManager.ts` - Web Audio API wrapper for procedural sound
+- `src/audio/` - Pure music theory (`music.ts`), soundtrack rules (`soundtrack.ts`: intensity from streak, tempo, note choice) and `MusicEngine` (ambient drone + pulse/arpeggio layers on a lookahead scheduler)
 
 ### World Mechanics (src/constants/game.ts)
 Each world (1-5) introduces cumulative effects:
