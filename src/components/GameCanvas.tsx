@@ -7,6 +7,7 @@ import {
   createInitialState,
   spawnActiveShape,
   updateActiveShape,
+  advanceClock,
   updateZoom,
   updateShapeRotations,
   updateShapeOpacities,
@@ -22,10 +23,12 @@ import type { GameMode } from "../types";
 import { forwardRef, useImperativeHandle } from "react";
 import {
   drawShape,
+  drawPerfectGuide,
   drawBackground,
   clearCanvas,
 } from "../rendering/shapeRenderer";
 import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture";
+import { getPerfectGuide } from "../gameplay/guide";
 import { installGameTestBridge } from "../utils/testBridge";
 import { getWorldTheme } from "../visual/theme";
 import { haptic } from "../utils/haptics";
@@ -44,6 +47,9 @@ import {
   updateEffects,
   type EffectsState,
 } from "../rendering/effects";
+
+/** Matches the PERFECT quality colour used by the HUD overlay. */
+const PERFECT_GUIDE_COLOR = "#fff3a8";
 
 /** Time Attack: tick every second once this few seconds remain. */
 export const COUNTDOWN_TICK_FROM = 5;
@@ -353,8 +359,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         return;
       }
 
-      const tapTimeSec = Date.now() / 1000;
-      if (isTapBlockedByFracture(state, tapTimeSec)) {
+      if (isTapBlockedByFracture(state, state.elapsedTime)) {
         miss();
         return;
       }
@@ -527,6 +532,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         }
 
         if (dt > 0 && !wasOver) {
+          state = advanceClock(state, dt);
           state = updateActiveShape(state, dt);
           state = updateZoom(state, dt);
           state = updateShapeRotations(state, dt);
@@ -601,7 +607,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const mechanics = getWorldMechanics(state.world);
         const theme = getWorldTheme(state.world, state.runSeed, reducedFx);
         const timeInSeconds = timeMs / 1000;
-        const fractureOverlay = getFractureOverlay(state, Date.now() / 1000);
+        const fractureOverlay = getFractureOverlay(state, state.elapsedTime);
 
         drawBackground(ctx, width, height, pulse, mechanics, theme);
 
@@ -628,6 +634,19 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         if (state.activeShape) {
           const offsetX = state.activeOffset?.x ?? 0;
           const offsetY = state.activeOffset?.y ?? 0;
+          const guide = getPerfectGuide(state);
+          if (guide) {
+            drawPerfectGuide(
+              ctx,
+              state.activeShape,
+              guide.perfectSize,
+              centerX + offsetX,
+              centerY + offsetY,
+              state.zoom,
+              guide.inPerfectBand,
+              PERFECT_GUIDE_COLOR,
+            );
+          }
           drawShape(
             ctx,
             state.activeShape,

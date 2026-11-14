@@ -2,8 +2,10 @@
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
-  push:
+  # Deploy only after CI succeeded on main (tests gate the release).
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: ["main"]
 
   # Allows you to run this workflow manually from the Actions tab
@@ -25,6 +27,7 @@ jobs:
   # Single deploy job since we're just deploying; no build step required in simple cases, 
   # but for Vite we DO need a build step.
   deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -32,13 +35,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Deploy exactly the commit CI validated.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build
         run: npm run build
       - name: Setup Pages

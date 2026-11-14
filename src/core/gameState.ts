@@ -83,6 +83,7 @@ export const createInitialState = (
     isBossLevel: false,
     runSeed,
     rngState: seedRng(runSeed),
+    elapsedTime: 0,
     styleScore: 0,
     streak: 0,
     bestStreak: 0,
@@ -196,7 +197,8 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
   let pulseOffset = 0;
   let finalRotationSpeed = 0;
 
-  const time = Date.now() / 1000;
+  // Game clock, not wall clock: frozen while paused.
+  const time = state.elapsedTime;
 
   if (state.isBossLevel) {
     const bossConfig = getBossConfigForScore(state.stackCount + 1);
@@ -278,6 +280,12 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
     activeOffset,
   };
 };
+
+/**
+ * Advance the game clock. Call once per simulated frame, before other updates.
+ */
+export const advanceClock = (state: GameState, dt: number): GameState =>
+  dt > 0 ? { ...state, elapsedTime: state.elapsedTime + dt } : state;
 
 /**
  * Check if the active shape is still contained within the last stacked shape.

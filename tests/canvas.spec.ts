@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures";
 import { makeBridge, waitForBridge } from "./bridgeHelpers";
 
-test.describe("GameCanvas Rendering", () => {
+test.describe("GameCanvas Rendering", { tag: "@cross-browser" }, () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.click(".start-btn");

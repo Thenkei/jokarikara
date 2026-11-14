@@ -34,6 +34,13 @@ export interface GameState {
   isBossLevel?: boolean; // For Boss Mechanics
   runSeed: number;
   rngState: number;
+  /**
+   * Seconds of simulated play. Advances only while the game is running, so
+   * time-driven mechanics (fractures, boss pulse/hue) freeze during pause and
+   * are deterministic under the test bridge. Never use wall-clock time for
+   * gameplay.
+   */
+  elapsedTime: number;
   styleScore: number;
   streak: number;
   bestStreak: number;
