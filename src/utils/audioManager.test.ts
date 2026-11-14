@@ -28,7 +28,8 @@ describe("audioManager", () => {
     audio.init();
     audio.init();
     expect(AudioContext).toHaveBeenCalledTimes(1);
-    expect(mock.ctx.createDynamicsCompressor).toHaveBeenCalledTimes(1);
+    // Glue compressor + limiter on the master bus.
+    expect(mock.ctx.createDynamicsCompressor).toHaveBeenCalledTimes(2);
   });
 
   it("plays more voices for a PERFECT stack than an OK one", () => {

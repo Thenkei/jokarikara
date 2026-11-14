@@ -32,7 +32,7 @@ export const ARPEGGIO_LAYER_THRESHOLD = 6;
  * Music bus level relative to the SFX path (both feed the same master gain,
  * where SFX enter at unity). Keeps the bed clearly under gameplay feedback.
  */
-export const MUSIC_VOLUME = 0.4;
+export const MUSIC_VOLUME = 0.042;
 
 /** Steady-state gain of each layer inside the music bus. */
 export const DRONE_LEVEL = 0.22;
