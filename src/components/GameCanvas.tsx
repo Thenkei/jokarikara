@@ -27,6 +27,10 @@ import {
 import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture";
 import { installGameTestBridge } from "../utils/testBridge";
 import { getWorldTheme } from "../visual/theme";
+import { haptic } from "../utils/haptics";
+
+/** Time Attack: tick every second once this few seconds remain. */
+export const COUNTDOWN_TICK_FROM = 5;
 
 /**
  * Upper bound for a single simulation step. Browsers stop rAF in background
@@ -167,14 +171,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
       if (stateRef.current.isGameOver && !wasGameOver) {
         audioService.playFailSound();
+        haptic("fail");
         onGameOver(
           stateRef.current.score,
           stateRef.current.world,
           stateRef.current.level,
         );
       } else {
-        // Just reset shape in Zen
-        audioService.playFailSound(); // Or a less "fail" sound?
+        // Zen: a life is lost but the run continues.
+        audioService.playMissSound();
+        haptic("miss");
       }
     }, [onGameOver, onStyleUpdate, onZenLivesChange, audioService]);
 
@@ -221,17 +227,26 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         bestStreak: result.state.bestStreak,
         lastStackQuality: result.state.lastStackQuality,
       });
-      audioService.playStackSound(result.state.stackCount);
+      // Zen has no combo streak; use the stack position so the melody still climbs.
+      const melodyStep =
+        result.state.mode === "ZEN"
+          ? (result.state.stackCount % 10) + 1
+          : result.state.streak;
+      audioService.playStack(result.quality, melodyStep, state.world);
+      haptic(result.quality === "PERFECT" ? "perfect" : "tap");
+      if (result.isPerfect && result.state.mode === "TIME_ATTACK") {
+        audioService.playTimeBonus();
+      }
 
       // Check for level up
       if (result.leveledUp) {
+        haptic("levelUp");
         if (result.worldUp) {
           onWorldUp(result.state.world);
-          // Maybe a special sound?
-          audioService.playStackSound(result.state.stackCount * 3);
+          audioService.playWorldUp(result.state.world);
         } else {
           onLevelUp(result.newLevel);
-          audioService.playStackSound(result.state.stackCount * 2); // Double pitch for level up
+          audioService.playLevelUp(result.state.world);
         }
       }
 
@@ -336,8 +351,17 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
               wholeSecond !== lastReportedSecondRef.current ||
               state.isGameOver
             ) {
+              const previous = lastReportedSecondRef.current;
               lastReportedSecondRef.current = wholeSecond;
               onTimeUpdate?.(remaining);
+              if (
+                previous !== null &&
+                wholeSecond < previous &&
+                wholeSecond > 0 &&
+                wholeSecond <= COUNTDOWN_TICK_FROM
+              ) {
+                audioService.playTick(wholeSecond <= 2);
+              }
             }
             if (state.isGameOver) {
               stateRef.current = state;

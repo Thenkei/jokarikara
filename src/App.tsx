@@ -55,6 +55,11 @@ function App() {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [runSeed, setRunSeed] = useState(0);
   const [reducedFx, setReducedFx] = useState(() => getSettings().reducedFx);
+  const [muted, setMuted] = useState(() => {
+    const initial = getSettings().muted;
+    audioManager.setMuted(initial);
+    return initial;
+  });
   const [styleScore, setStyleScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
@@ -204,6 +209,14 @@ function App() {
     revealSecondaryHud();
   };
 
+  const handleToggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    audioManager.setMuted(next);
+    saveSettings({ muted: next });
+    revealSecondaryHud();
+  };
+
   const handleMainMenu = () => {
     clearSecondaryHudTimeout();
     setShowSecondaryHud(false);
@@ -310,6 +323,13 @@ function App() {
               )}
               <button className="fx-toggle-btn" onClick={handleToggleReducedFx}>
                 {reducedFx ? "FX: LOW" : "FX: FULL"}
+              </button>
+              <button
+                className="mute-toggle-btn"
+                onClick={handleToggleMute}
+                aria-pressed={muted}
+              >
+                {muted ? "SOUND: OFF" : "SOUND: ON"}
               </button>
             </div>
           </div>

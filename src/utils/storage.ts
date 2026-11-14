@@ -8,10 +8,12 @@ const SETTINGS_STORAGE_KEY = "shape-stack-settings";
 
 export interface GameSettings {
   reducedFx: boolean;
+  muted: boolean;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
   reducedFx: false,
+  muted: false,
 };
 
 export const getHighScores = (): HighScore[] => {
@@ -56,6 +58,8 @@ export const getSettings = (): GameSettings => {
         typeof parsed.reducedFx === "boolean"
           ? parsed.reducedFx
           : DEFAULT_SETTINGS.reducedFx,
+      muted:
+        typeof parsed.muted === "boolean" ? parsed.muted : DEFAULT_SETTINGS.muted,
     };
   } catch (e) {
     console.error("Failed to load settings", e);

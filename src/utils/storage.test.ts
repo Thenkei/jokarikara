@@ -98,13 +98,13 @@ describe("storage", () => {
 
   describe("getSettings", () => {
     it("returns the default settings when nothing is stored", () => {
-      expect(getSettings()).toEqual({ reducedFx: false });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false });
     });
 
     it("returns stored settings with reducedFx: true", () => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ reducedFx: true }));
 
-      expect(getSettings()).toEqual({ reducedFx: true });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: false });
     });
 
     it("falls back to the default for reducedFx when the stored value is not a boolean", () => {
@@ -119,7 +119,7 @@ describe("storage", () => {
     it("returns the default settings when JSON is corrupted", () => {
       localStorage.setItem(SETTINGS_KEY, "{{bad");
 
-      expect(getSettings()).toEqual({ reducedFx: false });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false });
     });
   });
 

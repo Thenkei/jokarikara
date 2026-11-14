@@ -1,0 +1,30 @@
+/**
+ * Thin wrapper over the Vibration API. Unsupported on iOS Safari and desktop,
+ * where it is a silent no-op.
+ */
+export type HapticPattern = "tap" | "perfect" | "miss" | "fail" | "levelUp";
+
+const PATTERNS: Record<HapticPattern, number | number[]> = {
+  tap: 8,
+  perfect: [12, 30, 18],
+  miss: 30,
+  fail: [40, 40, 90],
+  levelUp: [10, 25, 10, 25, 20],
+};
+
+let enabled = true;
+
+export const setHapticsEnabled = (value: boolean): void => {
+  enabled = value;
+};
+
+export const haptic = (pattern: HapticPattern): void => {
+  if (!enabled) return;
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function")
+    return;
+  try {
+    navigator.vibrate(PATTERNS[pattern]);
+  } catch {
+    // Some browsers throw when vibration is blocked by user-activation rules.
+  }
+};

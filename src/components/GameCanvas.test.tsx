@@ -7,8 +7,16 @@ import type { IAudioService } from "../audio/types";
 // Mock the audio service
 const mockAudioService: IAudioService = {
   playStackSound: vi.fn(),
+  playStack: vi.fn(),
+  playLevelUp: vi.fn(),
+  playWorldUp: vi.fn(),
   playFailSound: vi.fn(),
+  playMissSound: vi.fn(),
   playEarlyClickSound: vi.fn(),
+  playTick: vi.fn(),
+  playTimeBonus: vi.fn(),
+  setMuted: vi.fn(),
+  isMuted: vi.fn(() => false),
   init: vi.fn(),
   resume: vi.fn(),
 };
@@ -78,7 +86,11 @@ describe("GameCanvas", () => {
 
     // After first tap, it should stack the shape
     expect(onScore).toHaveBeenCalled();
-    expect(mockAudioService.playStackSound).toHaveBeenCalled();
+    expect(mockAudioService.playStack).toHaveBeenCalledWith(
+      expect.any(String),
+      1,
+      1,
+    );
   });
 
   it("handles game over", async () => {
@@ -178,7 +190,7 @@ describe("GameCanvas", () => {
     tap(canvas);
 
     expect(mockAudioService.playEarlyClickSound).toHaveBeenCalled();
-    expect(mockAudioService.playStackSound).not.toHaveBeenCalled();
+    expect(mockAudioService.playStack).not.toHaveBeenCalled();
   });
 
   it("fires onStyleUpdate with style data after a successful stack", async () => {
