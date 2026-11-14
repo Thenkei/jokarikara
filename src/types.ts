@@ -37,7 +37,16 @@ export interface GameState {
   styleScore: number;
   streak: number;
   bestStreak: number;
+  /** Number of PERFECT stacks landed this run (reduced by Zen undo). */
+  perfectCount: number;
   lastStackQuality: StackQuality | null;
+}
+
+/** End-of-run summary handed to the UI. */
+export interface RunStats {
+  stackCount: number;
+  perfectCount: number;
+  bestStreak: number;
 }
 
 /**
@@ -45,7 +54,12 @@ export interface GameState {
  */
 export interface GameCallbacks {
   onScore: (score: number) => void;
-  onGameOver: (finalScore: number, world: number, level: number) => void;
+  onGameOver: (
+    finalScore: number,
+    world: number,
+    level: number,
+    stats?: RunStats,
+  ) => void;
   onLevelUp: (level: number) => void;
   onWorldUp: (world: number) => void;
 }
