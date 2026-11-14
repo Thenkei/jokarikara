@@ -94,8 +94,12 @@ export const STACK_REVERB_BOOST_DB: Readonly<Record<StackQuality, number>> = {
   PERFECT: 3,
 };
 
-/** Soundtrack send (post music bus): a touch of room glues the bed. */
-export const MUSIC_REVERB_SEND_DB = -12;
+/**
+ * Soundtrack send (post music bus): a touch of room glues the bed. Its wet
+ * adds ~0.3 dB, compensated in `MUSIC_VOLUME` so the bed stays where it was:
+ * the timing cue must sit > 1 dB above it, the tightest margin in the mix.
+ */
+export const MUSIC_REVERB_SEND_DB = -18;
 /** Overall wet level on the return, on top of the unit-energy calibration. */
 export const REVERB_RETURN_DB = 0;
 /** Keeps lows out of the tail (heartbeat thump, fail growl) to avoid mud. */
