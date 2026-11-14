@@ -15,6 +15,8 @@ import {
   restartActiveShape,
   undoLastStack,
   getStackQuality,
+  STACK_DRIFT_SPEED,
+  STACK_FADE_SPEED,
 } from "./gameState";
 
 import {
@@ -566,6 +568,27 @@ describe("gameState", () => {
       // First few shapes should start fading
       expect(updated.shapes[0].opacity).toBeLessThan(1);
     });
+
+    it("returns the same state reference when no shape is old enough to fade", () => {
+      const state = createInitialState(1000);
+      expect(updateShapeOpacities(state, 0.5)).toBe(state);
+    });
+
+    it("fades by the same amount per second regardless of frame rate", () => {
+      let state = createInitialState(1000);
+      for (let i = 0; i < 14; i++) {
+        state = spawnActiveShape(state);
+        state = stackActiveShape(state).state;
+      }
+
+      let at60 = state;
+      for (let i = 0; i < 60; i++) at60 = updateShapeOpacities(at60, 1 / 60);
+      let at120 = state;
+      for (let i = 0; i < 120; i++) at120 = updateShapeOpacities(at120, 1 / 120);
+
+      expect(at120.shapes[0].opacity).toBeCloseTo(at60.shapes[0].opacity, 6);
+      expect(at60.shapes[0].opacity).toBeCloseTo(1 - STACK_FADE_SPEED, 6);
+    });
   });
 
   describe("updateShapeRotations", () => {
@@ -575,6 +598,17 @@ describe("gameState", () => {
 
       const updated = updateShapeRotations(state);
       expect(updated.shapes[0].rotation).not.toBe(initialRotation);
+    });
+
+    it("drifts by the same angle per second at 60 Hz and 120 Hz", () => {
+      const state = createInitialState(1000);
+      let at60 = state;
+      for (let i = 0; i < 60; i++) at60 = updateShapeRotations(at60, 1 / 60);
+      let at120 = state;
+      for (let i = 0; i < 120; i++) at120 = updateShapeRotations(at120, 1 / 120);
+
+      expect(at120.shapes[0].rotation).toBeCloseTo(at60.shapes[0].rotation, 9);
+      expect(at60.shapes[0].rotation).toBeCloseTo(STACK_DRIFT_SPEED, 9);
     });
 
     it("should alternate rotation direction by index", () => {

@@ -13,6 +13,10 @@ const mockAudioService: IAudioService = {
   resume: vi.fn(),
 };
 
+/** Real browsers mark the first finger / the mouse as the primary pointer. */
+const tap = (target: Element, init: PointerEventInit = {}) =>
+  fireEvent.pointerDown(target, { isPrimary: true, ...init });
+
 describe("GameCanvas", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,7 +74,7 @@ describe("GameCanvas", () => {
     // Actually, spawnActiveShape spawns the FIRST shape as the first stacked shape if shapes array is empty?
     // No, createInitialState might spawn the ground shape.
 
-    fireEvent.click(canvas);
+    tap(canvas);
 
     // After first tap, it should stack the shape
     expect(onScore).toHaveBeenCalled();
@@ -171,7 +175,7 @@ describe("GameCanvas", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    fireEvent.click(canvas);
+    tap(canvas);
 
     expect(mockAudioService.playEarlyClickSound).toHaveBeenCalled();
     expect(mockAudioService.playStackSound).not.toHaveBeenCalled();
@@ -198,7 +202,7 @@ describe("GameCanvas", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    fireEvent.click(canvas);
+    tap(canvas);
 
     expect(onStyleUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -238,5 +242,96 @@ describe("GameCanvas", () => {
 
     expect(canvas.style.width).toBe("480px");
     expect(canvas.style.height).toBe("800px");
+  });
+
+  describe("game loop", () => {
+    type FrameCallback = (time: number) => void;
+    let frames: FrameCallback[];
+
+    beforeEach(() => {
+      frames = [];
+      vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+        frames.push(cb as FrameCallback);
+        return frames.length;
+      });
+      vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    });
+
+    const runFrames = (startMs: number, count: number, frameMs: number) => {
+      for (let i = 0; i < count; i += 1) {
+        const next = frames.pop();
+        frames.length = 0;
+        if (!next) return;
+        act(() => next(startMs + i * frameMs));
+      }
+    };
+
+    it("reports Time Attack time once per displayed second, not every frame", () => {
+      const onTimeUpdate = vi.fn();
+      render(
+        <GameCanvas
+          mode="TIME_ATTACK"
+          onScore={vi.fn()}
+          onGameOver={vi.fn()}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          onTimeUpdate={onTimeUpdate}
+          audioService={mockAudioService}
+        />
+      );
+
+      // ~1.5 s of 60 Hz frames: crosses the 60 -> 59 boundary once.
+      runFrames(1000, 90, 1000 / 60);
+
+      expect(onTimeUpdate.mock.calls.length).toBeGreaterThan(0);
+      expect(onTimeUpdate.mock.calls.length).toBeLessThanOrEqual(3);
+      const displayed = onTimeUpdate.mock.calls.map(([t]) => Math.ceil(t));
+      expect(new Set(displayed).size).toBe(displayed.length);
+    });
+
+    it("clamps long frame gaps so a background tab cannot auto-fail the run", () => {
+      const onGameOver = vi.fn();
+      render(
+        <GameCanvas
+          onScore={vi.fn()}
+          onGameOver={onGameOver}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          audioService={mockAudioService}
+        />
+      );
+
+      runFrames(1000, 2, 16);
+      // Simulate returning to the tab 30 s later.
+      runFrames(31000, 1, 16);
+
+      expect(onGameOver).not.toHaveBeenCalled();
+      expect(mockAudioService.playFailSound).not.toHaveBeenCalled();
+    });
+  });
+
+  it("ignores non-primary mouse buttons", async () => {
+    const onScore = vi.fn();
+    const { container } = render(
+      <GameCanvas
+        onScore={onScore}
+        onGameOver={vi.fn()}
+        onLevelUp={vi.fn()}
+        onWorldUp={vi.fn()}
+        audioService={mockAudioService}
+      />
+    );
+    const canvas = container.querySelector("canvas");
+    if (!canvas) throw new Error("Canvas not found");
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    tap(canvas, { pointerType: "mouse", button: 2 });
+    expect(onScore).not.toHaveBeenCalled();
+
+    tap(canvas, { pointerType: "mouse", button: 0 });
+    expect(onScore).toHaveBeenCalled();
   });
 });

@@ -9,10 +9,15 @@ const getMaxNumericKey = (record: Record<number, unknown>): number => {
 
 export const getGameplayConfig = (): GameplayConfig => gameplayConfig;
 
+// The gameplay config is built once and never mutated, so the max keys can be
+// resolved at module load instead of on every call. These selectors run
+// several times per animation frame.
+const MAX_WORLD = getMaxNumericKey(gameplayConfig.worlds);
+const MAX_LEVEL = getMaxNumericKey(gameplayConfig.levels);
+
 export const getWorldConfig = (world: number): WorldConfig => {
   const config = getGameplayConfig();
-  const maxWorld = getMaxNumericKey(config.worlds);
-  return config.worlds[world] ?? config.worlds[maxWorld];
+  return config.worlds[world] ?? config.worlds[MAX_WORLD];
 };
 
 export const getWorldMechanics = (world: number) =>
@@ -20,8 +25,7 @@ export const getWorldMechanics = (world: number) =>
 
 export const getZoomForLevel = (level: number): number => {
   const config = getGameplayConfig();
-  const maxLevel = getMaxNumericKey(config.levels);
-  return config.levels[level]?.zoom ?? config.levels[maxLevel].zoom;
+  return config.levels[level]?.zoom ?? config.levels[MAX_LEVEL].zoom;
 };
 
 export const getUnlockedShapes = (level: number): ShapeType[] => {

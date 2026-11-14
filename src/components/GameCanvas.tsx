@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
 import type { GameState, StyleUpdate } from "../types";
@@ -27,6 +27,26 @@ import {
 import { getFractureOverlay, isTapBlockedByFracture } from "../gameplay/fracture";
 import { installGameTestBridge } from "../utils/testBridge";
 import { getWorldTheme } from "../visual/theme";
+
+/**
+ * Upper bound for a single simulation step. Browsers stop rAF in background
+ * tabs and GC/JIT hitches can stall a frame; without a clamp the first frame
+ * after resuming would grow the active shape by seconds' worth of size and
+ * auto-fail the player through no fault of their own.
+ */
+export const MAX_FRAME_DT = 0.05;
+
+/**
+ * Backing-store scale cap. 3x screens triple the fill cost (9x pixels vs 1x)
+ * for no perceptible gain on flat-coloured vector shapes.
+ */
+export const MAX_DEVICE_PIXEL_RATIO = 2;
+
+/**
+ * Only the newest stacked layers get the (expensive) shadow-blur glow. Deeper
+ * layers are mostly covered and fade out anyway.
+ */
+export const GLOW_LAYER_DEPTH = 5;
 
 interface GameCanvasProps {
   mode?: GameMode;
@@ -79,6 +99,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     const manualModeRef = useRef(false);
     const loopRef = useRef<(time: number) => void>(undefined);
     const reducedFxRef = useRef(reducedFx);
+    // Last whole second reported to onTimeUpdate. The HUD only shows
+    // Math.ceil(time), so reporting every frame re-rendered <App/> ~60x/s.
+    const lastReportedSecondRef = useRef<number | null>(null);
 
     useEffect(() => {
       reducedFxRef.current = reducedFx;
@@ -94,6 +117,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         reducedFxRef.current,
       );
       stateRef.current = spawnActiveShape(initialState, reducedFxRef.current);
+      lastReportedSecondRef.current = null;
       onZenLivesChange?.(
         stateRef.current.mode === "ZEN"
           ? (stateRef.current.zenLivesRemaining ?? null)
@@ -266,11 +290,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         const ctx = ctxRef.current;
         if (!ctx) return;
 
-        const dt =
+        const rawDt =
           dtOverrideSeconds ??
           (lastTimeRef.current === 0
             ? 0
             : (timeMs - lastTimeRef.current) / 1000);
+        const dt = Math.min(Math.max(rawDt, 0), MAX_FRAME_DT);
 
         const pulse = (Math.sin(timeMs / 500) + 1) / 2;
 
@@ -300,12 +325,20 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         if (dt > 0) {
           state = updateActiveShape(state, dt);
           state = updateZoom(state, dt);
-          state = updateShapeRotations(state);
-          state = updateShapeOpacities(state);
+          state = updateShapeRotations(state, dt);
+          state = updateShapeOpacities(state, dt);
 
           if (state.mode === "TIME_ATTACK") {
             state = updateTimer(state, dt);
-            onTimeUpdate?.(state.timeRemaining ?? 0);
+            const remaining = state.timeRemaining ?? 0;
+            const wholeSecond = Math.ceil(remaining);
+            if (
+              wholeSecond !== lastReportedSecondRef.current ||
+              state.isGameOver
+            ) {
+              lastReportedSecondRef.current = wholeSecond;
+              onTimeUpdate?.(remaining);
+            }
             if (state.isGameOver) {
               stateRef.current = state;
               audioService.playFailSound();
@@ -339,6 +372,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         drawBackground(ctx, width, height, pulse, mechanics, theme);
 
+        const glowFloor = state.shapes.length - GLOW_LAYER_DEPTH;
         state.shapes.forEach((shape, index) => {
           const isContainer = index === state.shapes.length - 1;
           drawShape(
@@ -354,6 +388,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             isContainer,
             theme,
             isContainer ? (fractureOverlay ?? undefined) : undefined,
+            index >= glowFloor,
           );
         });
 
@@ -400,7 +435,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       lastTimeRef.current = 0; // Reset time when loop starts/restarts
 
       const resize = () => {
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = Math.min(
+          window.devicePixelRatio || 1,
+          MAX_DEVICE_PIXEL_RATIO,
+        );
         const width = window.innerWidth;
         const height = window.innerHeight;
 
@@ -415,8 +453,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         canvas.width = width * dpr;
         canvas.height = height * dpr;
 
-        // Scale context to match DPR
-        ctx.scale(dpr, dpr);
+        // Resizing the backing store resets the context, but setTransform is
+        // explicit and idempotent should the browser keep the old matrix.
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       };
       window.addEventListener("resize", resize);
       resize();
@@ -478,10 +517,22 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       forceStack,
       reducedFx,
     ]);
+    // pointerdown fires on contact; click waits for release (and on touch
+    // devices for gesture disambiguation), adding 50-150 ms of latency to a
+    // game that is entirely about timing.
+    const handlePointerDown = useCallback(
+      (event: ReactPointerEvent<HTMLCanvasElement>) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (event.isPrimary === false) return;
+        handleTap();
+      },
+      [handleTap],
+    );
+
     return (
       <canvas
         ref={canvasRef}
-        onClick={handleTap}
+        onPointerDown={handlePointerDown}
         style={{ width: "100%", height: "100%", cursor: "pointer" }}
       />
     );

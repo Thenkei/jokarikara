@@ -98,11 +98,21 @@ export const drawStarPath = (
   ctx.closePath();
 };
 
+type Hsl = { h: number; s: number; l: number };
+
 /**
- * Convert hex color to HSL and shift hue.
+ * Palette colours are a small, fixed set per world, but colour-shift worlds
+ * re-derive HSL for every stacked shape on every frame. Memoising the parse
+ * removes that work from the hot path. Bounded to avoid unbounded growth if
+ * callers ever feed dynamic colours.
  */
-const shiftHue = (hexColor: string, hueShift: number): string => {
-  // Parse hex to RGB
+const HSL_CACHE_LIMIT = 256;
+const hslCache = new Map<string, Hsl>();
+
+const hexToHsl = (hexColor: string): Hsl => {
+  const cached = hslCache.get(hexColor);
+  if (cached) return cached;
+
   const hex = hexColor.replace("#", "");
   const r = parseInt(hex.substring(0, 2), 16) / 255;
   const g = parseInt(hex.substring(2, 4), 16) / 255;
@@ -124,11 +134,25 @@ const shiftHue = (hexColor: string, hueShift: number): string => {
     else h = ((r - g) / d + 4) / 6;
   }
 
-  // Apply hue shift
-  h = (h * 360 + hueShift) % 360;
-
-  return `hsl(${h}, ${s * 100}%, ${l * 100}%)`;
+  const result: Hsl = { h: h * 360, s: s * 100, l: l * 100 };
+  if (hslCache.size >= HSL_CACHE_LIMIT) hslCache.clear();
+  hslCache.set(hexColor, result);
+  return result;
 };
+
+/**
+ * Convert hex color to HSL and shift hue.
+ */
+const shiftHue = (hexColor: string, hueShift: number): string => {
+  const { h, s, l } = hexToHsl(hexColor);
+  return `hsl(${(h + hueShift) % 360}, ${s}%, ${l}%)`;
+};
+
+/**
+ * Below this alpha a shape contributes nothing visible; skipping it saves a
+ * full path + fill + blurred stroke.
+ */
+export const MIN_VISIBLE_OPACITY = 0.01;
 
 const drawFractureOverlay = (
   ctx: CanvasRenderingContext2D,
@@ -175,6 +199,8 @@ const drawFractureOverlay = (
  * @param time - Time in seconds (for animations)
  * @param isStacked - Whether this is a stacked shape (vs active)
  * @param stackIndex - Index of shape in stack (for phase offsets)
+ * @param glow - Apply the theme glow (shadowBlur). Shadow blur is by far the
+ *   most expensive canvas op here, so callers disable it for deep layers.
  */
 export const drawShape = (
   ctx: CanvasRenderingContext2D,
@@ -189,7 +215,10 @@ export const drawShape = (
   isContainer: boolean = false,
   theme?: WorldTheme,
   fractureOverlay?: FractureOverlay,
+  glow: boolean = true,
 ): void => {
+  if (shape.opacity < MIN_VISIBLE_OPACITY) return;
+
   ctx.save();
   ctx.translate(x, y);
 
@@ -279,8 +308,10 @@ export const drawShape = (
     lineWidth = 4;
   }
 
-  ctx.shadowBlur = theme?.shape.glowBlur ?? 15;
-  ctx.shadowColor = theme?.shape.glow ?? "rgba(0, 0, 0, 0.5)";
+  if (glow) {
+    ctx.shadowBlur = theme?.shape.glowBlur ?? 15;
+    ctx.shadowColor = theme?.shape.glow ?? "rgba(0, 0, 0, 0.5)";
+  }
   ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
