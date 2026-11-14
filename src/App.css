@@ -250,37 +250,6 @@
   }
 }
 
-/* Final stats on game over */
-.final-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-}
-
-.final-level {
-  font-size: 1.4rem;
-  color: #888;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-}
-
-.score-display {
-  font-size: 2.5rem;
-  font-weight: 800;
-  background: linear-gradient(to bottom, #fff 0%, #888 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.progression-score {
-  font-size: 1.1rem;
-  color: var(--accent-color);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
-
 /* Leaderboard */
 .leaderboard {
   width: 100%;
@@ -686,31 +655,156 @@ button:active {
   color: #000;
 }
 
-/* Game over extras */
-.new-best-badge {
-  padding: 0.35rem 1rem;
-  border-radius: 999px;
+/* ---------- Game over ----------
+ * Hero (score) + cards in a scrolling body, and an action bar that is a flex
+ * sibling of the body (never scrolls away). Phones pin the bar to the bottom
+ * edge; wider screens centre body + bar together. */
+.screen.gameover-screen {
+  --gameover-width: 24rem;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.gameover-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1rem 1.25rem;
+  /* Fades the last line under the action bar edge while there is more to read. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent);
+}
+
+.gameover-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Centre when the content fits; start at the top (no clipping) when it scrolls. */
+.gameover-body > :first-child {
+  margin-top: auto;
+}
+
+.gameover-body > :last-child {
+  margin-bottom: auto;
+}
+
+.gameover-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.screen.gameover-screen .gameover-title {
+  font-size: clamp(1.6rem, 8vw, 2.4rem);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.score-display {
+  font-size: clamp(3.6rem, 19vw, 5.5rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(to bottom, #fff 0%, #9a9aa3 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-top: 0.15rem;
+}
+
+.gameover-hero .daily-result-label,
+.gameover-hero .practice-result-label {
+  font-size: 0.7rem;
+  margin-bottom: 0.1rem;
+}
+
+.gameover-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.4rem;
+}
+
+.final-level {
   font-size: 0.8rem;
+  color: #9aa0ad;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.gameover-meta-sep {
+  color: #555;
+}
+
+.new-best-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.2em;
   color: #1a1200;
   background: linear-gradient(90deg, #ffd34d, #ffb100);
-  box-shadow: 0 0 24px rgba(255, 190, 40, 0.45);
+  box-shadow: 0 0 18px rgba(255, 190, 40, 0.4);
   animation: fadeIn 0.4s ease-out;
 }
 
-.run-stats {
+.gameover-cards,
+.gameover-col {
   display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-  margin: 0.8rem 0 0;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.gameover-cards {
+  max-width: var(--gameover-width);
+}
+
+.gameover-card {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  text-align: left;
+}
+
+.gameover-card h3 {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #777;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.6rem;
+}
+
+.run-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.2rem, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  text-align: center;
 }
 
 .run-stats dt {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.15em;
   color: #777;
+  white-space: nowrap;
 }
 
 .run-stats dd {
@@ -718,6 +812,136 @@ button:active {
   font-size: 1.3rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+.gameover-run .quality-breakdown {
+  margin-top: 0.85rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* The leaderboard family becomes a card like the others on this screen. */
+.gameover-screen .leaderboard {
+  max-width: none;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 1.1rem;
+  backdrop-filter: none;
+}
+
+.gameover-screen .leaderboard ul {
+  gap: 0.45rem;
+}
+
+.gameover-screen .leaderboard li {
+  font-size: 0.95rem;
+}
+
+.gameover-screen .daily-summary {
+  align-items: flex-start;
+  gap: 0;
+}
+
+.gameover-actions {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: calc(var(--gameover-width) + 2rem);
+  padding: 1.1rem 1rem max(0.9rem, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-color);
+}
+
+.gameover-actions .retry-btn {
+  width: 100%;
+  padding: 1rem 2rem;
+}
+
+.gameover-actions-secondary {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gameover-actions-secondary > button {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0.75rem 0.5rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* Brighter than the shared .menu-btn: it is a primary path here (AA contrast). */
+.gameover-actions .menu-btn {
+  color: #a3a9b6;
+  border-color: #3a3a40;
+}
+
+/* Sits in the bar's top padding: no layout shift when it appears. */
+.gameover-actions .share-status {
+  position: absolute;
+  top: 0.15rem;
+  left: 1rem;
+  right: 1rem;
+  min-height: 0;
+  font-size: 0.68rem;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+@media (min-width: 641px) {
+  .screen.gameover-screen {
+    justify-content: center;
+  }
+
+  .gameover-body {
+    flex: 0 1 auto;
+  }
+
+  .gameover-actions {
+    border-top: none;
+    padding-top: 1.3rem;
+  }
+}
+
+/* Wide screens: two card columns so a 720p window shows everything. */
+@media (min-width: 900px) {
+  .screen.gameover-screen {
+    --gameover-width: 44rem;
+  }
+
+  .gameover-cards {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .gameover-col {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .gameover-actions {
+    flex-direction: row;
+    max-width: 36rem;
+  }
+
+  .gameover-actions .retry-btn {
+    flex: 1 1 auto;
+    width: auto;
+  }
+
+  .gameover-actions-secondary {
+    flex: none;
+  }
+
+  .gameover-actions-secondary > button {
+    flex: none;
+    padding: 0.75rem 1.4rem;
+  }
 }
 
 .leaderboard li.current-best {
@@ -799,15 +1023,13 @@ button:focus-visible {
 }
 
 .daily-result-label {
-  margin-top: -1.4rem;
   color: #ffd84d;
   font-size: 0.85rem;
   font-weight: 800;
   letter-spacing: 0.18em;
 }
 
-.daily-summary,
-.run-share {
+.daily-summary {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1076,32 +1298,56 @@ button:focus-visible {
 
 .run-achievements {
   width: 100%;
-  max-width: 300px;
 }
 
-.run-achievements h3 {
-  font-size: 0.75rem;
-  font-weight: 800;
+.gameover-card.run-achievements h3 {
   color: #c9a93a;
-  letter-spacing: 0.2em;
-  margin-bottom: 0.5rem;
+}
+
+.run-achievements-count {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 216, 77, 0.16);
+  color: #ffd84d;
+  letter-spacing: 0.05em;
 }
 
 .run-achievements ul {
   list-style: none;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 
 .run-achievements li {
-  padding: 0.3rem 0.7rem;
+  padding: 0.25rem 0.6rem;
   border-radius: 999px;
   background: rgba(255, 216, 77, 0.12);
   color: #ffd84d;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 800;
+  white-space: nowrap;
+}
+
+.run-achievements li.run-achievements-more {
+  padding: 0;
+  background: none;
+}
+
+.run-achievements-toggle {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px dashed rgba(255, 216, 77, 0.4);
+  color: #ffd84d;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.run-achievements-toggle:hover {
+  border-style: solid;
 }
 
 /* Never intercepts taps: the whole region ignores pointer events. */
@@ -1140,6 +1386,27 @@ button:focus-visible {
   letter-spacing: 0.16em;
 }
 
+/* Game over: the action bar owns the bottom edge, so toasts drop in from the top. */
+.game-container:has(> .gameover-screen) .achievement-toast-region {
+  top: max(0.75rem, env(safe-area-inset-top));
+  bottom: auto;
+}
+
+.game-container:has(> .gameover-screen) .achievement-toast {
+  animation-name: achievementToastDrop;
+}
+
+@keyframes achievementToastDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes achievementToastIn {
   from {
     opacity: 0;
@@ -1152,7 +1419,8 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .achievement-toast {
+  .achievement-toast,
+  .game-container:has(> .gameover-screen) .achievement-toast {
     animation: none;
   }
 }
@@ -1191,15 +1459,6 @@ button:focus-visible {
     font-size: clamp(2.4rem, 12vw, 4rem);
   }
 
-  .final-stats {
-    margin-bottom: 0;
-    gap: 0.3rem;
-  }
-
-  .score-display {
-    font-size: 2rem;
-  }
-
   .leaderboard {
     padding: 1rem 1.25rem;
     margin-bottom: 0;
@@ -1211,10 +1470,6 @@ button:focus-visible {
 
   .menu-btn {
     margin-top: 0;
-  }
-
-  .daily-result-label {
-    margin-top: -0.6rem;
   }
 
   .achievements-count {
@@ -1321,7 +1576,6 @@ button:focus-visible {
 }
 
 .practice-result-label {
-  margin-top: -1.4rem;
   color: #8fe6c4;
   font-size: 0.8rem;
   font-weight: 800;
@@ -1476,9 +1730,9 @@ button:focus-visible {
 }
 
 /* ---------- Game over insights ---------- */
-.end-insight {
-  max-width: 22rem;
-  margin-top: -0.5rem;
+.gameover-card.end-insight {
+  background: rgba(255, 120, 120, 0.06);
+  border-color: rgba(255, 140, 140, 0.2);
 }
 
 .end-insight-title {
@@ -1495,7 +1749,7 @@ button:focus-visible {
 }
 
 .quality-breakdown {
-  width: min(86vw, 20rem);
+  width: 100%;
 }
 
 .quality-breakdown-bar {
