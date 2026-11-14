@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ACHIEVEMENTS, ACHIEVEMENT_COUNT } from "../progression/achievements";
+import { buildStatRows, isFirstEverProfile } from "../progression/stats";
 import type { AchievementRecord } from "../utils/storage";
 
 interface AchievementsPanelProps {
@@ -22,6 +23,22 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
     [record],
   );
   const unlockedCount = items.filter((item) => item.unlocked).length;
+  // Keyboard focus starts on BACK, but without scrolling to it: on a phone
+  // the panel overflows and autoFocus would open it scrolled to the bottom,
+  // hiding the heading and stats.
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    backButtonRef.current?.focus({ preventScroll: true });
+  }, []);
+  // "Today" is sampled when the panel opens (it remounts on every open), so
+  // the daily streak can only be stale if the panel stays open past midnight.
+  const statRows = useMemo(
+    () =>
+      isFirstEverProfile(record.lifetime)
+        ? null
+        : buildStatRows(record.lifetime, new Date()),
+    [record.lifetime],
+  );
 
   return (
     <section
@@ -34,6 +51,21 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
       <p className="achievements-count">
         {unlockedCount} / {ACHIEVEMENT_COUNT} UNLOCKED
       </p>
+      {statRows && (
+        <section className="lifetime-stats" aria-labelledby="lifetime-stats-heading">
+          <h3 id="lifetime-stats-heading" className="lifetime-stats-heading">
+            STATS
+          </h3>
+          <dl className="lifetime-stats-list">
+            {statRows.map((row) => (
+              <div key={row.id} className="lifetime-stat" data-stat-id={row.id}>
+                <dt className="lifetime-stat-label">{row.label}</dt>
+                <dd className="lifetime-stat-value">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
       <ul className="achievement-list">
         {items.map(({ achievement, unlocked, progress }) => (
           <li
@@ -62,7 +94,12 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
           </li>
         ))}
       </ul>
-      <button className="achievements-back-btn" data-ui-sound="back" onClick={onClose} autoFocus>
+      <button
+        ref={backButtonRef}
+        className="achievements-back-btn"
+        data-ui-sound="back"
+        onClick={onClose}
+      >
         BACK
       </button>
     </section>
