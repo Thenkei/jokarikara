@@ -1953,6 +1953,81 @@ button:focus-visible {
   }
 }
 
+/* ---------- Start screen secrets ---------- */
+
+/*
+ * The title takes taps for a secret but stays a plain heading: no focus, no
+ * role. Rapid taps must not select text or double-tap-zoom on phones.
+ */
+.start-screen .title {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Flourish: each layer's wrapper spins up and bursts outward, then settles
+ * exactly where it started (360deg, scale 1) so the idle spin never jumps. */
+.start-backdrop-burst {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.start-backdrop.flourish .start-backdrop-burst {
+  animation: backdropBurst 1.6s cubic-bezier(0.22, 0.9, 0.24, 1) both;
+  animation-delay: calc(var(--burst-depth, 0) * 50ms);
+}
+
+.start-backdrop.flourish .start-backdrop-svg {
+  animation: backdropGlow 1.8s ease-out;
+}
+
+@keyframes backdropBurst {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  38% {
+    transform: rotate(calc(var(--burst-turn, 1) * 220deg))
+      scale(calc(1.1 + var(--burst-depth, 0) * 0.09));
+  }
+  100% {
+    transform: rotate(calc(var(--burst-turn, 1) * 360deg)) scale(1);
+  }
+}
+
+@keyframes backdropGlow {
+  0%,
+  100% {
+    opacity: 0.16;
+  }
+  30% {
+    opacity: 0.48;
+  }
+}
+
+/* No motion: the backdrop only brightens and fades back. */
+@media (prefers-reduced-motion: reduce) {
+  .start-backdrop.flourish .start-backdrop-burst {
+    animation: none;
+  }
+}
+
+/*
+ * Mono look. The canvas and the start backdrop get their tint from the theme
+ * (src/visual/theme.ts), so the per-frame canvas is never filtered; the DOM
+ * layers on top (static or small) share the same phosphor tint via a filter.
+ */
+.game-container[data-theme="mono"] {
+  --bg-color: #010a04;
+  /* Tuned by eye against the canvas tint (MONO_HUE, phosphor green). */
+  --mono-filter: grayscale(1) sepia(1) hue-rotate(72deg) saturate(2.4);
+}
+
+.game-container[data-theme="mono"] > :not(.game-screen, .start-backdrop, .sr-only),
+.game-container[data-theme="mono"] .game-screen > :not(.canvas-container) {
+  filter: var(--mono-filter);
+}
+
 /* ---------- Game over insights ---------- */
 .gameover-card.end-insight {
   background: rgba(255, 120, 120, 0.06);

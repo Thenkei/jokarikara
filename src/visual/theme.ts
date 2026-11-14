@@ -20,6 +20,12 @@ export interface WorldTheme {
   world: number;
   runSeed: number;
   reducedFx: boolean;
+  /**
+   * Session-only "Mono" look: every colour is a shade of one tint. The
+   * renderer maps colours it does not own (shape fills, effects) through
+   * `toMonoColor` when this is set.
+   */
+  mono: boolean;
   palette: string[];
   background: {
     base: string;
@@ -307,15 +313,107 @@ const createPalette = (
   };
 };
 
+// ---------------------------------------------------------------------------
+// Mono look
+// ---------------------------------------------------------------------------
+
+/** Phosphor green, the hue of every colour in the Mono look. */
+export const MONO_HUE = 140;
+const MONO_SATURATION = 90;
+const MONO_LIGHTNESS = { min: 20, max: 82 } as const;
+/**
+ * Relative luminance range stretched onto MONO_LIGHTNESS. World palettes
+ * cluster in ~0.15-0.6 (contrast floor + saturated hues), so mapping the
+ * full 0-1 range would flatten every shape into the same green.
+ */
+const MONO_LUMINANCE = { min: 0.08, max: 0.68 } as const;
+/** For non-hex input (e.g. the boss shape's per-frame rainbow hsl). */
+const MONO_HIGHLIGHT = hslToHex({ h: MONO_HUE, s: 100, l: 76 });
+/** Same bound as the renderer's hsl cache: palettes are small, fixed sets. */
+const MONO_CACHE_LIMIT = 256;
+const monoCache = new Map<string, string>();
+
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/**
+ * Maps any colour to the Mono tint, keeping its perceived brightness (a blue
+ * stays a dark green, a yellow a bright one), so neighbouring shapes stay
+ * distinguishable. Memoised: palette colours are parsed once, and a render
+ * frame only does map lookups (no allocation). Non-hex colours, such as the
+ * boss shape's rainbow, map to a fixed highlight without touching the cache.
+ */
+export const toMonoColor = (color: string): string => {
+  const cached = monoCache.get(color);
+  if (cached) return cached;
+  if (!HEX_COLOR.test(color)) return MONO_HIGHLIGHT;
+  const luminance = relativeLuminance(color.length === 9 ? color.slice(0, 7) : color);
+  const t = clamp(
+    (luminance - MONO_LUMINANCE.min) / (MONO_LUMINANCE.max - MONO_LUMINANCE.min),
+    0,
+    1,
+  );
+  const mapped = hslToHex({
+    h: MONO_HUE,
+    s: MONO_SATURATION,
+    l: MONO_LIGHTNESS.min + (MONO_LIGHTNESS.max - MONO_LIGHTNESS.min) * t,
+  });
+  if (monoCache.size >= MONO_CACHE_LIMIT) monoCache.clear();
+  monoCache.set(color, mapped);
+  return mapped;
+};
+
+/** A shade of the Mono tint (lightness/saturation in %). */
+export const monoShade = (lightness: number, saturation = MONO_SATURATION): string =>
+  hslToHex({ h: MONO_HUE, s: saturation, l: lightness });
+
+/** Derives the Mono variant of a theme: same structure, one tint. */
+const toMonoTheme = (base: WorldTheme): WorldTheme => {
+  const primary = toMonoColor(base.hud.primary);
+  const secondary = toMonoColor(base.hud.secondary);
+  const { reducedFx } = base;
+  return {
+    ...base,
+    id: `${base.id}:mono`,
+    mono: true,
+    palette: base.palette.map(toMonoColor),
+    background: {
+      base: monoShade(4, 60),
+      innerGlow: withAlpha(primary, reducedFx ? 0.1 : 0.16),
+      outerGlow: withAlpha(secondary, reducedFx ? 0.05 : 0.1),
+      vignette: base.background.vignette,
+    },
+    hud: {
+      primary,
+      secondary,
+      accent: toMonoColor(base.hud.accent),
+      text: monoShade(92, 100),
+      subtleText: monoShade(74, 60),
+    },
+    shape: {
+      ...base.shape,
+      stroke: withAlpha(monoShade(88, 100), reducedFx ? 0.24 : 0.4),
+      glow: withAlpha(primary, reducedFx ? 0.2 : 0.38),
+    },
+    // Colour shift would rotate shapes out of the tint.
+    fx: { ...base.fx, hueShiftMultiplier: 0 },
+  };
+};
+
 export const getWorldTheme = (
   world: number,
   runSeed: number,
   reducedFx: boolean = false,
+  mono: boolean = false,
 ): WorldTheme => {
-  const id = `${world}:${runSeed}:${reducedFx ? 1 : 0}`;
+  const id = `${world}:${runSeed}:${reducedFx ? 1 : 0}${mono ? ":mono" : ""}`;
   const cached = cache.get(id);
   if (cached) {
     return cached;
+  }
+  if (mono) {
+    const monoTheme = toMonoTheme(getWorldTheme(world, runSeed, reducedFx));
+    cache.set(id, monoTheme);
+    return monoTheme;
   }
 
   const profile = resolveProfile(world, reducedFx);
@@ -331,6 +429,7 @@ export const getWorldTheme = (
     world,
     runSeed,
     reducedFx,
+    mono: false,
     palette,
     background: {
       base: mixHex(backgroundBase, "#050507", 0.35),
@@ -367,8 +466,10 @@ export const getWorldPalette = (
   world: number,
   runSeed: number,
   reducedFx: boolean = false,
-): string[] => getWorldTheme(world, runSeed, reducedFx).palette;
+  mono: boolean = false,
+): string[] => getWorldTheme(world, runSeed, reducedFx, mono).palette;
 
 export const __resetThemeCacheForTests = (): void => {
   cache.clear();
+  monoCache.clear();
 };

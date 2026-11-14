@@ -581,6 +581,23 @@ class AudioManager implements IAudioService {
     this.play("menu", voices);
   }
 
+  playChime(): void {
+    // Glockenspiel-like cascade up the A-major pentatonic (the menu family):
+    // each strike is a sine plus a faint inharmonic partial (x2.76, the
+    // "bar" overtone) that dies fast, so it reads as a bell, not a beep.
+    const notes = [880, 1108.73, 1318.51, 1760, 2217.46];
+    const voices: Voice[] = [];
+    notes.forEach((freq, i) => {
+      const last = i === notes.length - 1;
+      const delay = i * 0.07;
+      voices.push(
+        { freq, type: "sine", delay, duration: last ? 0.9 : 0.42, peak: last ? 0.2 : 0.16, attack: 0.002 },
+        { freq: freq * 2.76, type: "sine", delay, duration: 0.12, peak: 0.035, attack: 0.001 },
+      );
+    });
+    this.play("chime", voices);
+  }
+
   playHeartbeat(): void {
     // Low "lub" with a falling pitch plus a soft click for definition on
     // small phone speakers that cannot reproduce the sub frequency.

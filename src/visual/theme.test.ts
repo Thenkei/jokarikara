@@ -3,6 +3,8 @@ import {
   __resetThemeCacheForTests,
   getWorldPalette,
   getWorldTheme,
+  MONO_HUE,
+  toMonoColor,
 } from "./theme";
 
 const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
@@ -101,5 +103,53 @@ describe("world theme", () => {
     theme.palette.forEach((color) => {
       expect(color).toMatch(/^#[0-9a-f]{6}$/i);
     });
+  });
+});
+
+describe("mono look", () => {
+  beforeEach(() => {
+    __resetThemeCacheForTests();
+  });
+
+  const hueOf = (hex: string) => rgbToHsl(hexToRgb(hex)).h;
+  const lightnessOf = (hex: string) => rgbToHsl(hexToRgb(hex)).l;
+
+  it("tints the whole palette and HUD with one hue", () => {
+    for (const world of [1, 5, 9]) {
+      const theme = getWorldTheme(world, 4242, false, true);
+      expect(theme.mono).toBe(true);
+      for (const color of [...theme.palette, theme.hud.primary, theme.hud.text]) {
+        expect(Math.abs(hueOf(color) - MONO_HUE)).toBeLessThan(3);
+      }
+    }
+  });
+
+  it("keeps brightness differences so neighbouring shapes stay distinct", () => {
+    const palette = getWorldPalette(3, 777, false, true);
+    expect(new Set(palette.map((c) => Math.round(lightnessOf(c)))).size).toBeGreaterThan(2);
+    // Brighter in, brighter out.
+    expect(lightnessOf(toMonoColor("#ffff00"))).toBeGreaterThan(
+      lightnessOf(toMonoColor("#0000ff")),
+    );
+  });
+
+  it("is a separate, cached variant that leaves the regular theme intact", () => {
+    const regular = getWorldTheme(5, 1, false);
+    const mono = getWorldTheme(5, 1, false, true);
+    expect(mono).not.toBe(regular);
+    expect(getWorldTheme(5, 1, false, true)).toBe(mono);
+    expect(mono.id).toBe(`${regular.id}:mono`);
+    expect(regular.mono).toBe(false);
+    // Colour shift would rotate shapes out of the tint.
+    expect(mono.fx.hueShiftMultiplier).toBe(0);
+    expect(regular.fx.hueShiftMultiplier).toBeGreaterThan(0);
+  });
+
+  it("memoises colours and maps non-hex input to a fixed highlight", () => {
+    expect(toMonoColor("#3b82f6")).toBe(toMonoColor("#3b82f6"));
+    expect(toMonoColor("#fff")).toBe(toMonoColor("#ffffff"));
+    const boss = toMonoColor("hsl(12.5, 80%, 60%)");
+    expect(boss).toBe(toMonoColor("hsl(250, 80%, 60%)"));
+    expect(Math.abs(hueOf(boss) - MONO_HUE)).toBeLessThan(3);
   });
 });

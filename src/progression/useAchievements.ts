@@ -12,6 +12,7 @@ import {
   breakPerfectRun,
   createRunProgress,
   evaluate,
+  grantAchievement,
   type AchievementId,
   type RunProgress,
 } from "./achievements";
@@ -65,6 +66,11 @@ export interface AchievementsApi {
   finishRun: (input: FinishRunInput) => readonly AchievementId[];
   /** Commits a run left without a game over (menu, restart). Idempotent. */
   abandonRun: () => void;
+  /**
+   * Event unlock outside runs (e.g. a start screen secret). Persists and
+   * announces via `onUnlock` once; a no-op when already unlocked.
+   */
+  unlock: (id: AchievementId) => void;
 }
 
 const defaultMonotonicNow = (): number =>
@@ -246,6 +252,23 @@ export function useAchievements(options: UseAchievementsOptions = {}): Achieveme
 
   const abandonRun = useMemo(() => guarded("abandonRun", undefined, commitRun), [commitRun]);
 
+  const unlock = useMemo(
+    () => guarded("unlock", undefined, (id: AchievementId) => {
+      if (recordRef.current.unlocked[id] !== undefined) return;
+      const at = (optionsRef.current.wallNow ?? Date.now)();
+      let granted = false;
+      const next = updateAchievementRecord((current) => {
+        // Re-checked against storage: another tab may have unlocked it.
+        const unlocked = grantAchievement(current.unlocked, id, at);
+        granted = unlocked !== null;
+        return unlocked ? { ...current, unlocked } : current;
+      });
+      publish(next);
+      if (granted) optionsRef.current.onUnlock?.([id]);
+    }),
+    [publish],
+  );
+
   return {
     record,
     beginRun,
@@ -255,5 +278,6 @@ export function useAchievements(options: UseAchievementsOptions = {}): Achieveme
     setPaused,
     finishRun,
     abandonRun,
+    unlock,
   };
 }

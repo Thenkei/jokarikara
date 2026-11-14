@@ -44,6 +44,7 @@ export const ACHIEVEMENT_IDS = [
   "time-lord",
   "daily-devotee",
   "architect",
+  "curious-mind",
 ] as const;
 
 export type AchievementId = (typeof ACHIEVEMENT_IDS)[number];
@@ -107,6 +108,15 @@ export interface AchievementDefinition {
   id: AchievementId;
   title: string;
   description: string;
+  /**
+   * Secret: listed as "???" with `HIDDEN_ACHIEVEMENT_TEXT` until unlocked, so
+   * the panel never hints at how to get it. Still counted in the total.
+   */
+  hidden?: boolean;
+  /**
+   * Run predicate. Event-driven achievements (unlocked through
+   * `grantAchievement`, e.g. an easter egg) never match here.
+   */
   isUnlocked: (ctx: AchievementContext) => boolean;
   /** Cheap progress hint for the list panel (best so far vs target). */
   progress?: (ctx: AchievementContext) => AchievementProgress;
@@ -283,7 +293,24 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
     isUnlocked: (ctx) => lifetimeStacks(ctx) >= ARCHITECT_LIFETIME_STACKS,
     progress: (ctx) => capped(lifetimeStacks(ctx), ARCHITECT_LIFETIME_STACKS),
   },
+  {
+    id: "curious-mind",
+    title: "Curious Mind",
+    description: "Found one of the start screen's secrets.",
+    hidden: true,
+    // Event-driven: granted by the start screen, never by a run.
+    isUnlocked: () => false,
+  },
 ] satisfies AchievementDefinition[]);
+
+/** What a hidden achievement shows until it is unlocked (no hints). */
+export const HIDDEN_ACHIEVEMENT_TEXT = Object.freeze({
+  title: "???",
+  description: "A hidden achievement.",
+});
+
+/** Unlocked by an event outside runs (see `grantAchievement`). */
+export const SECRET_ACHIEVEMENT_ID: AchievementId = "curious-mind";
 
 export const ACHIEVEMENT_COUNT = ACHIEVEMENTS.length;
 
@@ -324,6 +351,18 @@ export const evaluate = (
       return false;
     }
   }).map((achievement) => achievement.id);
+
+/**
+ * Event unlock (outside run evaluation). Pure: returns the unlocked map with
+ * `id` stamped at `at`, or `null` when it was already unlocked (first unlock
+ * wins, so the timestamp keeps its audit value).
+ */
+export const grantAchievement = (
+  unlocked: Partial<Record<AchievementId, number>>,
+  id: AchievementId,
+  at: number,
+): Partial<Record<AchievementId, number>> | null =>
+  unlocked[id] !== undefined ? null : { ...unlocked, [id]: at };
 
 // ---------------------------------------------------------------------------
 // Run reducers

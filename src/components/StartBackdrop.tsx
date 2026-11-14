@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 import { getRegularPolygonVertices } from "../utils/geometry";
 import { BACKDROP_LAYERS } from "./startBackdropLayers";
 
@@ -7,6 +7,10 @@ import { BACKDROP_LAYERS } from "./startBackdropLayers";
  * counter-rotating, i.e. the game's own visual language instead of a blank
  * page. Pure SVG + CSS transforms (compositor-only, no canvas, no JS per
  * frame); motion is disabled under prefers-reduced-motion via CSS.
+ *
+ * `flourish` plays a one-off celebration (layers spin up and burst outward,
+ * then settle back on their idle rotation). It is CSS-only too: each layer
+ * sits in a wrapper that owns the burst, so the idle spin is never reset.
  */
 
 const toPoints = (sides: number, radius: number): string =>
@@ -16,10 +20,13 @@ const toPoints = (sides: number, radius: number): string =>
 
 interface StartBackdropProps {
   palette: readonly string[];
+  /** True while the celebration plays (the caller times it). */
+  flourish?: boolean;
 }
 
 export const StartBackdrop = memo(function StartBackdrop({
   palette,
+  flourish = false,
 }: StartBackdropProps) {
   const layers = useMemo(
     () =>
@@ -32,32 +39,46 @@ export const StartBackdrop = memo(function StartBackdrop({
   );
 
   return (
-    <div className="start-backdrop" aria-hidden="true">
+    <div
+      className={`start-backdrop${flourish ? " flourish" : ""}`}
+      aria-hidden="true"
+    >
       <svg viewBox="-50 -50 100 100" className="start-backdrop-svg">
         {layers.map((layer, index) => (
           <g
             key={index}
-            className="start-backdrop-layer"
+            className="start-backdrop-burst"
             style={
-              layer.period !== 0
-                ? {
-                    animationDuration: `${Math.abs(layer.period)}s`,
-                    animationDirection: layer.period < 0 ? "reverse" : "normal",
-                  }
-                : { animation: "none" }
+              {
+                // Inner layers burst further and later; spin follows the idle direction.
+                "--burst-depth": index,
+                "--burst-turn": layer.period < 0 ? -1 : 1,
+              } as CSSProperties
             }
           >
-            <circle
-              className="start-backdrop-anchor"
-              r={layer.radius}
-              fill="none"
-              stroke="none"
-            />
-            {layer.points ? (
-              <polygon points={layer.points} fill={layer.color} />
-            ) : (
-              <circle r={layer.radius} fill={layer.color} />
-            )}
+            <g
+              className="start-backdrop-layer"
+              style={
+                layer.period !== 0
+                  ? {
+                      animationDuration: `${Math.abs(layer.period)}s`,
+                      animationDirection: layer.period < 0 ? "reverse" : "normal",
+                    }
+                  : { animation: "none" }
+              }
+            >
+              <circle
+                className="start-backdrop-anchor"
+                r={layer.radius}
+                fill="none"
+                stroke="none"
+              />
+              {layer.points ? (
+                <polygon points={layer.points} fill={layer.color} />
+              ) : (
+                <circle r={layer.radius} fill={layer.color} />
+              )}
+            </g>
           </g>
         ))}
       </svg>

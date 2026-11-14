@@ -36,6 +36,27 @@ describe("StartBackdrop", () => {
     expect(layers[2].style.animationDirection).toBe("reverse");
   });
 
+  it("plays the flourish on a per-layer wrapper, leaving the idle spin alone", () => {
+    const palette = ["#111111"];
+    const { container, rerender } = render(<StartBackdrop palette={palette} />);
+    const root = container.querySelector(".start-backdrop")!;
+    expect(root.classList.contains("flourish")).toBe(false);
+
+    rerender(<StartBackdrop palette={palette} flourish />);
+    expect(root.classList.contains("flourish")).toBe(true);
+    const bursts = container.querySelectorAll<SVGGElement>(".start-backdrop-burst");
+    expect(bursts).toHaveLength(BACKDROP_LAYERS.length);
+    bursts.forEach((burst, i) => {
+      // One spinning layer per wrapper; depth staggers the burst.
+      expect(burst.querySelectorAll(".start-backdrop-layer")).toHaveLength(1);
+      expect(burst.style.getPropertyValue("--burst-depth")).toBe(String(i));
+    });
+    expect(bursts[2].style.getPropertyValue("--burst-turn")).toBe("-1");
+
+    rerender(<StartBackdrop palette={palette} />);
+    expect(root.classList.contains("flourish")).toBe(false);
+  });
+
   it("falls back to a default colour with an empty palette", () => {
     const { container } = render(<StartBackdrop palette={[]} />);
     const first = container.querySelector(

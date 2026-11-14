@@ -87,6 +87,19 @@ describe("audioManager", () => {
     expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
   });
 
+  it("plays the secret chime as a bell cascade, and nothing while muted", () => {
+    const audio = createAudioManager();
+    audio.setMuted(true);
+    audio.playChime();
+    expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
+
+    audio.setMuted(false);
+    audio.playChime();
+    // Five strikes, each a fundamental plus one inharmonic partial.
+    expect(mock.oscillators).toHaveLength(10);
+    mock.oscillators.forEach((osc) => expect(osc.start).toHaveBeenCalled());
+  });
+
   it("zeroes master gain when muted after init and restores it", () => {
     const audio = createAudioManager();
     audio.init();

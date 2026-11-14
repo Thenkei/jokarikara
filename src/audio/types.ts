@@ -101,6 +101,9 @@ export interface IAudioService {
   /** Combo milestone fanfare; `tier` 1..5 lengthens the run of notes. */
   playComboMilestone(tier: number, world: number): void;
 
+  /** Start screen secret found: a short sparkling bell cascade. */
+  playChime(): void;
+
   setMuted(muted: boolean): void;
   isMuted(): boolean;
 

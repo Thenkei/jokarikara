@@ -13,6 +13,7 @@ import {
 import type { Shape } from "../utils/geometry";
 import { getWorldMechanics } from "../constants/game";
 import type { WorldMechanics } from "../constants/game";
+import { getWorldTheme, toMonoColor } from "../visual/theme";
 
 // Mock CanvasRenderingContext2D
 const createMockContext = () => {
@@ -334,6 +335,22 @@ describe("shapeRenderer", () => {
 
       // fillStyle should remain the original hex color
       expect(ctx.fillStyle).toBe("#ff0000");
+    });
+
+    it("Mono theme: fills with the tinted colour and skips the hue shift", () => {
+      const ctx = createMockContext();
+      const shape: Shape = {
+        type: "circle",
+        size: 100,
+        rotation: 0,
+        color: "#ff0000",
+        opacity: 1,
+      };
+      const mono = getWorldTheme(5, 1, false, true);
+
+      drawShape(ctx, shape, 0, 0, 1, colorShiftMechanics, 0.5, true, 0, false, mono);
+
+      expect(ctx.fillStyle).toBe(toMonoColor("#ff0000"));
     });
   });
 

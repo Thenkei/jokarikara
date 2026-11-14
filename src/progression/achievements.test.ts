@@ -5,6 +5,8 @@ import {
   ACHIEVEMENT_COUNT,
   ACHIEVEMENT_IDS,
   ARCHITECT_LIFETIME_STACKS,
+  HIDDEN_ACHIEVEMENT_TEXT,
+  SECRET_ACHIEVEMENT_ID,
   DAILY_DEVOTEE_DAYS,
   EMPTY_LIFETIME_STATS,
   MAX_TRACKED_DAILY_DATES,
@@ -21,6 +23,7 @@ import {
   createRunProgress,
   evaluate,
   getAchievement,
+  grantAchievement,
   isAchievementId,
   overallLevel,
   type AchievementId,
@@ -73,8 +76,12 @@ const unlockedBy = (r: RunProgress | null, l: LifetimeStats = lifetime()) =>
   evaluate({ run: r, lifetime: l }, NONE);
 
 describe("catalogue", () => {
-  it("has ~12 achievements with unique ids matching ACHIEVEMENT_IDS", () => {
-    expect(ACHIEVEMENT_COUNT).toBe(12);
+  it("has 12 visible + 1 hidden achievements with unique ids matching ACHIEVEMENT_IDS", () => {
+    // The total includes the hidden one: the panel lists it (as "???").
+    expect(ACHIEVEMENT_COUNT).toBe(13);
+    expect(ACHIEVEMENTS.filter((a) => a.hidden).map((a) => a.id)).toEqual([
+      SECRET_ACHIEVEMENT_ID,
+    ]);
     expect(ACHIEVEMENTS.map((a) => a.id)).toEqual([...ACHIEVEMENT_IDS]);
     expect(new Set(ACHIEVEMENT_IDS).size).toBe(ACHIEVEMENT_IDS.length);
   });
@@ -102,6 +109,38 @@ describe("catalogue", () => {
   it("nothing unlocks on an empty run with empty lifetime", () => {
     expect(unlockedBy(run())).toEqual([]);
     expect(unlockedBy(null)).toEqual([]);
+  });
+});
+
+describe("hidden achievement (Curious Mind)", () => {
+  const secret = getAchievement("curious-mind");
+
+  it("is hidden, with a placeholder that gives no hint", () => {
+    expect(secret.hidden).toBe(true);
+    expect(HIDDEN_ACHIEVEMENT_TEXT.title).toBe("???");
+    for (const word of ["title", "tap", "arrow", "key", "mono", "start"]) {
+      expect(HIDDEN_ACHIEVEMENT_TEXT.description.toLowerCase()).not.toContain(word);
+    }
+  });
+
+  it("is never unlocked by run evaluation, however big the run", () => {
+    const huge = run({
+      stackCount: 5000,
+      bestStreak: 999,
+      bestConsecutivePerfects: 999,
+      world: 10,
+      bossStacksCleared: 50,
+    });
+    expect(unlockedBy(huge, lifetime({ totalStacks: 99999 }))).not.toContain(
+      "curious-mind",
+    );
+  });
+
+  it("grantAchievement stamps a new unlock and keeps the first timestamp", () => {
+    const granted = grantAchievement({ "first-stack": 1 }, "curious-mind", 50);
+    expect(granted).toEqual({ "first-stack": 1, "curious-mind": 50 });
+    expect(grantAchievement(granted!, "curious-mind", 99)).toBeNull();
+    expect(countUnlocked(granted!)).toBe(2);
   });
 });
 
