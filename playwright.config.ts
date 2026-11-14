@@ -1,6 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
+ * Dedicated E2E port, deliberately outside Vite's default dev (5173+) and
+ * preview (4173+) ranges, so the suite never collides with — or silently
+ * reuses — a regular `npm run dev` server (which lacks VITE_E2E=true) or
+ * another Vite project running on the machine. Override with E2E_PORT.
+ */
+const E2E_PORT = Number(process.env.E2E_PORT ?? 6173);
+if (!Number.isInteger(E2E_PORT) || E2E_PORT <= 0 || E2E_PORT > 65535) {
+  throw new Error(`Invalid E2E_PORT: "${process.env.E2E_PORT}"`);
+}
+const BASE_URL = `http://localhost:${E2E_PORT}/jokarikara/`;
+
+/**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
@@ -18,7 +30,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://localhost:5173/jokarikara/",
+    baseURL: BASE_URL,
     viewport: { width: 1280, height: 720 },
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
@@ -65,8 +77,10 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "VITE_E2E=true npm run dev",
-    url: "http://localhost:5173/jokarikara/",
+    // --strictPort: fail fast if the port is taken, instead of Vite silently
+    // moving to the next port while Playwright polls the original one until timeout.
+    command: `VITE_E2E=true npm run dev -- --port ${E2E_PORT} --strictPort`,
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
   },
 });
