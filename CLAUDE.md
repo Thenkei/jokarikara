@@ -57,6 +57,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/gameplay/guide.ts` - PERFECT ghost guide rules (Zen + first level; reverse-aware)
 - `src/gameplay/combo.ts` - Combo milestones (fanfare, banner, haptics)
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
+- `src/modes/share.ts` - Share text for regular runs (mode, score, proportional emoji quality bar, game URL); reuses the Daily emoji legend
 - `src/modes/runInsights.ts` - Game over insights: why the run ended, stack quality breakdown
 - `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation); `playUi` for menu sounds
 - `src/audio/music.ts` - Pure music theory (pentatonic melody, per-world keys, quality harmony)

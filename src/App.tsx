@@ -48,6 +48,7 @@ import {
   getLocalDateKey,
   qualitiesFromScoreHistory,
 } from "./modes/daily";
+import { buildRunShareText } from "./modes/share";
 import {
   ACHIEVEMENT_COUNT,
   countUnlocked,
@@ -599,15 +600,26 @@ function App() {
   };
 
   const handleShare = async () => {
-    if (!lastRun?.daily) return;
-    const text = buildDailyShareText({
-      dateKey: lastRun.daily.dateKey,
-      score,
-      world,
-      level,
-      stackCount: lastRun.stats.stackCount,
-      qualities: qualitiesFromScoreHistory(lastRun.stats.scoreHistory),
-    });
+    if (!lastRun) return;
+    const text = lastRun.daily
+      ? buildDailyShareText({
+          dateKey: lastRun.daily.dateKey,
+          score,
+          world,
+          level,
+          stackCount: lastRun.stats.stackCount,
+          qualities: qualitiesFromScoreHistory(lastRun.stats.scoreHistory),
+        })
+      : buildRunShareText({
+          mode: lastRun.mode,
+          score,
+          world,
+          level,
+          stackCount: runStackCount,
+          bestCombo: lastRun.stats.bestStreak,
+          breakdown,
+          practiceWorld: lastRun.practiceWorld,
+        });
     setShareStatus(await shareText(text));
   };
 
@@ -779,6 +791,23 @@ function App() {
   const endInsight = lastRun ? getEndInsight(lastRun.stats.endReason, world) : null;
   const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
   const breakdownTotal = QUALITY_ORDER.reduce((sum, q) => sum + breakdown[q], 0);
+  /** Stacks made this run (a practice run starts with earlier worlds "done"). */
+  const runStackCount = Math.max(
+    0,
+    (lastRun?.stats.stackCount ?? 0) - stacksBeforeWorld(lastRun?.practiceWorld ?? 1),
+  );
+  const shareControls = (
+    <>
+      <button className="share-btn" data-ui-sound="confirm" onClick={handleShare}>
+        SHARE RESULT
+      </button>
+      <p className="share-status" role="status">
+        {shareStatus === "copied" && "Copied to clipboard"}
+        {shareStatus === "shared" && "Shared!"}
+        {shareStatus === "failed" && "Sharing unavailable"}
+      </p>
+    </>
+  );
 
   /**
    * Menu sounds via one delegated listener: every button plays "select"
@@ -1142,13 +1171,7 @@ function App() {
             <dl className="run-stats">
               <div>
                 <dt>STACKS</dt>
-                <dd className="stat-stacks">
-                  {Math.max(
-                    0,
-                    (lastRun?.stats.stackCount ?? 0) -
-                      stacksBeforeWorld(lastRun?.practiceWorld ?? 1),
-                  )}
-                </dd>
+                <dd className="stat-stacks">{runStackCount}</dd>
               </div>
               <div>
                 <dt>PERFECT</dt>
@@ -1213,14 +1236,7 @@ function App() {
                 {lastRun.daily.attempts}{" "}
                 {lastRun.daily.attempts === 1 ? "TRY" : "TRIES"}
               </p>
-              <button className="share-btn" data-ui-sound="confirm" onClick={handleShare}>
-                SHARE RESULT
-              </button>
-              <p className="share-status" role="status">
-                {shareStatus === "copied" && "Copied to clipboard"}
-                {shareStatus === "shared" && "Shared!"}
-                {shareStatus === "failed" && "Sharing unavailable"}
-              </p>
+              {shareControls}
             </div>
           ) : (
           <div className="leaderboard">
@@ -1245,6 +1261,7 @@ function App() {
             )}
           </div>
           )}
+          {lastRun && !lastRun.daily && <div className="run-share">{shareControls}</div>}
           <button className="retry-btn" data-ui-sound="confirm" onClick={restartRun}>
             RETRY
           </button>
