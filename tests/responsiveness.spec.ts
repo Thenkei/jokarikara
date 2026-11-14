@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures";
 import { makeBridge, waitForBridge } from "./bridgeHelpers";
 
-test.describe("Responsive Layout", () => {
+test.describe("Responsive Layout", { tag: "@cross-browser" }, () => {
   test("should display start screen on desktop", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator(".title")).toHaveText("SHAPE STACK");

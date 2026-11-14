@@ -56,9 +56,18 @@ npm run build
 
 ```bash
 npm run lint
-npm run test       # Vitest unit tests
-npm run test:e2e   # Playwright (5 browser projects)
+npm run test               # Vitest unit tests (~2 s)
+npm run test:e2e:chromium  # every E2E spec, Chromium only (fastest loop)
+npm run test:e2e           # Chromium: all specs; Firefox/WebKit/mobile: @cross-browser specs only
+npm run test:e2e:full      # every spec on all 5 projects
 ```
+
+Gameplay E2E specs drive deterministic state through the test bridge, so they run on Chromium only. Specs tagged `@cross-browser` (canvas rendering, responsive layout) run on every engine.
+
+CI (`.github/workflows/ci.yml`):
+- **Pull requests**: lint, build, unit tests and the targeted E2E matrix, with Playwright browsers cached.
+- **Pushes to `main`**: the full matrix; GitHub Pages deploys only after CI passes.
+- Visual snapshot baselines are macOS-only, so CI on Linux skips those assertions.
 
 ## Technologies Used
 

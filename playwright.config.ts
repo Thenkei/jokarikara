@@ -13,6 +13,24 @@ if (!Number.isInteger(E2E_PORT) || E2E_PORT <= 0 || E2E_PORT > 65535) {
 const BASE_URL = `http://localhost:${E2E_PORT}/jokarikara/`;
 
 /**
+ * Test-selection strategy (see README "Test"):
+ * - Chromium runs every spec.
+ * - Other engines/devices only run specs tagged `@cross-browser` (canvas
+ *   rendering, responsive layout). Gameplay specs drive deterministic JS state
+ *   through the test bridge, so replaying them on 5 engines proves nothing new.
+ * - `E2E_FULL=1` restores the full matrix (CI on main, manual runs).
+ */
+const FULL_MATRIX = process.env.E2E_FULL === "1";
+const crossBrowserOnly = FULL_MATRIX ? {} : { grep: /@cross-browser/ };
+
+/**
+ * Visual baselines are generated on macOS (`*-darwin.png`). Font/AA rendering
+ * differs on Linux runners, so snapshot assertions are skipped off-macOS in CI
+ * instead of failing on missing/mismatched baselines.
+ */
+const IGNORE_SNAPSHOTS = !!process.env.CI && process.platform !== "darwin";
+
+/**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
@@ -21,12 +39,13 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* One retry on CI: enough to absorb infra noise without hiding real flakes. */
+  retries: process.env.CI ? 1 : 0,
+  /* GitHub runners have 4 vCPUs; tests are independent (fresh page + storage). */
+  workers: process.env.CI ? 2 : undefined,
+  ignoreSnapshots: IGNORE_SNAPSHOTS,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: "html",
+  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -46,21 +65,25 @@ export default defineConfig({
 
     {
       name: "firefox",
+      ...crossBrowserOnly,
       use: { ...devices["Desktop Firefox"] },
     },
 
     {
       name: "webkit",
+      ...crossBrowserOnly,
       use: { ...devices["Desktop Safari"] },
     },
 
     /* Test against mobile viewports. */
     {
       name: "Mobile Chrome",
+      ...crossBrowserOnly,
       use: { ...devices["Pixel 5"] },
     },
     {
       name: "Mobile Safari",
+      ...crossBrowserOnly,
       use: { ...devices["iPhone 12"] },
     },
 
