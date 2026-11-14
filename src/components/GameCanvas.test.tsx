@@ -19,6 +19,22 @@ const mockAudioService: IAudioService = {
   isMuted: vi.fn(() => false),
   init: vi.fn(),
   resume: vi.fn(),
+  startMusic: vi.fn(),
+  setMusicIntensity: vi.fn(),
+  setMusicWorld: vi.fn(),
+  pauseMusic: vi.fn(),
+  resumeMusic: vi.fn(),
+  stopMusic: vi.fn(),
+  setMusicEnabled: vi.fn(),
+  isMusicEnabled: vi.fn(() => true),
+  getMusicState: vi.fn(() => ({
+    active: false,
+    paused: false,
+    enabled: true,
+    playing: false,
+    intensity: 0 as const,
+    world: 1,
+  })),
 };
 
 /** Real browsers mark the first finger / the mouse as the primary pointer. */
@@ -343,6 +359,55 @@ describe("GameCanvas", () => {
 
       expect(onGameOver).not.toHaveBeenCalled();
       expect(mockAudioService.playFailSound).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("soundtrack", () => {
+    const renderCanvas = (ref?: { current: GameCanvasHandle | null }) =>
+      render(
+        <GameCanvas
+          ref={ref}
+          onScore={vi.fn()}
+          onGameOver={vi.fn()}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          audioService={mockAudioService}
+        />
+      );
+
+    it("starts music for the run in world 1 and stops it on unmount", () => {
+      const { unmount } = renderCanvas();
+      expect(mockAudioService.startMusic).toHaveBeenCalledWith(1);
+      expect(mockAudioService.stopMusic).not.toHaveBeenCalled();
+      unmount();
+      expect(mockAudioService.stopMusic).toHaveBeenCalled();
+    });
+
+    it("pauses and resumes music with the game", () => {
+      const ref = { current: null } as { current: GameCanvasHandle | null };
+      renderCanvas(ref);
+      act(() => ref.current?.setPaused(true));
+      expect(mockAudioService.pauseMusic).toHaveBeenCalledTimes(1);
+      act(() => ref.current?.setPaused(false));
+      expect(mockAudioService.resumeMusic).toHaveBeenCalledTimes(1);
+    });
+
+    it("raises the music intensity as the combo streak grows", async () => {
+      const { container } = renderCanvas();
+      const canvas = container.querySelector("canvas");
+      if (!canvas) throw new Error("Canvas not found");
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      const intensities: number[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        tap(canvas);
+        const calls = vi.mocked(mockAudioService.setMusicIntensity).mock.calls;
+        intensities.push(calls[calls.length - 1]?.[0] as number);
+      }
+      expect(intensities).toEqual([0, 0, 1, 1, 1, 2]);
+      expect(mockAudioService.setMusicWorld).toHaveBeenCalledWith(1);
     });
   });
 
