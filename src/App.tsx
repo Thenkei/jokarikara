@@ -21,11 +21,14 @@ import {
 import type { HighScoresByMode } from "./utils/storage";
 import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
 import { getWorldTheme } from "./visual/theme";
+import { getTimeBonus } from "./core/gameState";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
   LEVELS_PER_WORLD,
   STACKS_PER_LEVEL,
   PERFECT_STACK_TIME_BONUS,
+  GREAT_STACK_TIME_BONUS,
+  TIME_ATTACK_MISS_PENALTY,
   ZEN_MAX_LIVES,
 } from "./constants/game";
 import {
@@ -86,7 +89,10 @@ const MODE_LABELS: Record<GameMode, { label: string; aria: string; description: 
   TIME_ATTACK: {
     label: "TIME",
     aria: "Time Attack mode",
-    description: "60 s, perfects add +5 s.",
+    description:
+      TIME_ATTACK_MISS_PENALTY !== undefined
+        ? `60 s. Perfect +${PERFECT_STACK_TIME_BONUS} s, great +${GREAT_STACK_TIME_BONUS} s, miss −${TIME_ATTACK_MISS_PENALTY} s.`
+        : `60 s, perfects add +${PERFECT_STACK_TIME_BONUS} s.`,
   },
 };
 
@@ -194,6 +200,8 @@ function App() {
   const [showSecondaryHud, setShowSecondaryHud] = useState(false);
   const [lastQuality, setLastQuality] = useState<StackQuality | null>(null);
   const [qualityPulseId, setQualityPulseId] = useState(0);
+  /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
+  const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
   const canvasRef = useRef<GameCanvasHandle>(null);
   const secondaryHudTimeoutRef = useRef<number | null>(null);
@@ -215,6 +223,17 @@ function App() {
     abandonRun: abandonAchievementRun,
   } = useAchievements({ onUnlock: handleAchievementUnlock });
   const unlockedAchievementCount = countUnlocked(achievementRecord.unlocked);
+
+  const handleRunMiss = useCallback(
+    (terminal: boolean) => {
+      recordAchievementMiss(terminal);
+      // A non-terminal Time Attack miss costs time: show the penalty.
+      if (!terminal && mode === "TIME_ATTACK" && TIME_ATTACK_MISS_PENALTY !== undefined) {
+        setPenaltyPulseId((current) => current + 1);
+      }
+    },
+    [recordAchievementMiss, mode],
+  );
   const bestWorldReached = achievementRecord.lifetime.bestWorld;
   // A saved pick can exceed what is unlocked only after storage resets.
   const pickedWorld = Math.min(practiceWorld, bestWorldReached);
@@ -305,6 +324,7 @@ function App() {
     previousZenLivesRef.current = initialZenLives;
     setLastQuality(null);
     setQualityPulseId(0);
+    setPenaltyPulseId(0);
     setLevel(1);
     setWorld(startWorld);
     setTimeRemaining(null);
@@ -745,7 +765,7 @@ function App() {
               onStyleUpdate={handleStyleUpdate}
               onZenLivesChange={handleZenLivesChange}
               onStack={recordAchievementStack}
-              onMiss={recordAchievementMiss}
+              onMiss={handleRunMiss}
             />
           </div>
 
@@ -862,15 +882,29 @@ function App() {
             </div>
           )}
 
-          {mode === "TIME_ATTACK" && lastQuality === "PERFECT" && (
-            <div
-              key={`bonus-${qualityPulseId}`}
-              className="time-bonus-pop"
-              aria-hidden="true"
-            >
-              +{PERFECT_STACK_TIME_BONUS}s
-            </div>
-          )}
+          {mode === "TIME_ATTACK" &&
+            lastQuality &&
+            getTimeBonus(lastQuality) > 0 && (
+              <div
+                key={`bonus-${qualityPulseId}`}
+                className="time-bonus-pop"
+                aria-hidden="true"
+              >
+                +{getTimeBonus(lastQuality)}s
+              </div>
+            )}
+
+          {mode === "TIME_ATTACK" &&
+            penaltyPulseId > 0 &&
+            TIME_ATTACK_MISS_PENALTY !== undefined && (
+              <div
+                key={`penalty-${penaltyPulseId}`}
+                className="time-penalty-pop"
+                aria-hidden="true"
+              >
+                −{TIME_ATTACK_MISS_PENALTY}s
+              </div>
+            )}
 
           {showLevelUp && !showWorldUp && (
             <div className="level-up-overlay">

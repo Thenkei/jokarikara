@@ -1270,3 +1270,40 @@ button:focus-visible {
   font-size: 0.85rem;
   line-height: 1.4;
 }
+
+/* Time Attack: miss penalty, mirrored from the bonus pop. */
+.time-penalty-pop {
+  position: absolute;
+  top: 4.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  pointer-events: none;
+  color: #ff7b7b;
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 10px rgba(255, 90, 90, 0.45);
+  animation: timePenaltyDrop 0.9s ease-out forwards;
+}
+
+@keyframes timePenaltyDrop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -0.4rem) scale(1.15);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 1.4rem) scale(0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .time-penalty-pop {
+    animation: timeBonusFade 0.9s linear forwards;
+  }
+}

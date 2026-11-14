@@ -12,6 +12,8 @@ import {
   type WorldMechanics,
   TIME_ATTACK_START_TIME,
   PERFECT_STACK_TIME_BONUS,
+  GREAT_STACK_TIME_BONUS,
+  TIME_ATTACK_MISS_PENALTY,
   REFERENCE_INITIAL_SIZE,
   STYLE_QUALITY_THRESHOLDS,
   STYLE_QUALITY_POINTS,
@@ -409,14 +411,10 @@ export const stackActiveShape = (
   const newStackCount = state.stackCount + 1;
   const newScoreHistory = [...state.scoreHistory, awardedScore];
 
-  // Time Attack: Bonus for perfect stack
+  // Time Attack: precise stacks buy time.
   let newTimeRemaining = state.timeRemaining;
-  if (
-    state.mode === "TIME_ATTACK" &&
-    isPerfect &&
-    newTimeRemaining !== undefined
-  ) {
-    newTimeRemaining += PERFECT_STACK_TIME_BONUS;
+  if (state.mode === "TIME_ATTACK" && newTimeRemaining !== undefined) {
+    newTimeRemaining += getTimeBonus(quality);
   }
 
   const { world: newWorld, level: newLevel } = computeProgression(newStackCount);
@@ -478,7 +476,44 @@ export const stackActiveShape = (
 /**
  * Handle a missed stack based on the game mode.
  */
+/** Seconds a stack of this quality adds in Time Attack. */
+export const getTimeBonus = (quality: StackQuality): number =>
+  quality === "PERFECT"
+    ? PERFECT_STACK_TIME_BONUS
+    : quality === "GREAT"
+      ? GREAT_STACK_TIME_BONUS
+      : 0;
+
+/** Growing shape reset to its spawn size after a non-terminal miss. */
+const resetActiveAfterMiss = (state: GameState): Shape | null =>
+  state.activeShape
+    ? {
+        ...state.activeShape,
+        size:
+          getSpawnSize(state.world, state.shapes[state.shapes.length - 1]) ??
+          state.activeShape.size,
+      }
+    : null;
+
 export const handleMiss = (state: GameState): GameState => {
+  if (
+    state.mode === "TIME_ATTACK" &&
+    TIME_ATTACK_MISS_PENALTY !== undefined &&
+    state.timeRemaining !== undefined
+  ) {
+    // Against the clock a miss costs time, not the run.
+    if (!state.activeShape) return state;
+    const timeRemaining = Math.max(0, state.timeRemaining - TIME_ATTACK_MISS_PENALTY);
+    const nextState: GameState = {
+      ...state,
+      timeRemaining,
+      streak: 0,
+      lastStackQuality: null,
+      activeShape: resetActiveAfterMiss(state),
+      activeOffset: { x: 0, y: 0 },
+    };
+    return timeRemaining <= 0 ? setGameOver(nextState) : nextState;
+  }
   if (state.mode === "ZEN") {
     if (!state.activeShape) return state;
     const nextLives = Math.max(
@@ -488,13 +523,7 @@ export const handleMiss = (state: GameState): GameState => {
     const nextState: GameState = {
       ...state,
       zenLivesRemaining: nextLives,
-      activeShape: {
-        ...state.activeShape,
-        // Restart at the spawn size for this world.
-        size:
-          getSpawnSize(state.world, state.shapes[state.shapes.length - 1]) ??
-          state.activeShape.size,
-      },
+      activeShape: resetActiveAfterMiss(state),
       activeOffset: { x: 0, y: 0 },
     };
     if (nextLives <= 0) {
