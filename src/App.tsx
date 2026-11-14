@@ -58,6 +58,11 @@ import {
 } from "./components/AchievementToaster";
 import { AchievementsPanel } from "./components/AchievementsPanel";
 import {
+  GearIcon,
+  SettingsSheet,
+  type SettingId,
+} from "./components/SettingsSheet";
+import {
   GameOverScreen,
   type GameOverRun,
   type ShareStatus,
@@ -210,6 +215,9 @@ function App() {
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  /** The gear that opened the sheet (start screen or pause menu, never both). */
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<GameCanvasHandle>(null);
   const secondaryHudTimeoutRef = useRef<number | null>(null);
   const previousZenLivesRef = useRef<number | null>(null);
@@ -522,6 +530,8 @@ function App() {
   const applyPaused = useCallback(
     (next: boolean) => {
       setPaused(next);
+      // The sheet only exists over the pause menu; never reopen it on a later pause.
+      if (!next) setShowSettings(false);
       announce(next ? "Paused" : "Resumed");
       canvasRef.current?.setPaused(next);
       // Paused time does not count towards play-time achievements.
@@ -587,6 +597,21 @@ function App() {
     else audioManager.playUi("select");
   };
 
+  const handleToggleSetting = (id: SettingId) => {
+    switch (id) {
+      case "fx":
+        return handleToggleReducedFx();
+      case "sound":
+        return handleToggleMute();
+      case "music":
+        return handleToggleMusic();
+      case "haptics":
+        return handleToggleHaptics();
+      case "timingCue":
+        return handleToggleTimingCue();
+    }
+  };
+
   const handleShare = async () => {
     if (!lastRun) return;
     const text = lastRun.daily
@@ -615,6 +640,7 @@ function App() {
     // No-op after a game over (already committed); counts an abandoned run.
     abandonAchievementRun();
     setPaused(false);
+    setShowSettings(false);
     setDailyKey(null);
     setTodayRecord(getDailyRecord(getLocalDateKey()));
     clearSecondaryHudTimeout();
@@ -626,11 +652,24 @@ function App() {
     setGameState("START");
   };
 
+  /**
+   * Preferences live behind one Settings entry (start screen corner + pause
+   * menu), not in the in-game HUD: they are not gameplay info, and a row of
+   * pills crowded both menus.
+   */
+  const settingsSheetVisible =
+    showSettings &&
+    ((gameState === "START" && !showAchievements) ||
+      (gameState === "PLAYING" && paused));
+
   // Latest-callback ref so the window listeners below are bound once per phase
   // instead of being torn down on every render.
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    // The sheet owns the keyboard while open (Escape, focus trap); nothing may
+    // resume, tap or start a run from behind it.
+    if (settingsSheetVisible) return;
 
     if (gameState === "PLAYING") {
       if (event.key === "Escape" || event.key === "p" || event.key === "P") {
@@ -725,65 +764,6 @@ function App() {
     return best === undefined ? "BEST --" : `BEST ${best}`;
   };
 
-  /**
-   * Preferences live in the pause menu and on the start screen, not in the
-   * in-game HUD: they are not gameplay info, and on phones the extra pills
-   * overflowed the HUD row.
-   */
-  const renderSettings = (variant: "pause" | "start") => (
-    <div
-      className={`settings-row settings-row--${variant}`}
-      role="group"
-      aria-label="Settings"
-    >
-      <button
-        className="fx-toggle-btn"
-        onClick={handleToggleReducedFx}
-        aria-label={
-          reducedFx
-            ? "Visual effects: low. Switch to full"
-            : "Visual effects: full. Switch to low"
-        }
-      >
-        {reducedFx ? "FX: LOW" : "FX: FULL"}
-      </button>
-      <button
-        className="mute-toggle-btn" data-ui-sound="none"
-        onClick={handleToggleMute}
-        aria-label="Mute sound"
-        aria-pressed={muted}
-      >
-        {muted ? "SOUND: OFF" : "SOUND: ON"}
-      </button>
-      <button
-        className="music-toggle-btn"
-        onClick={handleToggleMusic}
-        aria-label="Background music"
-        aria-pressed={musicOn}
-      >
-        {musicOn ? "MUSIC: ON" : "MUSIC: OFF"}
-      </button>
-      {hapticsSupported && (
-        <button
-          className="haptics-toggle-btn"
-          onClick={handleToggleHaptics}
-          aria-label="Vibration feedback"
-          aria-pressed={hapticsOn}
-        >
-          {hapticsOn ? "HAPTICS: ON" : "HAPTICS: OFF"}
-        </button>
-      )}
-      <button
-        className="timing-cue-toggle-btn" data-ui-sound="none"
-        onClick={handleToggleTimingCue}
-        aria-label="Timing cue: ticks that speed up towards the perfect moment"
-        aria-pressed={timingCueOn}
-      >
-        {timingCueOn ? "TIMING CUE: ON" : "TIMING CUE: OFF"}
-      </button>
-    </div>
-  );
-
   const endInsight = lastRun ? getEndInsight(lastRun.stats.endReason, world) : null;
   const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
   /** Stacks made this run (a practice run starts with earlier worlds "done"). */
@@ -822,7 +802,20 @@ function App() {
       {gameState === "START" && <StartBackdrop palette={backdropPalette} />}
 
       {gameState === "START" && !showAchievements && (
-        <div className="screen start-screen">
+        <button
+          ref={settingsTriggerRef}
+          className="settings-gear-btn"
+          onClick={() => setShowSettings(true)}
+          aria-label="Settings"
+          aria-haspopup="dialog"
+          inert={settingsSheetVisible}
+        >
+          <GearIcon />
+        </button>
+      )}
+
+      {gameState === "START" && !showAchievements && (
+        <div className="screen start-screen" inert={settingsSheetVisible}>
           <h1 className="title">SHAPE STACK</h1>
           <p className="subtitle">Tap to stack. Don't overlap.</p>
 
@@ -918,7 +911,6 @@ function App() {
             ACHIEVEMENTS {unlockedAchievementCount}/{ACHIEVEMENT_COUNT}
           </button>
 
-          {renderSettings("start")}
         </div>
       )}
 
@@ -926,6 +918,7 @@ function App() {
         <div
           className="game-screen"
           style={{ width: "100%", height: "100%", ...gameplayThemeVars }}
+          inert={settingsSheetVisible}
         >
           <div className="canvas-container">
             <GameCanvas
@@ -1045,10 +1038,18 @@ function App() {
               >
                 RESTART
               </button>
+              <button
+                ref={settingsTriggerRef}
+                className="pause-settings-btn menu-btn"
+                onClick={() => setShowSettings(true)}
+                aria-haspopup="dialog"
+              >
+                <GearIcon />
+                SETTINGS
+              </button>
               <button className="pause-menu-btn menu-btn" data-ui-sound="back" onClick={handleMainMenu}>
                 MAIN MENU
               </button>
-              {renderSettings("pause")}
             </div>
           )}
 
@@ -1142,6 +1143,22 @@ function App() {
           onShare={handleShare}
           onRetry={restartRun}
           onMenu={handleMainMenu}
+        />
+      )}
+
+      {settingsSheetVisible && (
+        <SettingsSheet
+          values={{
+            fx: !reducedFx,
+            sound: !muted,
+            music: musicOn,
+            haptics: hapticsOn,
+            timingCue: timingCueOn,
+          }}
+          hapticsSupported={hapticsSupported}
+          onToggle={handleToggleSetting}
+          onClose={() => setShowSettings(false)}
+          returnFocusRef={settingsTriggerRef}
         />
       )}
 

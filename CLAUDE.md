@@ -70,6 +70,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/utils/storage.ts` - localStorage: per-mode top-5 high scores, daily records, settings, achievements (all validated on read)
 - `src/progression/achievements.ts` - Achievement catalogue, named thresholds, pure `evaluate(run, lifetime)` and run/lifetime reducers; `useAchievements.ts` is the React glue (run state in refs, fed by `GameCanvas`'s `onStack`/`onMiss`, re-renders only on unlock)
 - `src/progression/stats.ts` - Pure `LifetimeStats` → ordered display rows (perfect rate, daily streak from an injected "today"), shown in the achievements panel
+- `src/components/SettingsSheet.tsx` - Settings dialog (labelled `role="switch"` rows) opened from the start screen gear and the pause menu; owns focus (first switch on open, Tab trap, Escape in document capture so it never reaches the pause handler, focus back to the opener); App makes the background `inert` and ignores game keys while it is open. E2E helpers in `tests/settingsHelpers.ts`
 - `src/components/StartBackdrop.tsx` - Animated start screen backdrop; layer data lives in `startBackdropLayers.ts` (non-component exports stay out of component modules for Fast Refresh)
 - `src/components/GameOverScreen.tsx` - Presentational game over: score hero, run cards in a scrolling body, and an action bar (RETRY / share / menu) that never scrolls away; achievement toasts move to the top while it is shown
 

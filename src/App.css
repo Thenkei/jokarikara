@@ -335,15 +335,19 @@ button:active {
   margin-top: 1rem;
 }
 
+/*
+ * Inactive pills sit on the animated backdrop: a mostly opaque dark surface
+ * keeps their text above WCAG AA whatever shape passes behind them.
+ */
 .mode-btn {
-  background: rgba(255, 255, 255, 0.05);
-  color: #888;
+  background: rgba(16, 18, 25, 0.72);
+  color: #c3cad8;
   padding: 0.8rem 1.5rem;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .mode-btn.active {
@@ -410,29 +414,6 @@ button:active {
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.07em;
-}
-
-.fx-toggle-btn,
-.mute-toggle-btn,
-.music-toggle-btn,
-.haptics-toggle-btn,
-.timing-cue-toggle-btn {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--world-hud-text);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 0.33rem 0.66rem;
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
-  pointer-events: auto;
-  transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.fx-toggle-btn:hover,
-.mute-toggle-btn:hover,
-.music-toggle-btn:hover,
-.haptics-toggle-btn:hover,
-.timing-cue-toggle-btn:hover {
-  background: color-mix(in srgb, var(--world-hud-primary) 24%, rgba(255, 255, 255, 0.06));
 }
 
 .quality-overlay {
@@ -534,11 +515,6 @@ button:active {
   .lives-badge,
   .streak-badge,
   .best-streak-badge,
-  .fx-toggle-btn,
-  .mute-toggle-btn,
-  .music-toggle-btn,
-  .haptics-toggle-btn,
-  .timing-cue-toggle-btn,
   .restart-btn,
   .undo-btn {
     font-size: 0.6rem;
@@ -587,7 +563,7 @@ button:active {
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #777;
+  color: #aeb6c5; /* AA over the brightest backdrop shape */
   font-variant-numeric: tabular-nums;
 }
 
@@ -644,6 +620,14 @@ button:active {
 .pause-overlay .menu-btn {
   margin-top: 0;
   min-width: 12rem;
+  /* #666 on the dimmed game read at ~3:1; keep secondary but AA. */
+  color: #b9c2d6;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.pause-overlay .menu-btn:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .pause-resume-btn {
@@ -1505,28 +1489,268 @@ button:focus-visible {
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
 }
 
-/* ---------- Settings (pause menu + start screen) ---------- */
-.settings-row {
-  display: flex;
-  flex-wrap: wrap;
+/* ---------- Settings: gear entry points + sheet ---------- */
+.settings-gear-btn {
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  z-index: 20;
+  width: 2.75rem;
+  height: 2.75rem; /* 44px touch target */
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: #c9d1e0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.settings-gear-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+.settings-gear-btn svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  transition: transform 0.45s ease;
+}
+
+.settings-gear-btn:hover svg {
+  transform: rotate(45deg);
+}
+
+.pause-settings-btn {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
 }
 
-.settings-row--pause {
-  margin-top: 0.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+.pause-settings-btn svg {
+  width: 1.05em;
+  height: 1.05em;
+  flex: none;
 }
 
-.settings-row .fx-toggle-btn,
-.settings-row .mute-toggle-btn,
-.settings-row .music-toggle-btn,
-.settings-row .haptics-toggle-btn,
-.settings-row .timing-cue-toggle-btn {
-  padding: 0.5rem 0.85rem;
-  font-size: 0.68rem;
-  min-height: 2.25rem; /* comfortable touch target */
+.settings-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 300; /* above the pause overlay (200) */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.settings-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 7, 12, 0.72);
+  backdrop-filter: blur(4px);
+  animation: settingsFade 0.2s ease-out;
+}
+
+/* Mobile first: a bottom sheet clear of the home indicator and notches. */
+.settings-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 30rem;
+  max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  text-align: left;
+  background: #13151c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  border-radius: 1.5rem 1.5rem 0 0;
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.55);
+  animation: settingsSheetIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  scrollbar-width: none;
+}
+
+.settings-sheet::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-heading {
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-align: center;
+  color: var(--text-color);
+}
+
+.settings-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+/* The whole row is the switch: a large touch target, labelled by its title. */
+.settings-switch {
+  width: 100%;
+  min-height: 3.6rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-color);
+  font: inherit;
+  letter-spacing: normal;
+  text-align: left;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.settings-switch:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.settings-switch:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.settings-switch:focus-visible {
+  outline-offset: 2px;
+}
+
+.settings-switch:disabled {
+  cursor: not-allowed;
+}
+
+.settings-switch-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.settings-switch-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.settings-switch-desc {
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #a3abbb;
+}
+
+.settings-switch:disabled .settings-switch-title {
+  color: #a3abbb;
+}
+
+.settings-switch-track {
+  flex: none;
+  position: relative;
+  width: 2.9rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.settings-switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: #c9d1e0;
+  transform: translateY(-50%);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease;
+}
+
+.settings-switch[aria-checked="true"] .settings-switch-track {
+  background: var(--accent-color);
+  border-color: #6ea8ff;
+}
+
+.settings-switch[aria-checked="true"] .settings-switch-thumb {
+  background: #fff;
+  transform: translate(1.2rem, -50%);
+}
+
+.settings-switch:disabled .settings-switch-track {
+  opacity: 0.4;
+}
+
+.settings-done-btn {
+  align-self: stretch;
+  padding: 0.95rem 1rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+}
+
+/* Larger screens: a centred dialog rather than a sheet glued to the edge. */
+@media (min-width: 640px) and (min-height: 560px) {
+  .settings-layer {
+    align-items: center;
+    padding: 1.5rem;
+  }
+
+  .settings-sheet {
+    padding: 1.5rem 1.25rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.5rem;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+    animation-name: settingsDialogIn;
+  }
+}
+
+@keyframes settingsFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes settingsSheetIn {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes settingsDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-scrim,
+  .settings-sheet {
+    animation: none;
+  }
+
+  .settings-gear-btn svg,
+  .settings-switch,
+  .settings-switch-track,
+  .settings-switch-thumb {
+    transition: none;
+  }
+
+  .settings-gear-btn:hover svg {
+    transform: none;
+  }
 }
 
 /* ---------- Zen practice (start world picker) ---------- */
