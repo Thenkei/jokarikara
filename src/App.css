@@ -1361,3 +1361,53 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/* ---------- Start screen backdrop ---------- */
+.start-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.start-backdrop-svg {
+  width: min(120vw, 120vh);
+  height: min(120vw, 120vh);
+  opacity: 0.16;
+  filter: saturate(1.1);
+  /* Fade the edges so text on top stays the focus. */
+  -webkit-mask-image: radial-gradient(circle, #000 35%, transparent 72%);
+  mask-image: radial-gradient(circle, #000 35%, transparent 72%);
+}
+
+.start-backdrop-layer {
+  /*
+   * Each layer contains an invisible circle of its radius, so its fill-box
+   * is centred on the stack centre even for odd polygons. This is more
+   * reliable across engines than view-box origins.
+   */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: backdropSpin linear infinite;
+}
+
+.start-backdrop-layer > :not(.start-backdrop-anchor) {
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 0.4;
+}
+
+@keyframes backdropSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-backdrop-layer {
+    animation: none;
+  }
+}

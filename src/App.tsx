@@ -20,7 +20,8 @@ import {
 } from "./utils/storage";
 import type { HighScoresByMode } from "./utils/storage";
 import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
-import { getWorldTheme } from "./visual/theme";
+import { getWorldPalette, getWorldTheme } from "./visual/theme";
+import { StartBackdrop } from "./components/StartBackdrop";
 import { getTimeBonus } from "./core/gameState";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
@@ -257,6 +258,11 @@ function App() {
     audioManager.playLevelUp(worldRef.current);
   }, []);
   const worldConfig = useMemo(() => getWorldConfig(world), [world]);
+  // Fixed seed: the start screen keeps the same look between visits.
+  const backdropPalette = useMemo(
+    () => getWorldPalette(1, 0, reducedFx),
+    [reducedFx]
+  );
   const worldTheme = useMemo(
     () => getWorldTheme(world, runSeed, reducedFx),
     [world, runSeed, reducedFx]
@@ -665,6 +671,8 @@ function App() {
           onClose={() => setShowAchievements(false)}
         />
       )}
+
+      {gameState === "START" && <StartBackdrop palette={backdropPalette} />}
 
       {gameState === "START" && !showAchievements && (
         <div className="screen start-screen">
