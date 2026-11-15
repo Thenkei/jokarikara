@@ -8,6 +8,8 @@ import { LEVELS_PER_WORLD } from "../constants/game";
 import { getAchievement, type AchievementId } from "../progression/achievements";
 import type { DailyCountdown, DailyStreakLabel } from "../modes/dailyStreak";
 import { StreakChip } from "./StreakChip";
+import { MedalGlyph } from "./MedalGlyph";
+import { MEDAL_LABELS, type MedalResult } from "../modes/medals";
 
 export type ShareStatus = "idle" | "copied" | "shared" | "failed";
 
@@ -53,6 +55,8 @@ interface GameOverScreenProps {
   endInsight: EndInsight | null;
   breakdown: QualityBreakdown;
   shareStatus: ShareStatus;
+  /** Time Attack runs only: medal earned and the next goal. */
+  medal?: MedalResult | null;
   /** Daily runs only: current streak (null below two days). */
   dailyStreak?: DailyStreakLabel | null;
   /** Daily runs only: when the next challenge unlocks. */
@@ -109,6 +113,33 @@ function RunAchievements({ ids }: { ids: readonly AchievementId[] }) {
   );
 }
 
+/** Medal under the score: earned metal (or an empty slot) and what is next. */
+function MedalSummary({ result }: { result: MedalResult }) {
+  const { earned, next } = result;
+  return (
+    <div
+      className={`gameover-medal medal--${earned ? earned.toLowerCase() : "none"}`}
+      data-testid="gameover-medal"
+    >
+      <MedalGlyph medal={earned} />
+      <p className="gameover-medal-text">
+        <span className="gameover-medal-title">
+          {earned ? `${MEDAL_LABELS[earned].toUpperCase()} MEDAL` : "NO MEDAL"}
+        </span>
+        {next && (
+          <span className="gameover-medal-next">
+            <span className="visually-hidden">. </span>
+            {MEDAL_LABELS[next.medal]} at {next.threshold}
+            <span aria-hidden="true"> · </span>
+            <span className="visually-hidden">, </span>
+            {next.toGo} to go
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
+
 /**
  * Game over: score hero, grouped run cards in a scrollable body and an action
  * bar (RETRY / share / menu) that never scrolls out of view. Presentational:
@@ -126,6 +157,7 @@ export function GameOverScreen({
   endInsight,
   breakdown,
   shareStatus,
+  medal = null,
   dailyStreak = null,
   nextDaily = null,
   onShare,
@@ -168,6 +200,7 @@ export function GameOverScreen({
               </span>
             )}
           </div>
+          {medal && <MedalSummary result={medal} />}
         </header>
 
         <div className="gameover-cards">

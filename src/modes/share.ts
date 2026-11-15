@@ -1,6 +1,7 @@
 import type { GameMode } from "../types";
 import { QUALITY_EMOJI } from "./daily";
 import { QUALITY_ORDER, type QualityBreakdown } from "./runInsights";
+import { getMedal, getMedalShareLabel, hasMedals } from "./medals";
 
 /**
  * Share text for regular (non-daily) runs. Pure: the caller hands over what
@@ -101,6 +102,9 @@ export interface RunShareInput {
  *   1240 pts · 42 stacks · W3 L2 · combo x12
  *   🟨🟨🟨🟨🟩🟩🟩🟦🟦⬜
  *   https://thenkei.github.io/jokarikara/
+ *
+ * Time Attack names the medal earned in the title, in words ("Shape Stack ·
+ * Time Attack · Gold medal"), and stays silent when there is none.
  */
 export const buildRunShareText = ({
   mode,
@@ -114,9 +118,12 @@ export const buildRunShareText = ({
 }: RunShareInput): string => {
   const modeLabel = MODE_SHARE_LABELS[mode] ?? MODE_SHARE_LABELS.CLASSIC;
   const practiceFrom = toCount(practiceWorld);
-  const title =
-    practiceFrom > 1
-      ? `Shape Stack · ${modeLabel} practice from W${practiceFrom}`
+  const practice = practiceFrom > 1;
+  const medal = hasMedals(mode, false, practice) ? getMedal(toCount(score)) : null;
+  const title = practice
+    ? `Shape Stack · ${modeLabel} practice from W${practiceFrom}`
+    : medal
+      ? `Shape Stack · ${modeLabel} · ${getMedalShareLabel(medal)}`
       : `Shape Stack · ${modeLabel}`;
 
   const stacks = toCount(stackCount);

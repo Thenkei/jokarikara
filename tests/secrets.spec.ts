@@ -52,7 +52,7 @@ test.describe("Start screen secrets", () => {
     await expect(heading).not.toHaveAttribute("role");
 
     // Locked secret: listed, counted, but tells nothing.
-    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 0/13");
+    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 0/14");
     await page.click(".achievements-btn");
     const secret = page.locator('[data-achievement-id="curious-mind"]');
     await expect(secret).toHaveClass(/locked/);
@@ -69,7 +69,7 @@ test.describe("Start screen secrets", () => {
     await expect(page.locator(".achievement-toast")).toHaveText(
       "ACHIEVEMENT · Curious Mind",
     );
-    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 1/13");
+    await expect(page.locator(".achievements-btn")).toHaveText("ACHIEVEMENTS 1/14");
 
     // The flourish settles back to the idle backdrop on its own.
     await expect(backdrop).not.toHaveClass(/flourish/, { timeout: 4000 });
