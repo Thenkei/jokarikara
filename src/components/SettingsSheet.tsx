@@ -47,6 +47,8 @@ interface SettingRow {
    */
   uiSound?: "none";
   disabled?: boolean;
+  /** Keyboard shortcut App handles for this setting (`aria-keyshortcuts`). */
+  keyShortcuts?: string;
 }
 
 const FOCUSABLE =
@@ -172,6 +174,8 @@ export function SettingsSheet({
       title: t("settings.sound.title"),
       description: t("settings.sound.description"),
       uiSound: "none",
+      // App toggles it with M anywhere (see MUTE_SHORTCUT_KEYS).
+      keyShortcuts: "M",
     },
     {
       id: "music",
@@ -224,6 +228,7 @@ export function SettingsSheet({
                   aria-checked={checked}
                   aria-labelledby={titleId}
                   aria-describedby={descId}
+                  aria-keyshortcuts={row.keyShortcuts}
                   disabled={row.disabled}
                   onClick={() => onToggle(row.id)}
                 >

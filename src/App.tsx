@@ -179,6 +179,27 @@ interface KnownDailyRecord {
   readonly record: DailyDayRecord;
 }
 
+/** Keys that toggle sound anywhere (shown as `aria-keyshortcuts` on the switch). */
+const MUTE_SHORTCUT_KEYS: ReadonlySet<string> = new Set(["m", "M"]);
+/** How long the "SOUND OFF / ON" pill stays after the M shortcut. */
+const SOUND_TOAST_MS = 1200;
+
+/** Speaker glyph for the sound pill, crossed out when muted. */
+function SpeakerIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+      <path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5z" fill="currentColor" />
+      <path
+        d={muted ? "M11 6l3.5 4M14.5 6L11 10" : "M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.8a6 6 0 0 1 0 8.4"}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** Latest the idle audio warm-up may wait after load (requestIdleCallback). */
 const AUDIO_PREWARM_TIMEOUT_MS = 2000;
 /** Warm-up delay where requestIdleCallback is missing (older Safari). */
@@ -1026,6 +1047,21 @@ function App() {
     if (!next) audioManager.playUi("select");
     saveSettings({ muted: next });
     revealSecondaryHud();
+    return next;
+  };
+
+  // M toggles sound from anywhere (start, run, pause, game over): a brief
+  // pill shows the new state, and screen readers hear it.
+  const [soundToast, setSoundToast] = useState<{ muted: boolean; id: number } | null>(null);
+  useEffect(() => {
+    if (!soundToast) return;
+    const timer = window.setTimeout(() => setSoundToast(null), SOUND_TOAST_MS);
+    return () => window.clearTimeout(timer);
+  }, [soundToast]);
+  const handleMuteShortcut = () => {
+    const nowMuted = handleToggleMute();
+    announce(t(nowMuted ? "announce.soundOff" : "announce.soundOn"));
+    setSoundToast((current) => ({ muted: nowMuted, id: (current?.id ?? 0) + 1 }));
   };
 
   const handleToggleMusic = () => {
@@ -1112,6 +1148,11 @@ function App() {
     // The sheet owns the keyboard while open (Escape, focus trap); nothing may
     // resume, tap or start a run from behind it.
     if (settingsSheetVisible) return;
+
+    if (MUTE_SHORTCUT_KEYS.has(event.key) && !event.repeat) {
+      handleMuteShortcut();
+      return;
+    }
 
     if (gameState === "PLAYING") {
       if (event.key === "Escape" || event.key === "p" || event.key === "P") {
@@ -1460,6 +1501,13 @@ function App() {
         )}
 
         <AchievementToaster ref={toasterRef} onShow={playAchievementCue} />
+        {soundToast && (
+          // Visual only: the announcement already speaks the new state.
+          <div className="sound-toast" key={soundToast.id} aria-hidden="true">
+            <SpeakerIcon muted={soundToast.muted} />
+            {t(soundToast.muted ? "toast.soundOff" : "toast.soundOn")}
+          </div>
+        )}
       </div>
     </I18nContext>
   );

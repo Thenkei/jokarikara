@@ -131,6 +131,10 @@ export const en = {
 
   // ---------------------------------------------------------------- screen reader announcements
   "announce.paused": "Paused",
+  "announce.soundOn": "Sound on",
+  "announce.soundOff": "Sound off",
+  "toast.soundOn": "SOUND ON",
+  "toast.soundOff": "SOUND OFF",
   "announce.resuming": "Resuming in {seconds}",
   "announce.finishConfirm": "Finish this run? Press again to end it and keep your score",
   "announce.level": "Level {level}",

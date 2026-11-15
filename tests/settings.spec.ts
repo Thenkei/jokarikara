@@ -95,4 +95,41 @@ test.describe("Settings sheet", () => {
     await bridge.finishResumeCountdown();
     expect((await bridge.getState())?.paused).toBe(false);
   });
+
+  test("M toggles sound anywhere, shows it briefly and keeps the setting", async ({ page }) => {
+    await page.goto("/");
+    const toast = page.locator(".sound-toast");
+    const live = page.locator(".sr-only[aria-live='polite']");
+    const storedMuted = () =>
+      page.evaluate(() => JSON.parse(localStorage.getItem("shape-stack-settings") ?? "{}").muted);
+
+    await expect(page.locator(".start-btn")).toBeVisible();
+    await page.keyboard.press("m");
+    await expect(toast).toHaveText("SOUND OFF");
+    await expect(live).toHaveText("Sound off");
+    expect(await storedMuted()).toBe(true);
+    await expect(toast).toHaveCount(0, { timeout: 5_000 });
+
+    // The settings switch follows, and advertises the shortcut.
+    await openSettings(page);
+    const sound = settingSwitch(page, "Sound");
+    await expect(sound).toHaveAttribute("aria-checked", "false");
+    await expect(sound).toHaveAttribute("aria-keyshortcuts", "M");
+    // While the sheet is open it owns the keyboard: M does nothing.
+    await page.keyboard.press("M");
+    await expect(sound).toHaveAttribute("aria-checked", "false");
+    await page.keyboard.press("Escape");
+
+    // Mid-run: M neither taps nor pauses.
+    await page.locator(".start-btn").press("Enter");
+    await waitForBridge(page);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    await page.keyboard.press("m");
+    await expect(toast).toHaveText("SOUND ON");
+    expect(await storedMuted()).toBe(false);
+    expect((await bridge.getState())?.stackCount).toBe(0);
+    await expect(page.locator(".pause-overlay")).toHaveCount(0);
+  });
 });
+
