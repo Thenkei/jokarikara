@@ -2,6 +2,7 @@ import type { MutableRefObject } from "react";
 import type { IAudioService, MusicState } from "../audio/types";
 import { getWorldMechanics } from "../constants/game";
 import { isFractureActive, isTapBlockedByFracture } from "../gameplay/fracture";
+import type { Medal } from "../modes/medals";
 import type { GameState } from "../types";
 import type { WorldTheme } from "../visual/theme";
 
@@ -64,6 +65,11 @@ export type GameTestBridge = {
 
 export type CueCall = { step: number; inWindow: boolean };
 
+/** A run-ending sound the audio service was asked to play. */
+export type EndSoundCall =
+  | { sound: "fail" }
+  | { sound: "timeUp"; world: number; medal: Medal | null };
+
 /** E2E-only, read-only view of the audio service (outlives GameCanvas). */
 export type AudioTestBridge = {
   getMusicState: () => MusicState;
@@ -72,6 +78,8 @@ export type AudioTestBridge = {
   /** Every `playCue` call the audio service received, oldest first. */
   getCueCalls: () => CueCall[];
   clearCueCalls: () => void;
+  /** Every fail / time-up sound the audio service received, oldest first. */
+  getEndSoundCalls: () => EndSoundCall[];
 };
 
 type InstallArgs = {
@@ -293,6 +301,19 @@ export const installAudioTestBridge = (
     cueCalls.push({ step, inWindow });
     playCue.call(audio, step, inWindow);
   };
+  // Same for the run-ending sounds: which one a run ended on (Firefox in the
+  // CI container never starts audio, so recorded calls are the only proof).
+  const endSoundCalls: EndSoundCall[] = [];
+  const playFailSound = audio.playFailSound;
+  audio.playFailSound = () => {
+    endSoundCalls.push({ sound: "fail" });
+    playFailSound.call(audio);
+  };
+  const playTimeUp = audio.playTimeUp;
+  audio.playTimeUp = (world, medal) => {
+    endSoundCalls.push({ sound: "timeUp", world, medal });
+    playTimeUp.call(audio, world, medal);
+  };
   window.__GAME_AUDIO__ = {
     getMusicState: () => audio.getMusicState(),
     getContextState: () => audio.getContextState(),
@@ -300,9 +321,12 @@ export const installAudioTestBridge = (
     clearCueCalls: () => {
       cueCalls.length = 0;
     },
+    getEndSoundCalls: () => endSoundCalls.map((call) => ({ ...call })),
   };
   return () => {
     audio.playCue = playCue;
+    audio.playFailSound = playFailSound;
+    audio.playTimeUp = playTimeUp;
     delete window.__GAME_AUDIO__;
   };
 };

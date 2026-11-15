@@ -14,9 +14,11 @@ import {
   STOP_FADE_SECONDS,
 } from "../audio/soundtrack";
 import type { StackQuality } from "../types";
+import type { Medal } from "../modes/medals";
 import {
   getCueNoteHz,
   getStackNoteHz,
+  getTimeUpCadence,
   pentatonicSemitones,
   getWorldRoot,
   LEVEL_UP_ARPEGGIO,
@@ -27,6 +29,13 @@ import {
 
 /** Seconds the record fanfare waits so the stack note under it reads first. */
 const RECORD_DELAY = 0.08;
+
+/**
+ * Time-up: the chord lands once the bell strike has read (seconds), after
+ * its pickup notes, one per step.
+ */
+const TIME_UP_CHORD_AT = 0.42;
+const TIME_UP_PICKUP_STEP = 0.09;
 
 interface WindowWithWebkitAudioContext extends Window {
   webkitAudioContext?: typeof AudioContext;
@@ -786,6 +795,59 @@ class AudioManager implements IAudioService {
       { freq: at(24), type: "sine", delay: chord + 0.04, duration: 0.5, peak: 0.04, detune: 6 },
       { freq: at(24) * 2.76, type: "sine", delay: chord, duration: 0.1, peak: 0.025, attack: 0.001 },
     ]);
+  }
+
+  playTimeUp(world: number, medal: Medal | null): void {
+    // In the world's key but unshaped by the palette (like the record and
+    // combo fanfares): the result must read the same in every world, and a
+    // mirrored world would invert the medal's major third, a swelling one
+    // blur the strike. `tests/audio-levels.spec.ts` keeps every world's key
+    // within ±2 dB of world 1 instead.
+    const root = getWorldRoot(world) * 2;
+    const at = (semitones: number) => root * semitonesToRatio(semitones);
+    const bell = at(24);
+    const cadence = getTimeUpCadence(medal);
+    const voices: Voice[] = [
+      // "TIME!": a struck bell two octaves over the chord root. The bar's
+      // inharmonic partials (x2.76, x5.4) die fast so it rings, not beeps;
+      // a soft hum under the chord gives it body on small speakers.
+      { freq: bell, type: "sine", duration: 1.1, peak: 0.22, attack: 0.002 },
+      { freq: bell * 2.76, type: "sine", duration: 0.2, peak: 0.06, attack: 0.001 },
+      { freq: bell * 5.4, type: "sine", duration: 0.07, peak: 0.025, attack: 0.001 },
+      { freq: at(-12), type: "sine", duration: 0.8, peak: 0.1, attack: 0.004 },
+    ];
+    // Every result lands its chord at the same moment (a longer run starts
+    // earlier), so tiers differ by the chord, not by where it falls.
+    const pickups = cadence.pickup.length;
+    cadence.pickup.forEach((semitones, i) => {
+      voices.push({
+        freq: at(semitones),
+        type: "triangle",
+        delay: TIME_UP_CHORD_AT - (pickups - i) * TIME_UP_PICKUP_STEP,
+        duration: TIME_UP_PICKUP_STEP + 0.03,
+        peak: 0.18,
+        attack: 0.004,
+      });
+    });
+    const chordAt = TIME_UP_CHORD_AT;
+    cadence.chord.forEach((semitones, i) => {
+      voices.push({
+        freq: at(semitones),
+        // The root leads (triangle); the upper notes are soft sines, so a
+        // richer chord reads fuller, not much louder.
+        type: i === 0 ? "triangle" : "sine",
+        delay: chordAt + i * 0.012,
+        duration: cadence.hold - i * 0.02,
+        peak: i === 0 ? 0.24 : 0.08,
+      });
+    });
+    if (cadence.sparkle) {
+      voices.push(
+        { freq: at(24) * 2.76, type: "sine", delay: chordAt, duration: 0.12, peak: 0.025, attack: 0.001 },
+        { freq: at(28), type: "sine", delay: chordAt + 0.05, duration: 0.6, peak: 0.03, detune: 6 },
+      );
+    }
+    this.play("timeUp", voices);
   }
 
   playHeartbeat(): void {

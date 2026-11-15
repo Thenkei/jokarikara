@@ -17,6 +17,10 @@ import type { StackQuality } from "../types";
  *   pulse) without raising it; the cue keeps its ≥ 3 dB, measured ≈ 3.6)
  *   secret chime (start screen) ≈ -21: above menu clicks, under a level up
  *   personal best ("record") ≈ -16: above a PERFECT stack, ≈ combo, ≤ world up
+ *   Time Attack time up, around world up (±2 dB; world up ≈ -16.1 measured):
+ *   no medal ≈ -17.3, Bronze ≈ -16.6, Silver ≈ -16.1, Gold ≈ -15.1 (a climb,
+ *   not a jump); every world's key within ±1.2 dB of world 1's; its worst
+ *   pile-up (PERFECT + bonus + urgent tick + miss + Gold) peaks ≈ -4.7 dBFS
  *   worst simultaneous burst: peak ≤ -1 dBFS (measured ≈ -4.5, no clipping)
  *   (stack/level up/world up in world 1; worlds 2-10 reshape them through
  *   `palette.ts` and stay within ±2 dB of world 1, measured ≤ 1.5 dB)
@@ -47,7 +51,8 @@ export type SfxId =
   | "record"
   | "menu"
   | "ui"
-  | "cue";
+  | "cue"
+  | "timeUp";
 
 /** Gain applied before the bus processing (linear). */
 export const MASTER_VOLUME = 1;
@@ -69,6 +74,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   menu: 0,
   ui: 2.5,
   cue: 10,
+  timeUp: -2.7,
 };
 
 /**
@@ -100,6 +106,9 @@ export const SFX_REVERB_SEND_DB: Readonly<Record<SfxId, number>> = {
   ui: -26,
   // Timing cue is a rhythm aid: a tail would smear where the beat lands.
   cue: -40,
+  // End of a Time Attack run: nothing left to time, so the bell may ring
+  // into the room like the new-world chord.
+  timeUp: -10,
 };
 
 /**

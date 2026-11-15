@@ -10,6 +10,7 @@ import type { DailyCountdown, DailyStreakLabel } from "../modes/dailyStreak";
 import { StreakChip } from "./StreakChip";
 import { MedalGlyph } from "./MedalGlyph";
 import { MEDAL_LABELS, type MedalResult } from "../modes/medals";
+import { getGameOverHeadline } from "../modes/endFeedback";
 
 export type ShareStatus = "idle" | "copied" | "shared" | "failed";
 
@@ -173,7 +174,7 @@ export function GameOverScreen({
       <div className="gameover-body" tabIndex={0} role="region" aria-label="Run summary">
         <header className="gameover-hero">
           <h1 className="title gameover-title">
-            {run?.stats.endReason === "finished" ? "SESSION COMPLETE" : "GAME OVER"}
+            {getGameOverHeadline(run?.stats.endReason)}
           </h1>
           {run?.practiceWorld && (
             <p className="practice-result-label">

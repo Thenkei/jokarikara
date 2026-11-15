@@ -1,4 +1,5 @@
 import type { StackQuality } from "../types";
+import type { Medal } from "../modes/medals";
 
 export type UiSoundKind = "select" | "confirm" | "back";
 
@@ -118,6 +119,14 @@ export interface IAudioService {
    * beat after the stack note it plays over, so both read.
    */
   playRecord(world: number): void;
+
+  /**
+   * Time Attack clock ran out (the mode's normal ending, never the fail
+   * buzz): a bright bell strike, then a cadence in the world's key that
+   * resolves by result, neutral without a medal and richer per medal
+   * (`medal`: the run's final one, null for none). See `TIME_UP_CADENCE`.
+   */
+  playTimeUp(world: number, medal: Medal | null): void;
 
   setMuted(muted: boolean): void;
   isMuted(): boolean;

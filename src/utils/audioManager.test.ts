@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { getWorldPalette } from "../audio/palette";
+import { getTimeUpCadence, getWorldRoot, semitonesToRatio } from "../audio/music";
 import { createAudioManager } from "./audioManager";
 import {
   makeMockAudioContext,
@@ -116,6 +117,71 @@ describe("audioManager", () => {
       // Every voice starts after "now" (0): the stack note lands first.
       const [when] = osc.start.mock.calls[0] as [number];
       expect(when).toBeGreaterThan(0);
+    });
+  });
+
+  describe("time up (Time Attack clock ran out)", () => {
+    const TIERS = [null, "BRONZE", "SILVER", "GOLD"] as const;
+    const freqOf = (osc: (typeof mock.oscillators)[number]) =>
+      osc.frequency.setValueAtTime.mock.calls[0][0] as number;
+    const startOf = (osc: (typeof mock.oscillators)[number]) =>
+      osc.start.mock.calls[0][0] as number;
+    /** Oscillators created by one playTimeUp call. */
+    const play = (audio: ReturnType<typeof createAudioManager>, world: number, medal: (typeof TIERS)[number]) => {
+      const before = mock.oscillators.length;
+      audio.playTimeUp(world, medal);
+      return mock.oscillators.slice(before);
+    };
+
+    it("allocates nothing while muted", () => {
+      const audio = createAudioManager();
+      audio.setMuted(true);
+      for (const medal of TIERS) audio.playTimeUp(1, medal);
+      expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
+    });
+
+    it("strikes a bell at once, then lands the cadence's chord at the same moment for every result", () => {
+      const audio = createAudioManager();
+      const world = 3;
+      const root = getWorldRoot(world) * 2;
+      const plays = TIERS.map((medal) => play(audio, world, medal));
+      // Richer per result: strictly more voices from no medal up to Gold.
+      const counts = plays.map((oscs) => oscs.length);
+      expect(counts).toEqual([...counts].sort((a, b) => a - b));
+      expect(new Set(counts).size).toBe(TIERS.length);
+      for (const [i, oscs] of plays.entries()) {
+        const cadence = getTimeUpCadence(TIERS[i]);
+        // The bell: first voice, starting now, two octaves over the chord root.
+        expect(startOf(oscs[0])).toBe(0);
+        expect(freqOf(oscs[0])).toBeCloseTo(root * 4, 6);
+        oscs.forEach((osc) => expect(osc.start).toHaveBeenCalled());
+        // The chord root (first chord voice, after bell + hum + pickups).
+        const chordRoot = oscs[4 + cadence.pickup.length];
+        expect(freqOf(chordRoot)).toBeCloseTo(root, 6);
+        expect(startOf(chordRoot)).toBeCloseTo(startOf(plays[0][4 + 1]), 9);
+        // Pickups lead into it, in order.
+        const pickups = oscs.slice(4, 4 + cadence.pickup.length);
+        pickups.forEach((osc, j) => {
+          expect(freqOf(osc)).toBeCloseTo(root * semitonesToRatio(cadence.pickup[j]), 6);
+          expect(startOf(osc)).toBeLessThan(startOf(chordRoot));
+          expect(startOf(osc)).toBeGreaterThan(0);
+        });
+      }
+    });
+
+    it("is never the fail buzz: no falling glide, no saw or square", () => {
+      const audio = createAudioManager();
+      for (const medal of TIERS) {
+        for (const osc of play(audio, 1, medal)) {
+          expect(["sine", "triangle"]).toContain(osc.type);
+          expect(osc.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+        }
+      }
+    });
+
+    it("blooms into the reverb like a world-up moment once the bus exists", () => {
+      expect(SFX_REVERB_SEND_DB.timeUp).toBeGreaterThan(SFX_REVERB_SEND_DB.fail);
+      expect(SFX_REVERB_SEND_DB.timeUp).toBe(SFX_REVERB_SEND_DB.worldUp);
     });
   });
 

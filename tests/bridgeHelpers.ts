@@ -1,5 +1,9 @@
 import type { Page } from "@playwright/test";
-import type { CueCall, GameTestBridgeState } from "../src/utils/testBridge";
+import type {
+  CueCall,
+  EndSoundCall,
+  GameTestBridgeState,
+} from "../src/utils/testBridge";
 import type { MusicState } from "../src/audio/types";
 
 export const waitForBridge = async (page: Page) => {
@@ -20,6 +24,12 @@ export const getCueCalls = (page: Page) =>
 
 export const clearCueCalls = (page: Page) =>
   page.evaluate(() => window.__GAME_AUDIO__?.clearCueCalls());
+
+/** Run-ending sounds (fail / time-up) recorded at the audio service. */
+export const getEndSoundCalls = (page: Page) =>
+  page.evaluate(
+    () => (window.__GAME_AUDIO__?.getEndSoundCalls() ?? []) as EndSoundCall[],
+  );
 
 export const makeBridge = (page: Page) => ({
   getState: () =>

@@ -34,6 +34,7 @@ test("sound effects and music keep their mix relationships", async ({
       playComboMilestone: (tier: number, world: number) => void;
       playChime: () => void;
       playRecord: (world: number) => void;
+      playTimeUp: (world: number, medal: "BRONZE" | "SILVER" | "GOLD" | null) => void;
       playUi: (kind: "select" | "confirm" | "back") => void;
       playCue: (step: number, inWindow: boolean) => void;
       startMusic: (w: number) => void;
@@ -118,6 +119,8 @@ test("sound effects and music keep their mix relationships", async ({
       perfect: Level;
       levelUp: Level;
       worldUp: Level;
+      timeUp: Level;
+      timeUpGold: Level;
     }[] = [];
     for (let world = 1; world <= 10; world += 1) {
       worlds.push({
@@ -126,6 +129,9 @@ test("sound effects and music keep their mix relationships", async ({
         perfect: await measure(1.2, (a) => a.playStack("PERFECT", 1, world)),
         levelUp: await measure(1.5, (a) => a.playLevelUp(world)),
         worldUp: await measure(2.5, (a) => a.playWorldUp(world)),
+        // Unshaped by the palette, but in each world's key.
+        timeUp: await measure(2.5, (a) => a.playTimeUp(world, null)),
+        timeUpGold: await measure(2.5, (a) => a.playTimeUp(world, "GOLD")),
       });
     }
     return {
@@ -157,6 +163,21 @@ test("sound effects and music keep their mix relationships", async ({
         a.playComboMilestone(5, 1);
         a.playLevelUp(1);
         a.playRecord(1);
+      }),
+      // Time Attack's clock ran out, by result (none, then each medal).
+      timeUp: await measure(2.5, (a) => a.playTimeUp(1, null)),
+      timeUpBronze: await measure(2.5, (a) => a.playTimeUp(1, "BRONZE")),
+      timeUpSilver: await measure(2.5, (a) => a.playTimeUp(1, "SILVER")),
+      timeUpGold: await measure(2.5, (a) => a.playTimeUp(1, "GOLD")),
+      // Worst time-up pile-up: a miss whose penalty drained the clock (its
+      // own miss sound) on the frame of the last urgent tick, over the tail
+      // of a PERFECT stack and its time bonus, ending on Gold.
+      timeUpBurst: await measure(2.5, (a) => {
+        a.playStack("PERFECT", 10, 1);
+        a.playTimeBonus();
+        a.playTick(true);
+        a.playMissSound();
+        a.playTimeUp(1, "GOLD");
       }),
       uiSelect: await measure(0.5, (a) => a.playUi("select"), [0.25, 0.5]),
       uiConfirm: await measure(0.5, (a) => a.playUi("confirm")),
@@ -224,9 +245,30 @@ test("sound effects and music keep their mix relationships", async ({
     body: JSON.stringify(worlds, null, 2),
     contentType: "application/json",
   });
+  await test.info().attach("time-up-levels.json", {
+    body: JSON.stringify(
+      {
+        worldUp: levels.worldUp,
+        fail: levels.fail,
+        timeUp: levels.timeUp,
+        timeUpBronze: levels.timeUpBronze,
+        timeUpSilver: levels.timeUpSilver,
+        timeUpGold: levels.timeUpGold,
+        timeUpBurst: levels.timeUpBurst,
+        perWorld: worlds.map((w) => ({
+          world: w.world,
+          timeUp: w.timeUp.rmsDb,
+          timeUpGold: w.timeUpGold.rmsDb,
+        })),
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
   const all = [
     ...(Object.values(effects) as Level[]),
-    ...worlds.flatMap((w) => [w.ok, w.perfect, w.levelUp, w.worldUp]),
+    ...worlds.flatMap((w) => [w.ok, w.perfect, w.levelUp, w.worldUp, w.timeUp, w.timeUpGold]),
   ];
   // No clipping anywhere, including the worst simultaneous burst.
   for (const level of all) expect(level.peakDb).toBeLessThanOrEqual(-1);
@@ -267,6 +309,26 @@ test("sound effects and music keep their mix relationships", async ({
   expect(levels.record.rmsDb).toBeGreaterThan(levels.perfect.rmsDb);
   expect(levels.record.rmsDb).toBeGreaterThan(levels.levelUp.rmsDb - 2);
   expect(levels.record.rmsDb).toBeLessThanOrEqual(levels.worldUp.rmsDb + 1);
+
+  // Time Attack's clock running out is the mode's normal ending: it sits
+  // with the new-world chord (±2 dB), never under a routine stack, and the
+  // result reads as a climb (none < Bronze < Silver < Gold) without the
+  // medals turning into a jump in loudness.
+  const timeUps = [
+    levels.timeUp,
+    levels.timeUpBronze,
+    levels.timeUpSilver,
+    levels.timeUpGold,
+  ];
+  for (const level of timeUps) {
+    expect(Math.abs(level.rmsDb - levels.worldUp.rmsDb)).toBeLessThanOrEqual(2);
+    expect(level.rmsDb).toBeGreaterThan(levels.ok.rmsDb + 2);
+  }
+  for (let i = 1; i < timeUps.length; i += 1) {
+    expect(timeUps[i].rmsDb, `time-up tier ${i}`).toBeGreaterThan(timeUps[i - 1].rmsDb);
+  }
+  expect(levels.timeUpGold.rmsDb - levels.timeUp.rmsDb).toBeLessThanOrEqual(3);
+  // (Every variant's peak, and the time-up pile-up's, is in the no-clip loop.)
 
   // Menu sounds are subtle: quieter than any gameplay stack.
   for (const ui of [levels.uiSelect, levels.uiConfirm, levels.uiBack]) {
@@ -322,5 +384,11 @@ test("sound effects and music keep their mix relationships", async ({
       expect(Math.abs(w[key].rmsDb - origin[key].rmsDb), `${where} ${key}`).toBeLessThanOrEqual(2);
     }
     expect(w.perfect.rmsDb, where).toBeGreaterThan(w.ok.rmsDb);
+    // The time-up cue skips the palette but follows the key: same ±2 dB.
+    for (const key of ["timeUp", "timeUpGold"] as const) {
+      expect(Math.abs(w[key].rmsDb - origin[key].rmsDb), `${where} ${key}`).toBeLessThanOrEqual(2);
+    }
+    expect(w.timeUpGold.rmsDb, where).toBeGreaterThan(w.timeUp.rmsDb);
   }
+  expect(origin.timeUp.rmsDb).toBeCloseTo(levels.timeUp.rmsDb, 5);
 });

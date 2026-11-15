@@ -19,10 +19,19 @@ export const WORLD_FLASH_DURATION = 0.45;
 export const PUNCH_DURATION = 0.2;
 export const PUNCH_SCALE = 0.04;
 /** Delay before onGameOver so the fail feedback is visible; 0 under E2E. */
-export const GAME_OVER_DELAY_MS =
-  typeof import.meta !== "undefined" && import.meta.env?.VITE_E2E === "true"
-    ? 0
-    : 400;
+const E2E = typeof import.meta !== "undefined" && import.meta.env?.VITE_E2E === "true";
+export const GAME_OVER_DELAY_MS = E2E ? 0 : 400;
+/**
+ * Time Attack timeout: longer than a fail's beat so the "TIME!" banner and
+ * the bell read before the game over screen (the cadence rings on over it).
+ * 0 under E2E, like the fail delay.
+ */
+export const TIME_UP_DELAY_MS = E2E ? 0 : 1000;
+/** Time-up ring: life (s), growth (radii per second) and stroke. */
+export const TIME_UP_RING_LIFE = 0.8;
+export const TIME_UP_RING_GROWTH = 0.9;
+export const TIME_UP_RING_WIDTH = 4;
+export const TIME_UP_FLASH_DURATION = 0.5;
 
 export interface Particle {
   x: number;
@@ -179,6 +188,52 @@ export const triggerWorldUp = (
     dur: WORLD_FLASH_DURATION,
     color: "#ffffff",
     alpha: reducedFx ? 0.15 : 0.6,
+    danger: false,
+  },
+});
+
+export interface TimeUpMark {
+  x: number;
+  y: number;
+  /** On-screen radius of the top stacked shape (where the ring starts). */
+  radius: number;
+  /** World colour (the theme's HUD primary); Mono tints it at draw time. */
+  color: string;
+  reducedFx: boolean;
+}
+
+/**
+ * Time Attack's clock ran out: the calm counterpart of `triggerFail`. One
+ * bright ring in the world colour opens from the stack and a soft flash in
+ * the same colour fades; it adds no shake and nothing red (a miss that
+ * drained the clock keeps the small shake it already started). Reduced
+ * effects (the setting defaults to prefers-reduced-motion) keep the signal
+ * without the motion: the ring stays in place and both are fainter. Replaces
+ * any ring left from the last stack so the mark reads on its own.
+ */
+export const triggerTimeUp = (
+  fx: EffectsState,
+  { x, y, radius, color, reducedFx }: TimeUpMark,
+): EffectsState => ({
+  ...fx,
+  rings: [
+    {
+      x,
+      y,
+      radius,
+      growth: reducedFx ? 0 : radius * TIME_UP_RING_GROWTH,
+      life: TIME_UP_RING_LIFE,
+      maxLife: TIME_UP_RING_LIFE,
+      lineWidth: TIME_UP_RING_WIDTH,
+      color,
+      alpha: reducedFx ? 0.35 : 0.9,
+    },
+  ],
+  flash: {
+    t: TIME_UP_FLASH_DURATION,
+    dur: TIME_UP_FLASH_DURATION,
+    color,
+    alpha: reducedFx ? 0.1 : 0.28,
     danger: false,
   },
 });

@@ -4,7 +4,9 @@ import {
   CUE_ROOT_HZ,
   getCueNoteHz,
   getStackNoteHz,
+  getTimeUpCadence,
   getWorldRoot,
+  TIME_UP_CADENCE,
   MELODY_SPAN,
   pentatonicSemitones,
   QUALITY_HARMONY,
@@ -59,5 +61,46 @@ describe("music", () => {
     expect(getCueNoteHz(0, true)).toBe(CUE_ROOT_HZ * 2);
     expect(getCueNoteHz(CUE_MAX_STEP + 5, false)).toBe(approach.at(-1));
     expect(getCueNoteHz(-2, false)).toBe(CUE_ROOT_HZ);
+  });
+
+  describe("time-up cadence", () => {
+    const MAJOR_THIRD = 4;
+    const tiers = [null, "BRONZE", "SILVER", "GOLD"] as const;
+
+    it("resolves neutrally without a medal: no third, so neither major nor minor", () => {
+      const plain = getTimeUpCadence(null);
+      expect(plain).toBe(TIME_UP_CADENCE.NONE);
+      const pitchClasses = plain.chord.map((s) => s % 12);
+      expect(pitchClasses).not.toContain(MAJOR_THIRD);
+      expect(pitchClasses).not.toContain(3);
+      expect(plain.chord[0]).toBe(0);
+    });
+
+    it("resolves to a major chord for every medal", () => {
+      for (const medal of ["BRONZE", "SILVER", "GOLD"] as const) {
+        const { chord } = getTimeUpCadence(medal);
+        expect(chord.slice(0, 3)).toEqual([0, MAJOR_THIRD, 7]);
+      }
+    });
+
+    it("grows with the result: more pickup and chord notes, longer hold, Gold sparkles", () => {
+      const cadences = tiers.map(getTimeUpCadence);
+      for (let i = 1; i < cadences.length; i += 1) {
+        expect(cadences[i].chord.length).toBeGreaterThan(cadences[i - 1].chord.length);
+        expect(cadences[i].pickup.length).toBeGreaterThanOrEqual(cadences[i - 1].pickup.length);
+        expect(cadences[i].hold).toBeGreaterThan(cadences[i - 1].hold);
+      }
+      expect(cadences.map((c) => c.sparkle)).toEqual([false, false, false, true]);
+    });
+
+    it("never doubles the bell (double octave) or the hum under it", () => {
+      for (const medal of tiers) {
+        const { chord, pickup } = getTimeUpCadence(medal);
+        for (const s of [...chord, ...pickup]) {
+          expect(s).toBeGreaterThanOrEqual(0);
+          expect(s).toBeLessThan(24);
+        }
+      }
+    });
   });
 });

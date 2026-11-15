@@ -4,6 +4,7 @@ import { GameCanvas } from "./GameCanvas";
 import type { GameCanvasHandle } from "./GameCanvas";
 import type { IAudioService } from "../audio/types";
 import { LEVELS_PER_WORLD, STACKS_PER_LEVEL } from "../constants/game";
+import { GAME_OVER_DELAY_MS, TIME_UP_DELAY_MS } from "../rendering/effects";
 import {
   FIRST_VISIT_GRACE_MS,
   FIRST_VISIT_MAX_HOLD_MS,
@@ -28,6 +29,7 @@ const mockAudioService: IAudioService = {
   playComboMilestone: vi.fn(),
   playChime: vi.fn(),
   playRecord: vi.fn(),
+  playTimeUp: vi.fn(),
   playUi: vi.fn(),
   playCue: vi.fn(),
   setMuted: vi.fn(),
@@ -901,5 +903,152 @@ describe("GameCanvas", () => {
       expect(onGameOver).not.toHaveBeenCalled();
       expect(mockAudioService.playWorldUp).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("GameCanvas run endings", () => {
+  /** Same patterns as `src/utils/haptics.ts`. */
+  const LEVEL_UP_PATTERN = [10, 25, 10, 25, 20];
+  const FAIL_PATTERN = [40, 40, 90];
+  let vibrate: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // The E2E bridge drives the clock deterministically (pause + step).
+    vi.stubEnv("VITE_E2E", "true");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // Frames never fire on their own: only bridge steps advance the game.
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 1);
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    vibrate = vi.fn(() => true);
+    Object.defineProperty(navigator, "vibrate", { configurable: true, value: vibrate });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    Reflect.deleteProperty(navigator, "vibrate");
+  });
+
+  const bridge = () => {
+    const b = window.__GAME_TEST__;
+    if (!b) throw new Error("test bridge not installed");
+    return b;
+  };
+
+  const renderRun = (
+    mode: "CLASSIC" | "TIME_ATTACK",
+    extra: { medals?: boolean } = {},
+  ) => {
+    const onGameOver = vi.fn();
+    const onTimeUp = vi.fn();
+    const onMiss = vi.fn();
+    render(
+      <GameCanvas
+        mode={mode}
+        onScore={vi.fn()}
+        onGameOver={onGameOver}
+        onLevelUp={vi.fn()}
+        onWorldUp={vi.fn()}
+        onMiss={onMiss}
+        onTimeUp={onTimeUp}
+        audioService={mockAudioService}
+        {...extra}
+      />,
+    );
+    act(() => bridge().pause());
+    return { onGameOver, onTimeUp, onMiss };
+  };
+
+  const runOutTheClock = () =>
+    act(() => {
+      bridge().setTimeRemaining(0.01);
+      bridge().step(0.02);
+    });
+
+  it("ends a Time Attack timeout on the time-up cue, never the fail buzz", () => {
+    const { onGameOver, onTimeUp } = renderRun("TIME_ATTACK");
+    runOutTheClock();
+
+    expect(mockAudioService.stopMusic).toHaveBeenCalled();
+    expect(mockAudioService.playTimeUp).toHaveBeenCalledTimes(1);
+    expect(mockAudioService.playTimeUp).toHaveBeenCalledWith(1, null);
+    expect(mockAudioService.playFailSound).not.toHaveBeenCalled();
+    expect(mockAudioService.playMissSound).not.toHaveBeenCalled();
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(LEVEL_UP_PATTERN);
+    // The TIME! moment is reported at once...
+    expect(onTimeUp).toHaveBeenCalledWith({ score: 0, medal: null });
+    // ...the game over only after the longer time-up hold.
+    expect(onGameOver).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(TIME_UP_DELAY_MS));
+    expect(onGameOver).toHaveBeenCalledTimes(1);
+    expect(onGameOver.mock.calls[0][3]).toMatchObject({ endReason: "timeout" });
+
+    // Later frames only animate the mark: the ending never replays.
+    act(() => bridge().step(0.05));
+    expect(mockAudioService.playTimeUp).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves on the run's medal when the run has medals", () => {
+    const { onTimeUp } = renderRun("TIME_ATTACK", { medals: true });
+    // 8 PERFECT stacks: 1120 points, Bronze (1000).
+    act(() => {
+      for (let i = 0; i < 8; i += 1) bridge().forceStack(0.98);
+    });
+    expect(bridge().getState().score).toBe(1120);
+    runOutTheClock();
+    expect(mockAudioService.playTimeUp).toHaveBeenCalledWith(1, "BRONZE");
+    expect(onTimeUp).toHaveBeenCalledWith({ score: 1120, medal: "BRONZE" });
+  });
+
+  it("carries no medal for a run without medals, whatever the score", () => {
+    const { onTimeUp } = renderRun("TIME_ATTACK");
+    act(() => {
+      for (let i = 0; i < 8; i += 1) bridge().forceStack(0.98);
+    });
+    runOutTheClock();
+    expect(mockAudioService.playTimeUp).toHaveBeenCalledWith(1, null);
+    expect(onTimeUp).toHaveBeenCalledWith({ score: 1120, medal: null });
+  });
+
+  it("ends on time when a miss penalty drains the clock, after the miss's own feedback", () => {
+    const { onGameOver, onTimeUp, onMiss } = renderRun("TIME_ATTACK");
+    act(() => {
+      bridge().setTimeRemaining(3);
+      // Let the shape outgrow its container: an untapped overflow (-5 s).
+      const state = bridge().getState();
+      bridge().setActiveSize((state.lastSize ?? 1) * 1.2);
+      bridge().step(0.016);
+    });
+
+    expect(onMiss).toHaveBeenCalledTimes(1);
+    expect(onMiss.mock.calls[0][0]).toBe(true); // terminal
+    expect(bridge().getState()).toMatchObject({ isGameOver: true, timeRemaining: 0 });
+    expect(mockAudioService.playMissSound).toHaveBeenCalledTimes(1);
+    expect(mockAudioService.playTimeUp).toHaveBeenCalledWith(1, null);
+    expect(mockAudioService.playFailSound).not.toHaveBeenCalled();
+    // One haptic: the ending's (a miss buzz would be cut short by it anyway).
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(LEVEL_UP_PATTERN);
+    expect(onTimeUp).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(TIME_UP_DELAY_MS));
+    expect(onGameOver.mock.calls[0][3]).toMatchObject({ endReason: "timeout" });
+  });
+
+  it("keeps a Classic miss a fail: buzz, fail haptic, short hold, no TIME!", () => {
+    const { onGameOver, onTimeUp } = renderRun("CLASSIC");
+    act(() => {
+      const state = bridge().getState();
+      bridge().setActiveSize((state.lastSize ?? 1) * 1.2);
+      bridge().step(0.016);
+    });
+    expect(mockAudioService.playFailSound).toHaveBeenCalledTimes(1);
+    expect(mockAudioService.playTimeUp).not.toHaveBeenCalled();
+    expect(vibrate).toHaveBeenCalledWith(FAIL_PATTERN);
+    expect(onTimeUp).not.toHaveBeenCalled();
+    expect(onGameOver).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(GAME_OVER_DELAY_MS));
+    expect(onGameOver).toHaveBeenCalledTimes(1);
   });
 });

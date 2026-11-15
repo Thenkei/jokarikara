@@ -107,6 +107,7 @@ Effects are **cumulative**, and visual distortions only apply to stacked shapes,
 
 - **Stacks** play notes of a major pentatonic scale in the current world's key. The melody climbs with your combo, and better quality adds richer harmony (PERFECT adds a bell sparkle).
 - **Level up** plays an arpeggio, a **new world** plays a sustained chord, a **Zen miss** plays a soft drop and **game over** plays a low buzz (a Zen session you finish yourself ends on the new-world chord instead).
+- **Time Attack ends on time, not on a failure**: when the clock hits zero (including a miss whose −5 s empties it), a bell rings and a short cadence in the world's key resolves the run: a neutral open fifth without a medal, a major chord with a medal, growing richer from Bronze to Gold. The board shows **TIME!** (with your medal) over a calm ring and flash in the world colour, then the game over screen, headed TIME!.
 - **Visual feedback**: rings and particles on PERFECT/GREAT stacks, screen shake and a red flash on failure, a zoom punch on level up and a flash on a new world.
 - **Haptics** on supported phones.
 - **Settings** (saved):
