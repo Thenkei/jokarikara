@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { SettingsSheet, type SettingsValues } from "./SettingsSheet";
+import { getTranslator, type LanguageSetting } from "../i18n";
+import { I18nContext } from "../i18n/context";
 
 const VALUES: SettingsValues = {
   fx: true,
@@ -16,16 +18,19 @@ const renderSheet = (
 ) => {
   const onToggle = vi.fn();
   const onClose = vi.fn();
+  const onLanguageChange = vi.fn();
   const utils = render(
     <SettingsSheet
       values={VALUES}
       hapticsSupported
       onToggle={onToggle}
+      language="auto"
+      onLanguageChange={onLanguageChange}
       onClose={onClose}
       {...overrides}
     />,
   );
-  return { ...utils, onToggle, onClose };
+  return { ...utils, onToggle, onClose, onLanguageChange };
 };
 
 const switchNamed = (name: string) => screen.getByRole("switch", { name });
@@ -44,6 +49,8 @@ function Harness() {
           values={VALUES}
           hapticsSupported
           onToggle={() => {}}
+          language="auto"
+          onLanguageChange={() => {}}
           onClose={() => setOpen(false)}
           returnFocusRef={gearRef}
         />
@@ -142,6 +149,78 @@ describe("SettingsSheet", () => {
     (document.activeElement as HTMLElement).blur();
     fireEvent.keyDown(document.body, { key: "Tab" });
     expect(document.activeElement).toBe(first);
+  });
+
+  describe("language", () => {
+    /** The sheet as App drives it: the choice comes back as the new value. */
+    function LanguageHarness({ initial = "auto" }: { initial?: LanguageSetting }) {
+      const [language, setLanguage] = useState<LanguageSetting>(initial);
+      return (
+        <SettingsSheet
+          values={VALUES}
+          hapticsSupported
+          onToggle={() => {}}
+          language={language}
+          onLanguageChange={setLanguage}
+          onClose={() => {}}
+        />
+      );
+    }
+
+    const group = () => screen.getByRole("radiogroup", { name: "Language" });
+
+    it("is a labelled radio group: Auto, then each language in its own name", () => {
+      renderSheet({ language: "fr" });
+      const radios = within(group()).getAllByRole("radio");
+      expect(radios.map((radio) => radio.textContent)).toEqual(["Auto", "English", "Français"]);
+      expect(radios.map((radio) => radio.getAttribute("lang"))).toEqual([null, "en", "fr"]);
+      expect(radios.map((radio) => radio.getAttribute("aria-checked"))).toEqual([
+        "false",
+        "false",
+        "true",
+      ]);
+      // One tab stop: the checked option.
+      expect(radios.map((radio) => radio.tabIndex)).toEqual([-1, -1, 0]);
+      expect(
+        document.getElementById(group().getAttribute("aria-describedby")!)?.textContent,
+      ).toMatch(/browser/);
+    });
+
+    it("reports a click on an option", () => {
+      const { onLanguageChange } = renderSheet();
+      fireEvent.click(screen.getByRole("radio", { name: "Français" }));
+      expect(onLanguageChange).toHaveBeenLastCalledWith("fr");
+    });
+
+    it("moves and selects with the arrow keys, wrapping, Home and End", () => {
+      render(<LanguageHarness />);
+      const radio = (name: string) => screen.getByRole("radio", { name });
+      fireEvent.keyDown(radio("Auto"), { key: "ArrowRight" });
+      expect(radio("English").getAttribute("aria-checked")).toBe("true");
+      expect(document.activeElement).toBe(radio("English"));
+      fireEvent.keyDown(radio("English"), { key: "End" });
+      expect(document.activeElement).toBe(radio("Français"));
+      fireEvent.keyDown(radio("Français"), { key: "ArrowDown" });
+      expect(radio("Auto").getAttribute("aria-checked")).toBe("true");
+      fireEvent.keyDown(radio("Auto"), { key: "ArrowLeft" });
+      expect(radio("Français").getAttribute("aria-checked")).toBe("true");
+      fireEvent.keyDown(radio("Français"), { key: "Home" });
+      expect(document.activeElement).toBe(radio("Auto"));
+    });
+
+    it("renders in the active language", () => {
+      render(
+        <I18nContext value={getTranslator("fr")}>
+          <LanguageHarness initial="fr" />
+        </I18nContext>,
+      );
+      expect(screen.getByRole("dialog", { name: "RÉGLAGES" })).toBeTruthy();
+      expect(screen.getByRole("radiogroup", { name: "Langue" })).toBeTruthy();
+      expect(screen.getByRole("switch", { name: "Effets visuels" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "OK" })).toBeTruthy();
+      // Language names stay in their own language.
+      expect(screen.getByRole("radio", { name: "English" })).toBeTruthy();
+    });
   });
 
   it("returns focus to the opener when it closes", () => {

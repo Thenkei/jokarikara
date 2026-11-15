@@ -1,5 +1,6 @@
 import type { GameMode } from "../types";
 import { getLocalDateKey } from "../modes/daily";
+import { isLanguageSetting, type LanguageSetting } from "../i18n/types";
 import {
   EMPTY_LIFETIME_STATS,
   MAX_TRACKED_DAILY_DATES,
@@ -41,6 +42,8 @@ export interface GameSettings {
   haptics: boolean;
   /** Audio ticks that speed up towards the PERFECT window (opt-in aid). */
   timingCue: boolean;
+  /** UI language: "auto" follows the browser (see i18n/locale.ts). */
+  language: LanguageSetting;
 }
 
 const prefersReducedMotion = (): boolean => {
@@ -62,6 +65,7 @@ const getDefaultSettings = (): GameSettings => ({
   music: true,
   haptics: true,
   timingCue: false,
+  language: "auto",
 });
 
 const byScoreDesc = (a: HighScore, b: HighScore) => b.score - a.score;
@@ -159,6 +163,10 @@ export const getSettings = (): GameSettings => {
         typeof parsed.timingCue === "boolean"
           ? parsed.timingCue
           : getDefaultSettings().timingCue,
+      // Absent before languages existed, or a language since removed: auto.
+      language: isLanguageSetting(parsed.language)
+        ? parsed.language
+        : getDefaultSettings().language,
     };
   } catch (e) {
     console.error("Failed to load settings", e);

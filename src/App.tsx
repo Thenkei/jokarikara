@@ -119,7 +119,13 @@ import {
   type NextDailyStatus,
   type ShareStatus,
 } from "./components/GameOverScreen";
-import { DEFAULT_LOCALE, getTranslator, type Translator } from "./i18n";
+import {
+  getTranslator,
+  readBrowserLanguages,
+  resolveLocale,
+  type LanguageSetting,
+  type Translator,
+} from "./i18n";
 import { I18nContext } from "./i18n/context";
 import { Rich } from "./i18n/Rich";
 import "./App.css";
@@ -218,8 +224,26 @@ const stacksBeforeWorld = (world: number): number =>
   (Math.max(1, world) - 1) * STACKS_PER_LEVEL * LEVELS_PER_WORLD;
 
 function App() {
-  const i18n = useMemo(() => getTranslator(DEFAULT_LOCALE), []);
+  /**
+   * UI language: the stored setting ("auto" by default) resolved against the
+   * browser's languages, which can change while the page is open
+   * (`languagechange`). The translator is cached per locale, so `i18n` keeps
+   * its identity until the language actually changes.
+   */
+  const [language, setLanguage] = useState<LanguageSetting>(() => getSettings().language);
+  const [browserLanguages, setBrowserLanguages] = useState(readBrowserLanguages);
+  const locale = resolveLocale(language, browserLanguages);
+  const i18n = getTranslator(locale);
   const { t } = i18n;
+  useEffect(() => {
+    const onLanguageChange = () => setBrowserLanguages(readBrowserLanguages());
+    window.addEventListener("languagechange", onLanguageChange);
+    return () => window.removeEventListener("languagechange", onLanguageChange);
+  }, []);
+  // Screen readers pick their voice from <html lang>.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
   const [gameState, setGameState] = useState<"START" | "PLAYING" | "GAMEOVER">(
     "START"
   );
@@ -1121,6 +1145,12 @@ function App() {
     else audioManager.playUi("select");
   };
 
+  const handleLanguageChange = (next: LanguageSetting) => {
+    if (next === language) return;
+    setLanguage(next);
+    saveSettings({ language: next });
+  };
+
   const handleToggleSetting = (id: SettingId) => {
     switch (id) {
       case "fx":
@@ -1949,6 +1979,8 @@ function App() {
             }}
             hapticsSupported={hapticsSupported}
             onToggle={handleToggleSetting}
+            language={language}
+            onLanguageChange={handleLanguageChange}
             onClose={() => setShowSettings(false)}
             returnFocusRef={settingsTriggerRef}
           />

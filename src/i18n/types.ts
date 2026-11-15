@@ -4,7 +4,7 @@
  */
 
 /** UI languages with a full catalog. English is the source and the fallback. */
-export const LOCALES = ["en"] as const;
+export const LOCALES = ["en", "fr"] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
@@ -12,6 +12,15 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Stored preference: "auto" follows the browser, otherwise a fixed locale. */
 export const LANGUAGE_SETTINGS = ["auto", ...LOCALES] as const;
 export type LanguageSetting = (typeof LANGUAGE_SETTINGS)[number];
+
+/**
+ * Each language's own name (endonym), shown as is whatever the UI language:
+ * a player who cannot read the current one still finds theirs.
+ */
+export const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = Object.freeze({
+  en: "English",
+  fr: "Français",
+});
 
 export const isLocale = (value: unknown): value is Locale =>
   typeof value === "string" && (LOCALES as readonly string[]).includes(value);

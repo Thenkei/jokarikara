@@ -12,6 +12,7 @@ export { CATALOGS, createTranslator, getTranslator, interpolate, type Translator
 export { detectLocale, readBrowserLanguages, resolveLocale } from "./locale";
 export {
   DEFAULT_LOCALE,
+  LANGUAGE_NAMES,
   LANGUAGE_SETTINGS,
   LOCALES,
   isLanguageSetting,

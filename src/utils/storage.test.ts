@@ -103,13 +103,13 @@ describe("storage", () => {
 
   describe("getSettings", () => {
     it("returns the default settings when nothing is stored", () => {
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true, timingCue: false });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true, timingCue: false, language: "auto" });
     });
 
     it("returns stored settings with reducedFx: true", () => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ reducedFx: true }));
 
-      expect(getSettings()).toEqual({ reducedFx: true, muted: false, music: true, haptics: true, timingCue: false });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: false, music: true, haptics: true, timingCue: false, language: "auto" });
     });
 
     it("falls back to the default for reducedFx when the stored value is not a boolean", () => {
@@ -130,7 +130,7 @@ describe("storage", () => {
     it("returns the default settings when JSON is corrupted", () => {
       localStorage.setItem(SETTINGS_KEY, "{{bad");
 
-      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true, timingCue: false });
+      expect(getSettings()).toEqual({ reducedFx: false, muted: false, music: true, haptics: true, timingCue: false, language: "auto" });
     });
   });
 
@@ -152,7 +152,7 @@ describe("storage", () => {
       saveSettings({ reducedFx: true, muted: true });
       saveSettings({ music: false });
 
-      expect(getSettings()).toEqual({ reducedFx: true, muted: true, music: false, haptics: true, timingCue: false });
+      expect(getSettings()).toEqual({ reducedFx: true, muted: true, music: false, haptics: true, timingCue: false, language: "auto" });
     });
 
     it("does not throw when localStorage.setItem throws", () => {
@@ -313,6 +313,7 @@ describe("timing cue setting", () => {
       music: false,
       haptics: false,
       timingCue: false,
+      language: "auto",
     });
   });
 
@@ -327,6 +328,37 @@ describe("timing cue setting", () => {
     for (const value of ["yes", 1, null, {}]) {
       localStorage.setItem("shape-stack-settings", JSON.stringify({ timingCue: value }));
       expect(getSettings().timingCue).toBe(false);
+    }
+  });
+});
+
+describe("language setting", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to auto, also for settings saved before languages existed", () => {
+    expect(getSettings().language).toBe("auto");
+    localStorage.setItem("shape-stack-settings", JSON.stringify({ muted: true }));
+    expect(getSettings()).toMatchObject({ language: "auto", muted: true });
+  });
+
+  it("persists each choice independently of the other settings", () => {
+    for (const language of ["fr", "en", "auto"] as const) {
+      saveSettings({ language });
+      expect(getSettings().language).toBe(language);
+    }
+    saveSettings({ language: "fr" });
+    saveSettings({ muted: true });
+    expect(getSettings()).toMatchObject({ language: "fr", muted: true });
+  });
+
+  it("falls back to auto for an unknown or malformed stored value", () => {
+    for (const value of ["de", "FR", "fr-FR", "", 1, null, {}, ["fr"]]) {
+      localStorage.setItem(
+        "shape-stack-settings",
+        JSON.stringify({ language: value, haptics: false }),
+      );
+      // Only the bad field is reset; valid neighbours survive.
+      expect(getSettings()).toMatchObject({ language: "auto", haptics: false });
     }
   });
 });

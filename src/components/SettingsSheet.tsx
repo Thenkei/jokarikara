@@ -1,5 +1,12 @@
-import { useEffect, useId, useRef, type RefObject } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
+} from "react";
 import { useI18n } from "../i18n/context";
+import { LANGUAGE_NAMES, LANGUAGE_SETTINGS, type LanguageSetting } from "../i18n/types";
 
 export type SettingId = "fx" | "sound" | "music" | "haptics" | "timingCue";
 
@@ -19,6 +26,9 @@ interface SettingsSheetProps {
   /** False when the device cannot vibrate: the row stays, disabled, with why. */
   hapticsSupported: boolean;
   onToggle: (id: SettingId) => void;
+  /** Stored language preference ("auto" follows the browser). */
+  language: LanguageSetting;
+  onLanguageChange: (language: LanguageSetting) => void;
   onClose: () => void;
   /**
    * Where focus goes back on close (the gear that opened the sheet). Falls
@@ -72,12 +82,38 @@ export function SettingsSheet({
   values,
   hapticsSupported,
   onToggle,
+  language,
+  onLanguageChange,
   onClose,
   returnFocusRef,
 }: SettingsSheetProps) {
   const { t } = useI18n();
   const idPrefix = useId();
   const headingId = `${idPrefix}-heading`;
+  const languageTitleId = `${idPrefix}-language-title`;
+  const languageDescId = `${idPrefix}-language-desc`;
+  const languageRefs = useRef<Partial<Record<LanguageSetting, HTMLButtonElement | null>>>({});
+
+  /** WAI-ARIA radio group keys: arrows move and select, Home/End jump. */
+  const handleLanguageKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const index = LANGUAGE_SETTINGS.indexOf(language);
+    const count = LANGUAGE_SETTINGS.length;
+    const target =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? (index + 1) % count
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? (index - 1 + count) % count
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? count - 1
+              : null;
+    if (target === null) return;
+    event.preventDefault();
+    const next = LANGUAGE_SETTINGS[target];
+    onLanguageChange(next);
+    languageRefs.current[next]?.focus();
+  };
   const panelRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -206,6 +242,47 @@ export function SettingsSheet({
               </li>
             );
           })}
+          <li className="settings-language">
+            <span className="settings-switch-text">
+              <span id={languageTitleId} className="settings-switch-title">
+                {t("settings.language.title")}
+              </span>
+              <span id={languageDescId} className="settings-switch-desc">
+                {t("settings.language.description")}
+              </span>
+            </span>
+            <div
+              className="settings-segmented"
+              role="radiogroup"
+              aria-labelledby={languageTitleId}
+              aria-describedby={languageDescId}
+              onKeyDown={handleLanguageKeyDown}
+            >
+              {LANGUAGE_SETTINGS.map((option) => {
+                const checked = option === language;
+                return (
+                  <button
+                    key={option}
+                    ref={(node) => {
+                      languageRefs.current[option] = node;
+                    }}
+                    type="button"
+                    role="radio"
+                    className="settings-segment"
+                    data-language={option}
+                    aria-checked={checked}
+                    // Roving tabindex: one tab stop for the group, arrows inside.
+                    tabIndex={checked ? 0 : -1}
+                    // A language's own name is read in that language.
+                    lang={option === "auto" ? undefined : option}
+                    onClick={() => onLanguageChange(option)}
+                  >
+                    {option === "auto" ? t("settings.language.auto") : LANGUAGE_NAMES[option]}
+                  </button>
+                );
+              })}
+            </div>
+          </li>
         </ul>
         <button className="settings-done-btn" data-ui-sound="back" onClick={onClose}>
           {t("settings.done")}

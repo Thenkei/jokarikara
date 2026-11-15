@@ -1,4 +1,5 @@
 import { en } from "./en";
+import { fr } from "./fr";
 import type { Catalog, MessageArgs, MessageKey, ParamValue } from "./catalog";
 import { DATE_FORMATS, INTL_LOCALE } from "./formats";
 import type { DateFormatName, Locale, Message, PluralMessage } from "./types";
@@ -27,7 +28,7 @@ export interface Translator {
   upper(text: string): string;
 }
 
-export const CATALOGS: Readonly<Record<Locale, Catalog>> = Object.freeze({ en });
+export const CATALOGS: Readonly<Record<Locale, Catalog>> = Object.freeze({ en, fr });
 
 const PLACEHOLDER = /\{(\w+)\}/g;
 

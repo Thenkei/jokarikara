@@ -16,6 +16,10 @@ export const DATE_FORMATS: Readonly<
     dailyDay: { month: "short", day: "numeric" },
     scoreDate: { year: "numeric", month: "numeric", day: "numeric" },
   },
+  fr: {
+    dailyDay: { day: "numeric", month: "long" },
+    scoreDate: { year: "numeric", month: "2-digit", day: "2-digit" },
+  },
 });
 
 /**
@@ -25,4 +29,5 @@ export const DATE_FORMATS: Readonly<
  */
 export const INTL_LOCALE: Readonly<Record<Locale, string>> = Object.freeze({
   en: "en-US",
+  fr: "fr-FR",
 });

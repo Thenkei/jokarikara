@@ -273,6 +273,9 @@ export const en = {
   "settings.haptics.unsupported": "Not available on this device.",
   "settings.timingCue.title": "Timing cue",
   "settings.timingCue.description": "Ticks that speed up toward PERFECT.",
+  "settings.language.title": "Language",
+  "settings.language.description": "Follows your browser unless you pick one.",
+  "settings.language.auto": "Auto",
   "settings.done": "DONE",
 
   // ---------------------------------------------------------------- achievements
