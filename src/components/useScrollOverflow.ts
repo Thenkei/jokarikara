@@ -12,6 +12,7 @@ export function useScrollOverflow(ref: RefObject<HTMLElement | null>): boolean {
 
   // No deps on purpose: a re-render can add or drop a card. setState bails
   // out when the answer is unchanged, so this never loops.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const el = ref.current;
     if (el) setOverflows(isOverflowing(el));
