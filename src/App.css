@@ -1074,6 +1074,16 @@ button:active {
   background: var(--bg-color);
 }
 
+/* Reflex tap guard (GAME_OVER_INPUT_GUARD_MS): the bar is inert for a beat
+   after the screen appears and reads as not ready yet. */
+.gameover-actions {
+  transition: opacity 0.2s ease-out;
+}
+
+.gameover-actions[inert] {
+  opacity: 0.6;
+}
+
 .gameover-actions .retry-btn {
   width: 100%;
   padding: 1rem 2rem;

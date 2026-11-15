@@ -112,6 +112,7 @@ import {
 import { I18nContext } from "./i18n/context";
 import "./App.css";
 import { isE2eMode } from "./utils/e2e";
+import { GAME_OVER_INPUT_GUARD_MS } from "./modes/gameOverGuard";
 
 
 const createRunSeed = (): number => {
@@ -672,6 +673,18 @@ function App() {
   /** Same kind of run again (keeps Daily vs regular). */
   const restartRun = () => startRun({ mode, daily: dailyKey !== null });
 
+  // Game over actions (RETRY, share, menu, Enter) ignore a reflex tap from
+  // the run for a beat after the screen appears (see GAME_OVER_INPUT_GUARD_MS).
+  const [gameOverActionsReady, setGameOverActionsReady] = useState(true);
+  useEffect(() => {
+    if (gameState !== "GAMEOVER" || gameOverActionsReady) return;
+    const timer = window.setTimeout(
+      () => setGameOverActionsReady(true),
+      GAME_OVER_INPUT_GUARD_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [gameState, gameOverActionsReady]);
+
   const handleGameOver = useCallback(
     (
       finalScore: number,
@@ -733,6 +746,7 @@ function App() {
       setWorld(finalWorld);
       setLevel(finalLevel);
       hideSecondaryHud();
+      setGameOverActionsReady(GAME_OVER_INPUT_GUARD_MS <= 0);
       setGameState("GAMEOVER");
       disarmFinish();
       // A Time Attack run that used its clock was announced at the TIME!
@@ -1124,7 +1138,7 @@ function App() {
         startRun({ mode, daily: false });
       } else if (gameState === "GAMEOVER") {
         event.preventDefault();
-        restartRun();
+        if (gameOverActionsReady) restartRun();
       }
     }
   };
@@ -1355,6 +1369,7 @@ function App() {
             onShare={handleShare}
             onRetry={restartRun}
             onMenu={handleMainMenu}
+            actionsReady={gameOverActionsReady}
           />
         )}
 

@@ -66,6 +66,11 @@ interface GameOverScreenProps {
   onShare: () => void;
   onRetry: () => void;
   onMenu: () => void;
+  /**
+   * False for a beat after the screen appears: the action bar is inert, so
+   * a reflex tap from the run can't hit RETRY or MAIN MENU (default true).
+   */
+  actionsReady?: boolean;
 }
 
 /** Chips shown before "+N more"; a lone extra chip is shown rather than hidden. */
@@ -173,6 +178,7 @@ export function GameOverScreen({
   onShare,
   onRetry,
   onMenu,
+  actionsReady = true,
 }: GameOverScreenProps) {
   const i18n = useI18n();
   const { t } = i18n;
@@ -363,7 +369,7 @@ export function GameOverScreen({
         </div>
       </div>
 
-      <div className="gameover-actions">
+      <div className="gameover-actions" inert={!actionsReady}>
         {run && (
           <p className="share-status" role="status">
             {shareStatus === "idle" ? "" : t(SHARE_STATUS_KEYS[shareStatus])}
