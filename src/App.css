@@ -1509,7 +1509,8 @@ button:focus-visible {
 }
 
 .achievements-btn,
-.worlds-btn {
+.worlds-btn,
+.install-btn {
   background: transparent;
   color: #b9c2d6;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -1520,7 +1521,8 @@ button:focus-visible {
 }
 
 .achievements-btn:hover,
-.worlds-btn:hover {
+.worlds-btn:hover,
+.install-btn:hover {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.4);
 }
@@ -1671,6 +1673,17 @@ button:focus-visible {
 
 .start-secondary > button {
   padding: 0.65rem 1.1rem;
+}
+
+/* INSTALL: shown only when the browser offers it; icon + label on one line. */
+.start-secondary > .install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.install-icon {
+  flex: none;
 }
 
 /* ---------- World atlas ---------- */

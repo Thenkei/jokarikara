@@ -72,12 +72,16 @@ interface StartScreenProps {
   onStartDaily: () => void;
   onOpenPanel: (panel: StartPanel) => void;
   onOpenSettings: () => void;
+  /** The browser offers installation (see pwa/installPrompt): show INSTALL. */
+  canInstall: boolean;
+  onInstall: () => void;
 }
 
 /**
  * Start screen menu: settings gear, title, mode radio group (bests, best
  * Time Attack medal, mode rule), Zen practice picker, START, the Daily button
- * (streak, next-day countdown) and the ACHIEVEMENTS / WORLDS entries.
+ * (streak, next-day countdown), the ACHIEVEMENTS / WORLDS entries and, when
+ * the browser offers it, INSTALL.
  * Presentational: App owns the selection, records and navigation; this only
  * keeps the radio buttons' refs for arrow-key focus.
  */
@@ -99,6 +103,8 @@ export function StartScreen({
   onStartDaily,
   onOpenPanel,
   onOpenSettings,
+  canInstall,
+  onInstall,
 }: StartScreenProps) {
   const i18n = useI18n();
   const { t } = i18n;
@@ -283,8 +289,42 @@ export function StartScreen({
           >
             {t("start.worlds", { revealed: revealedWorldCount, total: ATLAS_WORLD_COUNT })}
           </button>
+          {canInstall && (
+            <button
+              className="install-btn"
+              data-ui-sound="confirm"
+              onClick={onInstall}
+              aria-label={t("start.installAria")}
+            >
+              <InstallIcon />
+              {t("start.install")}
+            </button>
+          )}
         </div>
       </div>
     </>
+  );
+}
+
+/** Down arrow into a tray: "install / download", drawn in currentColor. */
+function InstallIcon() {
+  return (
+    <svg
+      className="install-icon"
+      viewBox="0 0 16 16"
+      width="14"
+      height="14"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 12.5h10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

@@ -4,9 +4,12 @@ import './index.css'
 import App from './App.tsx'
 import { registerServiceWorker } from './pwa/registerServiceWorker.ts'
 import { applyInitialDocumentLang } from './i18n/initialLang.ts'
+import { captureInstallPrompt } from './pwa/installPrompt.ts'
 
 // Before the first render: index.html ships lang="en" for every player.
 applyInitialDocumentLang()
+// Before the first render too: Chromium may announce installability early.
+captureInstallPrompt()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

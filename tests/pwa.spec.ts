@@ -84,3 +84,39 @@ test.describe("Link preview", () => {
     expect(await meta('meta[property="og:image:height"]')).toBe("630");
   });
 });
+
+test.describe("Install offer", { tag: "@cross-browser" }, () => {
+  test("INSTALL appears when the browser offers it and opens its dialog once", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const install = page.getByRole("button", { name: "Install Shape Stack as an app, playable offline" });
+    await expect(page.locator(".start-btn")).toBeVisible();
+    // No offer from the browser (Safari, already installed...): no button.
+    await expect(install).toHaveCount(0);
+
+    // What Chromium fires when the page is installable.
+    await page.evaluate(() => {
+      const event = new Event("beforeinstallprompt", { cancelable: true });
+      const w = window as unknown as { __installPrompts: number };
+      w.__installPrompts = 0;
+      Object.assign(event, {
+        prompt: async () => {
+          w.__installPrompts += 1;
+        },
+        userChoice: Promise.resolve({ outcome: "accepted" }),
+      });
+      window.dispatchEvent(event);
+    });
+    await expect(install).toBeVisible();
+    await expect(install).toHaveText("INSTALL");
+
+    await install.press("Enter");
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __installPrompts: number }).__installPrompts))
+      .toBe(1);
+    // An offer prompts once: the button goes away.
+    await expect(install).toHaveCount(0);
+  });
+});
+

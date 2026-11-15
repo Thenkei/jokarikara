@@ -42,6 +42,8 @@ export const fr: Catalog = {
   "start.achievementsAria": "Succès\u00a0: {unlocked} sur {total} débloqués",
   "start.worlds": "MONDES {revealed}/{total}",
   "start.worldsAria": "Mondes\u00a0: {revealed} sur {total} découverts",
+  "start.install": "INSTALLER",
+  "start.installAria": "Installer Shape Stack comme une app, jouable hors ligne",
   "start.monoOn": "Style mono activé",
   "start.monoOff": "Style mono désactivé",
 
