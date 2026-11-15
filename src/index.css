@@ -1,8 +1,26 @@
 :root {
-  --bg-color: #0c0c0e;
+  /* Deep tone of world 1's hue: the menus sit on the same ground as the board. */
+  --bg-color: #0b0f17;
   --text-color: #f0f0f4;
   --accent-color: #3b82f6;
-  --font-main: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  /* Self-hosted (main.tsx imports @fontsource-variable/outfit): the PWA plays offline. */
+  --font-main: 'Outfit Variable', 'Outfit', system-ui, -apple-system, sans-serif;
+
+  /*
+   * Strata chrome: the menus use the board's material. Light "ink" for
+   * display text, a warm call-to-action against the cool ground, and a solid
+   * lower edge instead of a glow for depth.
+   */
+  --ink: #f3f1ff;
+  --cta: #ff9a5c;
+  --cta-hover: #ffab77;
+  --cta-edge: #b9572a;
+  --cta-text: #1f0f05;
+  --radius-control: 1rem;
+  --title-layer-1: #7b96f5;
+  --title-layer-2: #5470d6;
+  --title-layer-3: #3a50a8;
+  --title-layer-4: #25336f;
 
   /* Time Attack medal metals: highlight / base / shade, plus a text tone. */
   --medal-bronze-hi: #f6c9a3;
