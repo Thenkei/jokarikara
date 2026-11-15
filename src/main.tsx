@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { registerServiceWorker } from './pwa/registerServiceWorker.ts'
+import { applyInitialDocumentLang } from './i18n/initialLang.ts'
+
+// Before the first render: index.html ships lang="en" for every player.
+applyInitialDocumentLang()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
