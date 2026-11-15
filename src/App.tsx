@@ -348,6 +348,12 @@ function App() {
   const [timeUp, setTimeUp] = useState<TimeUpResult | null>(null);
   const timeUpRef = useRef(false);
   /**
+   * A miss ended the run: the board holds briefly for the fail feedback
+   * before the game over screen. Same rule as the TIME! hold: pausing is
+   * ignored, or MAIN MENU would abandon a lost run and drop its score.
+   */
+  const runLostRef = useRef(false);
+  /**
    * MISS pop for a miss that did not end the run (Zen, Time Attack), with how
    * far it was off ("+4 %", "BY A HAIR"). Set once per miss event, never per
    * frame; `id` replays the animation for identical consecutive labels.
@@ -430,7 +436,10 @@ function App() {
     (terminal: boolean, margin: MissMargin | null) => {
       recordAchievementMiss(terminal);
       // A terminal miss is explained (with its margin) on the game over card.
-      if (terminal) return;
+      if (terminal) {
+        runLostRef.current = true;
+        return;
+      }
       setMissPop((current) => ({
         label: margin ? getMissMarginLabel(margin) : null,
         id: (current?.id ?? 0) + 1,
@@ -713,6 +722,7 @@ function App() {
     setQualityPulseId(0);
     setPenaltyPulseId(0);
     timeUpRef.current = false;
+    runLostRef.current = false;
     setTimeUp(null);
     setMissPop(null);
     setComboBanner({ streak: 0, id: 0 });
@@ -983,8 +993,9 @@ function App() {
    */
   const applyPaused = useCallback(
     (next: boolean) => {
-      // Time is up: the board only holds for the TIME! banner, nothing to pause.
-      if (next && timeUpRef.current) return;
+      // The run is over (TIME! banner or fail feedback before the game over
+      // screen): the board only holds, there is nothing to pause.
+      if (next && (timeUpRef.current || runLostRef.current)) return;
       setPaused(next);
       // A confirm never survives the menu closing (nor a fresh pause).
       disarmFinish();
