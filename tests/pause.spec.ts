@@ -30,6 +30,8 @@ test.describe("Pause and keyboard", () => {
 
     await page.keyboard.press("Escape");
     await expect(page.locator(".pause-overlay")).toBeHidden();
+    // The resume countdown is covered by resume-countdown.spec.ts.
+    await bridge.finishResumeCountdown();
     expect((await bridge.getState())?.paused).toBe(false);
     await expect(page.locator(".gameover-screen")).toBeHidden();
   });

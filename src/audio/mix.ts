@@ -8,6 +8,7 @@ import type { StackQuality } from "../types";
  *   stack OK ≈ -24 … PERFECT ≈ -18   (quality hierarchy stays audible, < 7 dB)
  *   level up ≈ -18, world up ≈ -17, game over ≈ -19
  *   Zen miss ≈ -25, early tap ≈ -28, countdown tick ≈ -28 / urgent ≈ -26
+ *   (resume countdown: the same ticks `SOFT_TICK_DB` quieter)
  *   timing cue ≈ -31 / PERFECT tick ≈ -28: well under any stack, ≥ 3 dB above
  *   the music bed so the bed never masks it
  *   music bed ≈ 10 dB under a plain stack, so it never masks feedback
@@ -97,6 +98,12 @@ export const SFX_REVERB_SEND_DB: Readonly<Record<SfxId, number>> = {
   // Timing cue is a rhythm aid: a tail would smear where the beat lands.
   cue: -40,
 };
+
+/**
+ * Resume countdown ("3 · 2 · 1" after a pause): the countdown tick voice, this
+ * much quieter (the player is about to play, not racing the clock).
+ */
+export const SOFT_TICK_DB = -5;
 
 /** Extra stack send by quality: a PERFECT placement rings out. */
 export const STACK_REVERB_BOOST_DB: Readonly<Record<StackQuality, number>> = {

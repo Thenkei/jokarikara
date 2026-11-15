@@ -53,6 +53,8 @@ test.describe("Dynamic soundtrack", () => {
 
     await page.keyboard.press("Escape");
     await expect(page.locator(".pause-overlay")).toBeHidden();
+    // The soundtrack comes back on the resume countdown's "go".
+    await makeBridge(page).finishResumeCountdown();
     expect(await getMusicState(page)).toMatchObject({ paused: false, playing: true });
 
     // Auto-pause (tab hidden / window blur) pauses the music too.
@@ -91,6 +93,7 @@ test.describe("Dynamic soundtrack", () => {
       await expect(page.locator(".pause-overlay")).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(page.locator(".pause-overlay")).toBeHidden();
+      await bridge.finishResumeCountdown();
     };
 
     const sound = settingSwitch(page, "Sound");

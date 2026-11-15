@@ -39,6 +39,11 @@ export const makeBridge = (page: Page) => ({
   tap: () => page.evaluate(() => window.__GAME_TEST__?.tap()),
   pause: () => page.evaluate(() => window.__GAME_TEST__?.pause()),
   resume: () => page.evaluate(() => window.__GAME_TEST__?.resume()),
+  isResumeCountdownRunning: () =>
+    page.evaluate(() => window.__GAME_TEST__?.isResumeCountdownRunning() ?? false),
+  /** Skip the player-facing "3 · 2 · 1" after RESUME (no-op if not counting). */
+  finishResumeCountdown: () =>
+    page.evaluate(() => window.__GAME_TEST__?.finishResumeCountdown()),
   setActiveSize: (size: number) =>
     page.evaluate((value) => window.__GAME_TEST__?.setActiveSize(value), size),
   setTimeRemaining: (time: number) =>

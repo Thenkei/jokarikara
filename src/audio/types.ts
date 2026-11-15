@@ -80,8 +80,11 @@ export interface IAudioService {
   /** Too-early tap feedback in Zen mode. */
   playEarlyClickSound(): void;
 
-  /** Countdown tick for the final seconds of Time Attack. */
-  playTick(urgent: boolean): void;
+  /**
+   * Countdown tick: the final seconds of Time Attack, and (`soft`, a few dB
+   * quieter) the resume countdown after a pause (`urgent` = its "go").
+   */
+  playTick(urgent: boolean, soft?: boolean): void;
 
   /** Bonus time gained in Time Attack. */
   playTimeBonus(): void;

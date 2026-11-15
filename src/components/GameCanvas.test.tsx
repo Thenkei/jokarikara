@@ -1,8 +1,12 @@
 import { render, fireEvent, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GameCanvas } from "./GameCanvas";
 import type { GameCanvasHandle } from "./GameCanvas";
 import type { IAudioService } from "../audio/types";
+import {
+  RESUME_COUNTDOWN_STEP_MS,
+  RESUME_COUNTDOWN_TOTAL_MS,
+} from "../gameplay/resumeCountdown";
 
 // Mock the audio service
 const mockAudioService: IAudioService = {
@@ -467,6 +471,121 @@ describe("GameCanvas", () => {
 
       expect(onGameOver).not.toHaveBeenCalled();
       expect(mockAudioService.playFailSound).not.toHaveBeenCalled();
+    });
+
+    describe("resume countdown", () => {
+      beforeEach(() => {
+        // The driver reads performance.now(): fake it with the timers.
+        vi.useFakeTimers({
+          toFake: ["setTimeout", "clearTimeout", "Date", "performance"],
+        });
+      });
+      afterEach(() => vi.useRealTimers());
+
+      const renderPaused = (
+        props: Partial<Parameters<typeof GameCanvas>[0]> = {},
+      ) => {
+        const ref = { current: null as GameCanvasHandle | null };
+        const onResumeCountdown = vi.fn();
+        const utils = render(
+          <GameCanvas
+            ref={ref}
+            mode="ZEN"
+            timingCue
+            onScore={vi.fn()}
+            onGameOver={vi.fn()}
+            onLevelUp={vi.fn()}
+            onWorldUp={vi.fn()}
+            onResumeCountdown={onResumeCountdown}
+            audioService={mockAudioService}
+            {...props}
+          />
+        );
+        act(() => ref.current?.setPaused(true));
+        vi.clearAllMocks();
+        return { ...utils, ref, onResumeCountdown };
+      };
+      const countDown = () =>
+        act(() => vi.advanceTimersByTime(RESUME_COUNTDOWN_TOTAL_MS));
+
+      it("stays frozen through 3, 2, 1 (no cue ticks, taps ignored), then resumes", () => {
+        const { ref, onResumeCountdown, container } = renderPaused();
+        act(() => ref.current?.resumeWithCountdown());
+        expect(onResumeCountdown).toHaveBeenLastCalledWith(3);
+        expect(mockAudioService.playTick).toHaveBeenLastCalledWith(false, true);
+        expect(mockAudioService.resumeMusic).not.toHaveBeenCalled();
+
+        // Real frames keep coming: nothing grows, nothing ticks.
+        runFrames(1000, 600, 1000 / 60);
+        expect(mockAudioService.playCue).not.toHaveBeenCalled();
+        // A tap during the count is neither a stack, a miss nor an early tap.
+        tap(container.querySelector("canvas")!);
+        expect(mockAudioService.playStack).not.toHaveBeenCalled();
+        expect(mockAudioService.playMissSound).not.toHaveBeenCalled();
+        expect(mockAudioService.playEarlyClickSound).not.toHaveBeenCalled();
+
+        act(() => vi.advanceTimersByTime(RESUME_COUNTDOWN_STEP_MS));
+        expect(onResumeCountdown).toHaveBeenLastCalledWith(2);
+        act(() => vi.advanceTimersByTime(RESUME_COUNTDOWN_STEP_MS));
+        expect(onResumeCountdown).toHaveBeenLastCalledWith(1);
+        expect(mockAudioService.playTick).toHaveBeenCalledTimes(3);
+        act(() => vi.advanceTimersByTime(RESUME_COUNTDOWN_STEP_MS));
+        expect(onResumeCountdown).toHaveBeenLastCalledWith(null);
+        expect(onResumeCountdown).toHaveBeenCalledTimes(4);
+        // "Go": a brighter soft tick, and the soundtrack comes back.
+        expect(mockAudioService.playTick).toHaveBeenLastCalledWith(true, true);
+        expect(mockAudioService.resumeMusic).toHaveBeenCalledTimes(1);
+
+        runFrames(20000, 600, 1000 / 60);
+        expect(mockAudioService.playCue).toHaveBeenCalled();
+      });
+
+      it("keeps the Time Attack timer frozen until go", () => {
+        const onTimeUpdate = vi.fn();
+        const { ref } = renderPaused({ mode: "TIME_ATTACK", onTimeUpdate });
+        act(() => ref.current?.resumeWithCountdown());
+        runFrames(1000, 90, 1000 / 60);
+        expect(onTimeUpdate).not.toHaveBeenCalled();
+        countDown();
+        runFrames(5000, 90, 1000 / 60);
+        expect(onTimeUpdate).toHaveBeenCalled();
+      });
+
+      it("re-pausing cancels the count: no go, music stays paused", () => {
+        const { ref, onResumeCountdown } = renderPaused();
+        act(() => ref.current?.resumeWithCountdown());
+        act(() => ref.current?.setPaused(true));
+        countDown();
+        expect(onResumeCountdown).not.toHaveBeenCalledWith(null);
+        expect(mockAudioService.resumeMusic).not.toHaveBeenCalled();
+        expect(mockAudioService.playTick).toHaveBeenCalledTimes(1);
+      });
+
+      it("a second resume while counting keeps the running count", () => {
+        const { ref, onResumeCountdown } = renderPaused();
+        act(() => ref.current?.resumeWithCountdown());
+        act(() => vi.advanceTimersByTime(200));
+        act(() => ref.current?.resumeWithCountdown());
+        countDown();
+        expect(onResumeCountdown.mock.calls).toEqual([[3], [2], [1], [null]]);
+      });
+
+      it("Zen restart/undo skip the rest of the count (fresh shape, no go tick)", () => {
+        const { ref, onResumeCountdown } = renderPaused();
+        act(() => ref.current?.resumeWithCountdown());
+        act(() => ref.current?.undo());
+        expect(onResumeCountdown).toHaveBeenLastCalledWith(null);
+        expect(mockAudioService.resumeMusic).toHaveBeenCalledTimes(1);
+        expect(mockAudioService.playTick).toHaveBeenCalledTimes(1);
+      });
+
+      it("unmounting (new run, game over screen) drops a pending count", () => {
+        const { ref, onResumeCountdown, unmount } = renderPaused();
+        act(() => ref.current?.resumeWithCountdown());
+        unmount();
+        expect(vi.getTimerCount()).toBe(0);
+        expect(onResumeCountdown).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

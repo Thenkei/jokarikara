@@ -92,6 +92,7 @@ test.describe("Settings sheet", () => {
 
     await page.keyboard.press("Escape");
     await expect(pauseOverlay).toBeHidden();
+    await bridge.finishResumeCountdown();
     expect((await bridge.getState())?.paused).toBe(false);
   });
 });

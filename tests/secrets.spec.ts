@@ -128,6 +128,7 @@ test.describe("Start screen secrets", () => {
     await expect(page.locator(".pause-overlay")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator(".pause-overlay")).toBeHidden();
+    await bridge.finishResumeCountdown();
     expect((await bridge.getState())?.paused).toBe(false);
   });
 
