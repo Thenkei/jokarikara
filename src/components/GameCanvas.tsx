@@ -47,6 +47,7 @@ import {
   getHeartbeatPulse,
 } from "../gameplay/heartbeat";
 import { installGameTestBridge } from "../utils/testBridge";
+import { isE2eMode } from "../utils/e2e";
 import { useResumeCountdown, type ResumeGoSource } from "../gameplay/useResumeCountdown";
 import { useWorldIntroHold } from "../gameplay/useWorldIntroHold";
 import { FIRST_VISIT_MAX_HOLD_MS, shouldTeachWorld } from "../gameplay/worldIntro";
@@ -1165,7 +1166,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       };
 
       rafIdRef.current = requestAnimationFrame(loop);
-      const cleanupBridge = installGameTestBridge({
+      // Guarded at the call site too: production builds then drop this whole
+      // argument object (closures included), not just the installer's body.
+      const cleanupBridge = isE2eMode() ? installGameTestBridge({
         stateRef,
         handleTap,
         tick,
@@ -1188,7 +1191,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
                 monoRef.current,
               )
             : null,
-      });
+      }) : undefined;
       return () => {
         cancelled = true;
         cancelAnimationFrame(rafIdRef.current);

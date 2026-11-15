@@ -5,6 +5,7 @@ import { isFractureActive, isTapBlockedByFracture } from "../gameplay/fracture";
 import type { Medal } from "../modes/medals";
 import type { GameState } from "../types";
 import type { WorldTheme } from "../visual/theme";
+import { isE2eMode } from "./e2e";
 
 export type GameTestBridgeState = {
   score: number;
@@ -97,8 +98,6 @@ type InstallArgs = {
   setWorldIntroMaxHold: (ms: number) => void;
 };
 
-const isE2eMode = (): boolean =>
-  typeof import.meta !== "undefined" && import.meta.env?.VITE_E2E === "true";
 
 const advanceTestClock = (dtSeconds: number) => {
   const win = window as Window & { __TEST_NOW__?: number };
