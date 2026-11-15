@@ -50,4 +50,39 @@ test.describe("Accessibility", () => {
     await expect(live).toContainText("Game over");
     await expect(live).toContainText("Score");
   });
+
+  const loseClassicRun = async (page: import("@playwright/test").Page) => {
+    await page.goto("/");
+    await page.locator(".start-btn").press("Enter");
+    await waitForBridge(page);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    await bridge.forceStack(0.98);
+    const state = await bridge.getState();
+    await bridge.setActiveSize((state?.lastSize ?? 1) * 1.2);
+    await bridge.step(0.016);
+    await expect(page.locator(".gameover-screen")).toBeVisible();
+  };
+
+  test("game over cards are a tab stop only when they scroll", async ({ page }) => {
+    const body = page.getByRole("region", { name: "Run summary" });
+
+    // Desktop: everything fits, so the summary is no dead stop before RETRY.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await loseClassicRun(page);
+    await expect(body).not.toHaveAttribute("tabindex");
+
+    // Small phone: the cards scroll, and the keyboard needs a stop to scroll them.
+    await page.setViewportSize({ width: 320, height: 568 });
+    await expect(body).toHaveAttribute("tabindex", "0");
+    await body.focus();
+    await page.keyboard.press("End");
+    await expect
+      .poll(() => body.evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+
+    // Back to desktop: the stop goes away again.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(body).not.toHaveAttribute("tabindex");
+  });
 });

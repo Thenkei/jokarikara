@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "../i18n/context";
 import { Rich } from "../i18n/Rich";
 import type { GameMode, RunStats } from "../types";
@@ -14,6 +14,7 @@ import { MedalGlyph } from "./MedalGlyph";
 import { getMedalName, getMedalTitle, type MedalResult } from "../modes/medals";
 import { getGameOverHeadline } from "../modes/endFeedback";
 import { formatScoreDate } from "../modes/scoreDate";
+import { useScrollOverflow } from "./useScrollOverflow";
 
 export type ShareStatus = "idle" | "copied" | "shared" | "failed";
 
@@ -177,14 +178,18 @@ export function GameOverScreen({
   const i18n = useI18n();
   const { t } = i18n;
   const breakdownTotal = QUALITY_ORDER.reduce((sum, q) => sum + breakdown[q], 0);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const bodyScrolls = useScrollOverflow(bodyRef);
 
   return (
     <div className="screen gameover-screen">
-      {/* Focusable: on a phone the cards scroll, and keyboard users need a
-          stop to scroll them (there is no control inside to land on). */}
+      {/* Focusable only while it scrolls (phones): keyboard users need a stop
+          to scroll the cards (there is no control inside to land on). When
+          everything fits it would be a dead tab stop before RETRY. */}
       <div
+        ref={bodyRef}
         className="gameover-body"
-        tabIndex={0}
+        tabIndex={bodyScrolls ? 0 : undefined}
         role="region"
         aria-label={t("gameOver.summary")}
       >
