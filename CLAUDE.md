@@ -100,7 +100,7 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 
 ### Game Modes
 - **CLASSIC**: Standard fail-on-miss gameplay
-- **ZEN**: No fail state, restart/undo buttons available; can start from any world already reached (practice)
+- **ZEN**: No fail state, restart/undo buttons available; pause menu FINISH RUN (`src/modes/finishRun.ts`, `finishRun` in gameState) ends the run as a game over with `EndReason` "finished" (scores saved; MAIN MENU still abandons); can start from any world already reached (practice)
 - **TIME_ATTACK**: 60-second timer; PERFECT +5s, GREAT +2s, miss −5s
 - **Daily Challenge**: not a `GameMode` but a run variant (CLASSIC rules, date-derived `runSeed`), handled in `App.tsx`
 

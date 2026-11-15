@@ -717,4 +717,61 @@ describe("GameCanvas", () => {
     tap(canvas, { pointerType: "mouse", button: 0 });
     expect(onScore).toHaveBeenCalled();
   });
+  describe("finishRun (Zen FINISH RUN)", () => {
+    const renderWithRef = (mode: "ZEN" | "CLASSIC" | "TIME_ATTACK") => {
+      const ref = { current: null } as { current: GameCanvasHandle | null };
+      const onGameOver = vi.fn();
+      render(
+        <GameCanvas
+          ref={ref}
+          mode={mode}
+          onScore={vi.fn()}
+          onGameOver={onGameOver}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          audioService={mockAudioService}
+        />,
+      );
+      return { ref, onGameOver };
+    };
+
+    it("ends a Zen run at once as a calm game over", () => {
+      const { ref, onGameOver } = renderWithRef("ZEN");
+      act(() => ref.current?.setPaused(true));
+
+      let finished = false;
+      act(() => {
+        finished = ref.current?.finishRun() ?? false;
+      });
+
+      expect(finished).toBe(true);
+      // No fail-feedback delay: the player asked for it.
+      expect(onGameOver).toHaveBeenCalledTimes(1);
+      const [, world, level, stats] = onGameOver.mock.calls[0];
+      expect(world).toBe(1);
+      expect(level).toBe(1);
+      expect(stats).toMatchObject({ endReason: "finished", endMargin: null });
+      expect(mockAudioService.stopMusic).toHaveBeenCalled();
+      expect(mockAudioService.playWorldUp).toHaveBeenCalledWith(1);
+      expect(mockAudioService.playFailSound).not.toHaveBeenCalled();
+
+      // Once over, a second finish is a no-op.
+      act(() => {
+        finished = ref.current?.finishRun() ?? true;
+      });
+      expect(finished).toBe(false);
+      expect(onGameOver).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(["CLASSIC", "TIME_ATTACK"] as const)("is a no-op in %s", (mode) => {
+      const { ref, onGameOver } = renderWithRef(mode);
+      let finished = true;
+      act(() => {
+        finished = ref.current?.finishRun() ?? true;
+      });
+      expect(finished).toBe(false);
+      expect(onGameOver).not.toHaveBeenCalled();
+      expect(mockAudioService.playWorldUp).not.toHaveBeenCalled();
+    });
+  });
 });

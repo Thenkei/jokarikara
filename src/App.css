@@ -776,6 +776,14 @@ button:active {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
+/* Zen FINISH RUN armed ("TAP AGAIN TO FINISH"): warm and clearly a second
+   step, but not the danger red (finishing keeps the score). */
+.pause-overlay .pause-finish-btn.armed {
+  color: #ffe7a0;
+  border-color: rgba(255, 224, 102, 0.7);
+  background: rgba(255, 224, 102, 0.1);
+}
+
 .pause-resume-btn {
   min-width: 12rem;
   padding: 0.9rem 2rem;
@@ -2540,21 +2548,21 @@ button:focus-visible {
   filter: var(--mono-filter);
 }
 
-.game-container[data-theme="mono"] .gameover-card.end-insight {
+.game-container[data-theme="mono"] .gameover-card.end-insight.danger-signal {
   background: rgba(255, 90, 36, 0.07);
   border-color: rgba(255, 110, 60, 0.3);
 }
 
-.game-container[data-theme="mono"] .end-insight-title,
-.game-container[data-theme="mono"] .end-insight-margin {
+.game-container[data-theme="mono"] .danger-signal .end-insight-title,
+.game-container[data-theme="mono"] .danger-signal .end-insight-margin {
   color: var(--mono-danger-text);
 }
 
-.game-container[data-theme="mono"] .end-insight-hint {
+.game-container[data-theme="mono"] .danger-signal .end-insight-hint {
   color: #ffc9b3;
 }
 
-.game-container[data-theme="mono"] .end-insight-tip {
+.game-container[data-theme="mono"] .danger-signal .end-insight-tip {
   color: #d6b3a3;
 }
 
@@ -2626,6 +2634,17 @@ button:focus-visible {
   color: #aab1be;
   font-size: 0.8rem;
   line-height: 1.4;
+}
+
+/* Zen FINISH RUN: the run was ended on purpose, not lost. Calm, positive
+   (the GREAT green), never the danger red; Mono tints it like any card. */
+.gameover-card.end-insight.end-insight--calm {
+  background: rgba(94, 230, 168, 0.06);
+  border-color: rgba(94, 230, 168, 0.22);
+}
+
+.end-insight--calm .end-insight-title {
+  color: #9ff0c9;
 }
 
 .quality-breakdown {

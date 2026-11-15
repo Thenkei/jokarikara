@@ -250,7 +250,12 @@ export function GameOverScreen({
               )}
             </section>
             {endInsight && (
-              <div className="gameover-card end-insight danger-signal" role="status">
+              <div
+                className={`gameover-card end-insight ${
+                  endInsight.tone === "calm" ? "end-insight--calm" : "danger-signal"
+                }`}
+                role="status"
+              >
                 {endInsight.margin && (
                   <p className="end-insight-margin">{endInsight.margin}</p>
                 )}

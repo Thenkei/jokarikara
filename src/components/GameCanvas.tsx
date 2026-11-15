@@ -17,6 +17,7 @@ import {
   updateTimer,
   handleMiss,
   getEndReason,
+  finishRun as finishRunState,
   restartActiveShape,
   undoLastStack,
 } from "../core/gameState";
@@ -147,6 +148,13 @@ export interface GameCanvasHandle {
   resumeWithCountdown: () => void;
   /** Programmatic tap (keyboard). No-op while paused or after game over. */
   tap: () => void;
+  /**
+   * Zen FINISH RUN: ends the run as a regular game over (reason "finished")
+   * with a gentle resolving cue instead of the fail buzz, and reports it via
+   * `onGameOver` at once (no fail-feedback delay). Returns false, doing
+   * nothing, when the run cannot be finished (not Zen, already over).
+   */
+  finishRun: () => boolean;
 }
 
 const toRunStats = (state: GameState): RunStats => {
@@ -378,8 +386,32 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           resumeCountdown.start();
         },
         tap: () => handleTapRef.current(),
+        finishRun: () => {
+          const state = stateRef.current;
+          if (!state) return false;
+          const finished = finishRunState(state);
+          if (finished === state) return false;
+          stateRef.current = finished;
+          resumeCountdown.cancel();
+          if (gameOverTimerRef.current) {
+            clearTimeout(gameOverTimerRef.current);
+            gameOverTimerRef.current = null;
+          }
+          // Same game-over path as a lost run, minus the failure: the world's
+          // resolving chord and a light pulse instead of the buzz and shake.
+          audioService.stopMusic();
+          audioService.playWorldUp(finished.world);
+          haptic("levelUp");
+          onGameOver(
+            finished.score,
+            finished.world,
+            finished.level,
+            toRunStats(finished),
+          );
+          return true;
+        },
       }),
-      [setLoopPaused, resumeCountdown, onResumeCountdown],
+      [setLoopPaused, resumeCountdown, onResumeCountdown, audioService, onGameOver],
     );
 
     const setManualMode = useCallback((manual: boolean) => {

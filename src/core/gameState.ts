@@ -35,6 +35,7 @@ import {
 } from "../constants/game";
 import type { GameMode } from "../types";
 import { nextRandomUnit, seedRng } from "../utils/random";
+import { canFinishRun } from "../modes/finishRun";
 import {
   containsPrevious,
   createReverseSeed,
@@ -658,6 +659,7 @@ export const getMissMargin = (
  */
 export const getEndReason = (state: GameState): EndReason | null => {
   if (!state.isGameOver) return null;
+  if (state.finishedByPlayer) return "finished";
   if (state.mode === "TIME_ATTACK" && (state.timeRemaining ?? 1) <= 0) {
     return "timeout";
   }
@@ -813,6 +815,18 @@ export const undoLastStack = (state: GameState): GameState => {
     activeShape: null, // Force spawn of new shape
     perfectBandEnteredAt: null,
   };
+};
+
+/**
+ * Zen FINISH RUN: the player ends the session on purpose. A regular game
+ * over (score, stats and history untouched) whose end reason is "finished".
+ *
+ * Zen only (see `canFinishRun`); anything else, or a run that is already
+ * over, is returned as is.
+ */
+export const finishRun = (state: GameState): GameState => {
+  if (!canFinishRun(state.mode) || state.isGameOver) return state;
+  return { ...setGameOver(state), finishedByPlayer: true };
 };
 
 /**

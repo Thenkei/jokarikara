@@ -4,6 +4,7 @@ import { GameOverScreen, type GameOverRun } from "./GameOverScreen";
 import { ACHIEVEMENT_IDS } from "../progression/achievements";
 import { selectStreakLabel } from "../modes/dailyStreak";
 import { getMedalResult, MEDAL_THRESHOLDS } from "../modes/medals";
+import { getEndInsight } from "../modes/runInsights";
 
 const RUN: GameOverRun = {
   mode: "CLASSIC",
@@ -100,6 +101,30 @@ describe("GameOverScreen", () => {
     const { container } = renderScreen();
     expect(container.querySelector(".end-insight-margin")).toBeNull();
     expect(container.querySelector(".end-insight-title")?.textContent).toBe("Too late.");
+  });
+
+  it("shows a finished Zen session calmly: no danger styling, no margin", () => {
+    const { container } = renderScreen({
+      mode: "ZEN",
+      modeLabel: "ZEN",
+      run: {
+        ...RUN,
+        mode: "ZEN",
+        stats: { ...RUN.stats, endReason: "finished", endMargin: null },
+      },
+      endInsight: getEndInsight("finished", 5, null, [140, 140, 90]),
+    });
+    const card = container.querySelector(".end-insight");
+    expect(card?.classList.contains("danger-signal")).toBe(false);
+    expect(card?.classList.contains("end-insight--calm")).toBe(true);
+    expect(container.querySelector(".danger-signal")).toBeNull();
+    expect(card?.querySelector(".end-insight-margin")).toBeNull();
+    expect(card?.querySelector(".end-insight-title")?.textContent).toBe("Session complete.");
+    expect(card?.querySelector(".end-insight-tip")?.textContent).toContain("67% PERFECT");
+    // Still the full game over: stats, leaderboard and share.
+    expect(container.querySelector(".stat-stacks")?.textContent).toBe("60");
+    expect(screen.getByRole("heading", { name: "TOP SCORES - ZEN" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "SHARE RESULT" })).toBeTruthy();
   });
 
   it("hides the combo stat in Zen", () => {
