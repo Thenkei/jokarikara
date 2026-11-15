@@ -112,6 +112,7 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 ### HUD layout (components/GameHud.tsx + App.css)
 - Row 1 `.hud-top`: the score pill holds only the score and the vital readout (Time Attack timer / Zen lives); its `::before`/`::after` spacers reserve PAUSE's fixed-width corner (`--pause-width`, `--pause-reserve`), so the pill is centred while it fits and slides left, never under PAUSE.
 - Row 2 `.hud-meta` (always visible, below PAUSE, wraps): goal chip, W, L, DAILY. Row 3 `.hud-secondary`: auto-revealed STYLE/COMBO (Zen controls). New HUD chips go in row 2 or 3, not row 1. `tests/hud-layout.spec.ts` guards 320/375 px.
+- `.game-screen` sets `touch-action: none` during live play (no pinch zoom/pan from the HUD mid-run) and drops it while paused (`.is-paused`), so menus stay zoomable; the viewport itself never forbids zoom (`tests/touch-gestures.spec.ts`).
 
 ### i18n (src/i18n)
 Every user-facing string goes through the catalogs: visible text, `aria-label`s, screen-reader announcements, share text. No dependency, English (`en.ts`) is the source of truth.

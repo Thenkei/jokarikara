@@ -15,6 +15,17 @@
   touch-action: manipulation;
 }
 
+/*
+ * Live play: a two-finger touch on the HUD (or anywhere around the board)
+ * must not pinch-zoom or pan the page mid-run; the canvas already sets
+ * none. touch-action intersects with ancestors, so it is lifted on the
+ * whole screen while paused: the pause menu stays zoomable, as do the
+ * start and game over screens.
+ */
+.game-screen:not(.is-paused) {
+  touch-action: none;
+}
+
 .game-screen {
   --world-hud-primary: #6ea8ff;
   --world-hud-secondary: #ff5cb6;

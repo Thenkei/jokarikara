@@ -1249,7 +1249,7 @@ function App() {
 
         {gameState === "PLAYING" && (
           <div
-            className="game-screen"
+            className={paused ? "game-screen is-paused" : "game-screen"}
             style={{ width: "100%", height: "100%", ...gameplayThemeVars }}
             inert={settingsSheetVisible}
           >
