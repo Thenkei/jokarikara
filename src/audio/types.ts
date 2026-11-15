@@ -56,8 +56,18 @@ export interface MusicState {
  * Allows mocking in tests and swapping implementations.
  */
 export interface IAudioService {
-  /** Initialize the audio context (must follow a user gesture). */
+  /**
+   * Initialize the audio context. Outside a user gesture it is created
+   * suspended (autoplay policy) and the first gesture's sound resumes it.
+   */
   init(): void;
+
+  /**
+   * Start screen warm-up, called when the page is idle: builds the context
+   * (suspended until a gesture) and, idle too, the reverb, so the first tap
+   * only resumes. No-op while muted (mute = no allocation) or once built.
+   */
+  prewarm(): void;
 
   /**
    * Legacy pitched blip; kept for UI feedback (restart/undo in Zen).

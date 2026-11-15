@@ -178,6 +178,11 @@ interface KnownDailyRecord {
   readonly record: DailyDayRecord;
 }
 
+/** Latest the idle audio warm-up may wait after load (requestIdleCallback). */
+const AUDIO_PREWARM_TIMEOUT_MS = 2000;
+/** Warm-up delay where requestIdleCallback is missing (older Safari). */
+const AUDIO_PREWARM_FALLBACK_MS = 800;
+
 const NO_DAILY_RECORD: DailyDayRecord = Object.freeze({ best: 0, attempts: 0 });
 
 /** Fresh read (another tab may have played): used on mount and back to menu. */
@@ -684,6 +689,18 @@ function App() {
   };
 
   /** Same kind of run again (keeps Daily vs regular). */
+  // Warm the audio engine while the start screen idles (see prewarm): the
+  // first tap then resumes a ready context instead of building one.
+  useEffect(() => {
+    const warm = () => audioManager.prewarm();
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(warm, { timeout: AUDIO_PREWARM_TIMEOUT_MS });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(warm, AUDIO_PREWARM_FALLBACK_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const restartRun = () => startRun({ mode, daily: dailyKey !== null });
 
   // Game over actions (RETRY, share, menu, Enter) ignore a reflex tap from
