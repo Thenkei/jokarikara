@@ -49,6 +49,9 @@ describe("precache URLs", () => {
     expect(isPrecacheable(".DS_Store")).toBe(false);
     expect(isPrecacheable(".vite/manifest.json")).toBe(false);
     expect(isPrecacheable("assets/sw.js")).toBe(true);
+    // Link preview image: crawlers fetch it, the game never does.
+    expect(isPrecacheable("og-image.jpg")).toBe(false);
+    expect(isPrecacheable("icon-512.png")).toBe(true);
     const { urls } = buildPrecacheManifest(BASE, [
       ...SITE,
       { path: "sw.js", content: "" },

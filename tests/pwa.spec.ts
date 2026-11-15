@@ -56,3 +56,31 @@ test.describe("PWA install surfaces", () => {
     expect(await naturalSize(page, url)).toEqual({ width: 180, height: 180 });
   });
 });
+
+test.describe("Link preview", () => {
+  test("declares an Open Graph card with a 1200×630 image served by the build", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const meta = (selector: string) => page.locator(selector).getAttribute("content");
+    const publicUrl = "https://thenkei.github.io/jokarikara/";
+
+    expect(await meta('meta[property="og:title"]')).toBe("Shape Stack");
+    expect(await meta('meta[property="og:description"]')).toBeTruthy();
+    expect(await meta('meta[property="og:url"]')).toBe(publicUrl);
+    expect(await meta('meta[name="twitter:card"]')).toBe("summary_large_image");
+    expect(await page.locator('link[rel="canonical"]').getAttribute("href")).toBe(publicUrl);
+
+    // Absolute (crawlers don't resolve relative URLs) and under the public
+    // build; the same path must exist in this build.
+    const image = await meta('meta[property="og:image"]');
+    expect(image?.startsWith(publicUrl)).toBe(true);
+    const local = new URL(image!.slice(publicUrl.length), page.url()).href;
+    const response = await page.request.get(local);
+    expect(response.headers()["content-type"]).toContain("image/jpeg");
+    expect((await response.body()).length).toBeLessThan(300_000);
+    expect(await naturalSize(page, local)).toEqual({ width: 1200, height: 630 });
+    expect(await meta('meta[property="og:image:width"]')).toBe("1200");
+    expect(await meta('meta[property="og:image:height"]')).toBe("630");
+  });
+});

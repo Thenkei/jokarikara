@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test, expect } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
+import { isPrecacheable } from "../../build/sw/precache.ts";
 
 /**
  * Offline proof for the installed PWA (run with `npm run test:offline`).
@@ -38,11 +39,16 @@ test.beforeAll(async ({}, testInfo) => {
 
 test.afterAll(stopServer);
 
-/** Every file the build emitted except the worker, as URL paths. */
+/**
+ * Every file the build emitted that the precache rules keep (all but the
+ * worker and the link preview image), as URL paths.
+ */
 const expectedPrecache = () =>
   readdirSync(DIST, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name !== "sw.js")
-    .map((entry) => BASE + join(entry.parentPath, entry.name).slice(DIST.length + 1))
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(entry.parentPath, entry.name).slice(DIST.length + 1))
+    .filter(isPrecacheable)
+    .map((path) => BASE + path)
     .sort();
 
 test("the installed game starts and plays with no network", async ({ page, context }) => {
