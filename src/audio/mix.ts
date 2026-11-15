@@ -9,7 +9,7 @@ import type { StackQuality } from "../types";
  *   level up ≈ -18, world up ≈ -17, game over ≈ -19
  *   Zen miss ≈ -25, early tap ≈ -28, countdown tick ≈ -28 / urgent ≈ -26
  *   (resume countdown: the same ticks `SOFT_TICK_DB` quieter)
- *   timing cue ≈ -31 / PERFECT tick ≈ -28: well under any stack, ≥ 3 dB above
+ *   timing cue ≈ -30 / PERFECT tick ≈ -27: well under any stack, ≥ 3 dB above
  *   the music bed so the bed never masks it
  *   music bed ≈ 10 dB under a plain stack, so it never masks feedback
  *   (Time Attack tension, last 10 s: ≈ -34.7 at full tension vs ≈ -34.5
@@ -68,7 +68,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   record: -1.5,
   menu: 0,
   ui: 2.5,
-  cue: 9,
+  cue: 10,
 };
 
 /**
