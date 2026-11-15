@@ -89,6 +89,12 @@ const NO_TRANSITIONS_CSS =
 
 const analyze = async (page: Page, builder: AxeBuilder, pumpPausedClock: boolean) => {
   let done = false;
+  // Legacy mode runs axe.run in the page itself. The default (runPartial)
+  // opens and closes a helper page to finish the run, and `clock.runFor`
+  // drives every page of the context: a pump step landing on that close
+  // threw "Target page, context or browser has been closed" (CI trace).
+  // The scanned pages have no iframes, which is all legacy mode gives up.
+  if (pumpPausedClock) builder.setLegacyMode(true);
   const scan = builder.analyze().finally(() => {
     done = true;
   });
