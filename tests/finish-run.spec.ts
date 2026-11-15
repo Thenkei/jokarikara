@@ -77,6 +77,28 @@ test.describe("Zen FINISH RUN", () => {
     expect(record.lifetime.totalStacks).toBe(3);
   });
 
+  test("MAIN MENU after an UNDO commits the undone count, not the last stack event", async ({
+    page,
+  }) => {
+    await startZen(page);
+    const bridge = await startRunAndStack(page, 2);
+    await page.locator(".undo-btn").press("Enter");
+    await bridge.step(0.016); // the undo request is applied on the next tick
+    expect((await bridge.getState())?.stackCount).toBe(1);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".pause-overlay")).toBeVisible();
+    await page.locator(".pause-overlay .pause-menu-btn").press("Enter");
+    await expect(page.locator(".start-screen")).toBeVisible();
+
+    const record = await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? "{}"),
+      ACHIEVEMENTS_KEY,
+    );
+    expect(record.lifetime.runsPlayed).toBe(1);
+    expect(record.lifetime.totalStacks).toBe(1);
+  });
+
   test("a practice run finishes without saving a score", async ({ page }) => {
     // Registered after the fixture's script (which clears storage).
     await page.addInitScript((key) => {

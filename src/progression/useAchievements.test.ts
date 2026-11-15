@@ -122,7 +122,18 @@ describe("useAchievements", () => {
       expect(lifetime.bestZenStacks).toBe(1);
     });
 
-    it("abandoned (MAIN MENU): also one run played, but from the last stack event", () => {
+    it("abandoned (MAIN MENU) with RunStats: one run played, undo respected", () => {
+      const { hook } = setup();
+      playThenUndo(hook);
+      act(() => hook.result.current.abandonRun({ stackCount: 1, perfectCount: 1 }));
+
+      const { lifetime } = getAchievementRecord();
+      expect(lifetime.runsPlayed).toBe(1);
+      expect(lifetime.totalStacks).toBe(1);
+      expect(lifetime.totalPerfects).toBe(1);
+    });
+
+    it("abandoned without stats falls back to the stack events", () => {
       const { hook } = setup();
       playThenUndo(hook);
       act(() => hook.result.current.abandonRun());

@@ -64,8 +64,12 @@ export interface AchievementsApi {
   setPaused: (paused: boolean) => void;
   /** Final evaluation + lifetime commit. Returns everything unlocked this run. */
   finishRun: (input: FinishRunInput) => readonly AchievementId[];
-  /** Commits a run left without a game over (menu, restart). Idempotent. */
-  abandonRun: () => void;
+  /**
+   * Commits a run left without a game over (menu, restart). Idempotent.
+   * Pass the run's current RunStats when known: like at game over, they are
+   * authoritative over the stack events (a Zen undo lowers the counts).
+   */
+  abandonRun: (stats?: Pick<RunStats, "stackCount" | "perfectCount"> | null) => void;
   /**
    * Event unlock outside runs (e.g. a start screen secret). Persists and
    * announces via `onUnlock` once; a no-op when already unlocked.
@@ -250,7 +254,28 @@ export function useAchievements(options: UseAchievementsOptions = {}): Achieveme
     [evaluateRun, commitRun],
   );
 
-  const abandonRun = useMemo(() => guarded("abandonRun", undefined, commitRun), [commitRun]);
+  const abandonRun = useMemo(
+    () =>
+      guarded(
+        "abandonRun",
+        undefined,
+        (stats?: Pick<RunStats, "stackCount" | "perfectCount"> | null) => {
+          const run = runRef.current;
+          if (run && !run.committed && stats) {
+            runRef.current = {
+              ...run,
+              progress: {
+                ...run.progress,
+                stackCount: stats.stackCount,
+                perfectCount: stats.perfectCount,
+              },
+            };
+          }
+          commitRun();
+        },
+      ),
+    [commitRun],
+  );
 
   const unlock = useMemo(
     () => guarded("unlock", undefined, (id: AchievementId) => {
