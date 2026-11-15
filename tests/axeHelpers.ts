@@ -65,6 +65,8 @@ type ScanOptions = {
  * inside the 3 · 2 · 1, so both run while the countdown is on screen.
  */
 const PUMP_BUDGET_MS = Math.floor((RESUME_COUNTDOWN_TOTAL_MS - 100) / 2);
+/** Fake time advanced per pump step (one 60 Hz frame). */
+const PUMP_STEP_MS = 16;
 
 /**
  * Decorative image layers: the start screen backdrop (SVG) and the game board
@@ -81,7 +83,12 @@ const analyze = async (page: Page, builder: AxeBuilder, pumpPausedClock: boolean
     done = true;
   });
   if (pumpPausedClock) {
-    for (let ms = 0; !done && ms < PUMP_BUDGET_MS; ms += 1) await page.clock.runFor(1);
+    // One frame per step: each runFor is a browser round trip, and ~800
+    // one-millisecond steps per scan overran the 30 s test budget on loaded
+    // CI runners. 16 ms keeps the same fake-time budget in ~50 round trips.
+    for (let ms = 0; !done && ms < PUMP_BUDGET_MS; ms += PUMP_STEP_MS) {
+      await page.clock.runFor(PUMP_STEP_MS);
+    }
   }
   return scan;
 };
