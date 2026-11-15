@@ -168,7 +168,9 @@ export function GameOverScreen({
 
   return (
     <div className="screen gameover-screen">
-      <div className="gameover-body">
+      {/* Focusable: on a phone the cards scroll, and keyboard users need a
+          stop to scroll them (there is no control inside to land on). */}
+      <div className="gameover-body" tabIndex={0} role="region" aria-label="Run summary">
         <header className="gameover-hero">
           <h1 className="title gameover-title">
             {run?.stats.endReason === "finished" ? "SESSION COMPLETE" : "GAME OVER"}
@@ -229,7 +231,12 @@ export function GameOverScreen({
                 </div>
               </dl>
               {breakdownTotal > 0 && (
-                <div className="quality-breakdown" aria-label="Stack quality breakdown">
+                // A name is only allowed on a role: group the legend under it.
+                <div
+                  className="quality-breakdown"
+                  role="group"
+                  aria-label="Stack quality breakdown"
+                >
                   <div className="quality-breakdown-bar" aria-hidden="true">
                     {QUALITY_ORDER.map((q) =>
                       breakdown[q] > 0 ? (

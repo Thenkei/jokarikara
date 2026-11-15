@@ -90,12 +90,16 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
               <span className="achievement-desc">{text.description}</span>
             </span>
             {progress && progress.current > 0 && (
-              <span
-                className="achievement-progress"
-                aria-label={`${progress.current} of ${progress.target}`}
-              >
-                {progress.current}/{progress.target}
-              </span>
+              // aria-label is ignored on a plain span: read the spoken form
+              // from visually hidden text instead of "10 slash 1000".
+              <>
+                <span className="achievement-progress" aria-hidden="true">
+                  {progress.current}/{progress.target}
+                </span>
+                <span className="visually-hidden">
+                  {progress.current} of {progress.target}
+                </span>
+              </>
             )}
             <span className="visually-hidden">
               {unlocked ? "Unlocked" : "Locked"}
