@@ -77,6 +77,8 @@ import {
   type AchievementToasterHandle,
 } from "./components/AchievementToaster";
 import { AchievementsPanel } from "./components/AchievementsPanel";
+import { WorldAtlas } from "./components/WorldAtlas";
+import { ATLAS_WORLD_COUNT, countRevealedWorlds } from "./gameplay/atlas";
 import {
   GearIcon,
   SettingsSheet,
@@ -106,6 +108,9 @@ const createRunSeed = (): number => {
 
   return Math.floor(Math.random() * 0xffffffff);
 };
+
+/** Full-screen panels opened from the start screen menu. */
+type StartPanel = "achievements" | "worlds";
 
 const HUD_REVEAL_DURATION_MS = 2000;
 /** Start backdrop flourish length: the CSS burst plus its last layer's delay. */
@@ -274,7 +279,17 @@ function App() {
   const [personalBestPassed, setPersonalBestPassed] = useState(false);
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
-  const [showAchievements, setShowAchievements] = useState(false);
+  /** Start screen sub-panel shown instead of the menu (null = the menu). */
+  const [startPanel, setStartPanel] = useState<StartPanel | null>(null);
+  /**
+   * Panel just closed by the player: its menu entry gets focus back once the
+   * menu re-renders (like the settings sheet returning focus to its gear).
+   */
+  const panelReturnFocusRef = useRef<StartPanel | null>(null);
+  const panelTriggerRefs = useRef<Record<StartPanel, HTMLButtonElement | null>>({
+    achievements: null,
+    worlds: null,
+  });
   const [showSettings, setShowSettings] = useState(false);
   /**
    * Start screen secrets. Mono is session-only by design (never persisted):
@@ -320,6 +335,16 @@ function App() {
     [recordAchievementMiss, mode],
   );
   const bestWorldReached = achievementRecord.lifetime.bestWorld;
+  const revealedWorldCount = countRevealedWorlds(bestWorldReached);
+
+  // A closed panel hands focus back to the menu entry that opened it (the
+  // menu re-mounts on close, so this runs after it is back in the DOM).
+  useEffect(() => {
+    const closed = panelReturnFocusRef.current;
+    if (closed === null || startPanel !== null || gameState !== "START") return;
+    panelReturnFocusRef.current = null;
+    panelTriggerRefs.current[closed]?.focus({ preventScroll: true });
+  }, [startPanel, gameState]);
 
   /**
    * Daily habit loop. Once a Daily is played, the start screen button and the
@@ -328,7 +353,7 @@ function App() {
    * the button flips to the new day's NOT PLAYED. Screen changes refresh it.
    */
   const countdownDay =
-    gameState === "START" && !showAchievements && knownDailyRecord.record.attempts > 0
+    gameState === "START" && startPanel === null && knownDailyRecord.record.attempts > 0
       ? knownDailyRecord.dateKey
       : gameState === "GAMEOVER"
         ? (lastRun?.daily?.dateKey ?? null)
@@ -337,7 +362,7 @@ function App() {
   const nowMs = useWallClock(
     countdownEnd,
     DAILY_COUNTDOWN_TICK_MS,
-    `${gameState}:${showAchievements}`,
+    `${gameState}:${startPanel}`,
   );
   const dailyNow = useMemo(() => new Date(nowMs), [nowMs]);
   const dailyDates = achievementRecord.lifetime.dailyDates;
@@ -424,7 +449,7 @@ function App() {
   useEffect(() => {
     secretProgressRef.current = 0;
     titleTapsRef.current = [];
-  }, [gameState, showAchievements]);
+  }, [gameState, startPanel]);
 
   useEffect(
     () => () => {
@@ -477,16 +502,22 @@ function App() {
   const startRun = ({
     mode: selectedMode,
     daily,
+    practiceFrom,
   }: {
     mode: GameMode;
     daily: boolean;
+    /** Zen only: start world picked outside the start screen picker (atlas). */
+    practiceFrom?: number;
   }) => {
     // The Daily Challenge always uses Classic rules.
     const runMode: GameMode = daily ? "CLASSIC" : selectedMode;
     const initialZenLives = runMode === "ZEN" ? ZEN_MAX_LIVES : null;
     const todayKey = daily ? getLocalDateKey() : null;
     // Only Zen offers practice from a later world.
-    const startWorld = runMode === "ZEN" && !daily ? pickedWorld : 1;
+    const startWorld =
+      runMode === "ZEN" && !daily
+        ? Math.max(1, Math.min(practiceFrom ?? pickedWorld, bestWorldReached))
+        : 1;
     const practice = startWorld > 1;
 
     // Commits a run left from the pause menu (RESTART) before starting anew.
@@ -504,7 +535,7 @@ function App() {
     setPersonalBestTarget(previousBest);
     setPersonalBestPassed(false);
     setRunStartWorld(startWorld);
-    setShowAchievements(false);
+    setStartPanel(null);
     setMode(runMode);
     setDailyKey(todayKey);
     setShareStatus("idle");
@@ -536,6 +567,20 @@ function App() {
       setShowWorldUp(true);
       window.setTimeout(() => setShowWorldUp(false), WORLD_INTRO_MS);
     }
+  };
+
+  /**
+   * PRACTICE from the world atlas: the start screen's Zen practice path, with
+   * the picker moved to that world so RESTART replays the same practice.
+   */
+  const startPracticeFromAtlas = (practiceFrom: number) => {
+    setPracticeWorld(practiceFrom);
+    startRun({ mode: "ZEN", daily: false, practiceFrom });
+  };
+
+  const closeStartPanel = () => {
+    panelReturnFocusRef.current = startPanel;
+    setStartPanel(null);
   };
 
   /** Same kind of run again (keeps Daily vs regular). */
@@ -845,7 +890,7 @@ function App() {
    */
   const settingsSheetVisible =
     showSettings &&
-    ((gameState === "START" && !showAchievements) ||
+    ((gameState === "START" && startPanel === null) ||
       (gameState === "PLAYING" && paused));
 
   // Latest-callback ref so the window listeners below are bound once per phase
@@ -873,10 +918,10 @@ function App() {
       return;
     }
 
-    if (gameState === "START" && showAchievements) {
+    if (gameState === "START" && startPanel !== null) {
       if (event.key === "Escape") {
         event.preventDefault();
-        setShowAchievements(false);
+        closeStartPanel();
       }
       // Enter must not start a run from behind the panel.
       return;
@@ -990,10 +1035,15 @@ function App() {
         {/* key forces re-announcement of identical consecutive messages */}
         <span key={announcement.id}>{announcement.text}</span>
       </div>
-      {gameState === "START" && showAchievements && (
-        <AchievementsPanel
-          record={achievementRecord}
-          onClose={() => setShowAchievements(false)}
+      {gameState === "START" && startPanel === "achievements" && (
+        <AchievementsPanel record={achievementRecord} onClose={closeStartPanel} />
+      )}
+      {gameState === "START" && startPanel === "worlds" && (
+        <WorldAtlas
+          bestWorld={bestWorldReached}
+          reducedFx={reducedFx}
+          onPractice={startPracticeFromAtlas}
+          onClose={closeStartPanel}
         />
       )}
 
@@ -1001,7 +1051,7 @@ function App() {
         <StartBackdrop palette={backdropPalette} flourish={flourishing} />
       )}
 
-      {gameState === "START" && !showAchievements && (
+      {gameState === "START" && startPanel === null && (
         <button
           ref={settingsTriggerRef}
           className="settings-gear-btn"
@@ -1014,7 +1064,7 @@ function App() {
         </button>
       )}
 
-      {gameState === "START" && !showAchievements && (
+      {gameState === "START" && startPanel === null && (
         <div className="screen start-screen" inert={settingsSheetVisible}>
           {/* A plain heading for assistive tech: the tap secret is
               pointer-only (React delegates the listener to the root, so the
@@ -1114,13 +1164,28 @@ function App() {
             )}
           </button>
 
-          <button
-            className="achievements-btn"
-            onClick={() => setShowAchievements(true)}
-            aria-label={`Achievements: ${unlockedAchievementCount} of ${ACHIEVEMENT_COUNT} unlocked`}
-          >
-            ACHIEVEMENTS {unlockedAchievementCount}/{ACHIEVEMENT_COUNT}
-          </button>
+          <div className="start-secondary">
+            <button
+              ref={(node) => {
+                panelTriggerRefs.current.achievements = node;
+              }}
+              className="achievements-btn"
+              onClick={() => setStartPanel("achievements")}
+              aria-label={`Achievements: ${unlockedAchievementCount} of ${ACHIEVEMENT_COUNT} unlocked`}
+            >
+              ACHIEVEMENTS {unlockedAchievementCount}/{ACHIEVEMENT_COUNT}
+            </button>
+            <button
+              ref={(node) => {
+                panelTriggerRefs.current.worlds = node;
+              }}
+              className="worlds-btn"
+              onClick={() => setStartPanel("worlds")}
+              aria-label={`Worlds: ${revealedWorldCount} of ${ATLAS_WORLD_COUNT} discovered`}
+            >
+              WORLDS {revealedWorldCount}/{ATLAS_WORLD_COUNT}
+            </button>
+          </div>
 
         </div>
       )}

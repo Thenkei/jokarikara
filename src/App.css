@@ -1242,7 +1242,8 @@ button:focus-visible {
   border: 0;
 }
 
-.achievements-btn {
+.achievements-btn,
+.worlds-btn {
   background: transparent;
   color: #b9c2d6;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -1252,7 +1253,8 @@ button:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.achievements-btn:hover {
+.achievements-btn:hover,
+.worlds-btn:hover {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.4);
 }
@@ -1390,6 +1392,146 @@ button:focus-visible {
   font-weight: 800;
   color: var(--text-color);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Start screen secondary row: ACHIEVEMENTS + WORLDS ---------- */
+.start-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.start-secondary > button {
+  padding: 0.65rem 1.1rem;
+}
+
+/* ---------- World atlas ---------- */
+.world-atlas-intro {
+  margin-top: -1.2rem;
+  max-width: 420px;
+  color: #8a93a6;
+  font-size: 0.8rem;
+}
+
+.world-atlas-list {
+  list-style: none;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.world-card {
+  --world-a: #3d4352;
+  --world-b: #3d4352;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.world-card.revealed {
+  /* Mostly opaque: the rule text stays readable over the start backdrop. */
+  background: color-mix(in srgb, var(--world-a) 10%, rgba(12, 12, 14, 0.82));
+  border-color: color-mix(in srgb, var(--world-a) 38%, transparent);
+}
+
+/* World number in a ring painted with the world's own palette. */
+.world-card-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--bg-color), var(--bg-color)) padding-box,
+    conic-gradient(var(--world-a), var(--world-b), var(--world-a)) border-box;
+  font-size: 0.95rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.world-card.locked .world-card-badge {
+  background: transparent;
+  border: 2px dashed #3d4352;
+  color: #5f6470;
+}
+
+.world-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.world-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.world-card-number {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--world-a) 55%, #c7cedb);
+}
+
+.world-card-name {
+  font-size: 1rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.world-card-tagline {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #c7cedb;
+}
+
+.world-card-howto {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #a3abbb;
+}
+
+.world-card.locked .world-card-number,
+.world-card.locked .world-card-name,
+.world-card-hint {
+  color: #5f6470;
+}
+
+.world-card-hint {
+  font-size: 0.75rem;
+}
+
+.world-card-practice {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+  padding: 0.45rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+  color: #fff;
+  background: color-mix(in srgb, var(--world-a) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--world-a) 60%, transparent);
+}
+
+.world-card-practice:hover {
+  background: color-mix(in srgb, var(--world-a) 36%, transparent);
 }
 
 .run-achievements {
@@ -1576,6 +1718,10 @@ button:focus-visible {
 
   .achievements-count {
     margin-top: -0.4rem;
+  }
+
+  .world-atlas-intro {
+    margin-top: -0.6rem;
   }
 
   .achievement-item {
