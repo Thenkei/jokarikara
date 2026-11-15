@@ -18,6 +18,7 @@ npm run test:e2e:chromium # Playwright, Chromium only (fastest local loop)
 npm run test:e2e:full     # Playwright, every spec on every browser/device
 npm run test:e2e:ui       # Playwright with UI
 npm run perf              # Render FPS benchmark (tests/perf/render.perf.ts)
+node scripts/generate-icons.mjs  # Re-render PNG app icons after editing public/icon.svg
 ```
 
 Run a single unit test file:
