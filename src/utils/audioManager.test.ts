@@ -89,6 +89,42 @@ describe("audioManager", () => {
     expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
   });
 
+  describe("prewarm (start screen idle)", () => {
+    it("builds the context and the reverb before any sound, once", () => {
+      const audio = createAudioManager();
+      audio.prewarm();
+      expect(AudioContext).toHaveBeenCalledTimes(1);
+      expect(audio.getContextState()).not.toBeNull();
+      // The reverb follows on idle, still before the first tap.
+      expect(mock.ctx.createConvolver).not.toHaveBeenCalled();
+      flushIdle();
+      expect(mock.ctx.createConvolver).toHaveBeenCalledTimes(1);
+
+      // The first sound reuses it: no second context, nothing rebuilt.
+      audio.prewarm();
+      audio.playUi("confirm");
+      expect(AudioContext).toHaveBeenCalledTimes(1);
+      expect(mock.ctx.createConvolver).toHaveBeenCalledTimes(1);
+    });
+
+    it("allocates nothing while muted", () => {
+      const audio = createAudioManager();
+      audio.setMuted(true);
+      audio.prewarm();
+      expect(AudioContext).not.toHaveBeenCalled();
+      expect(audio.getContextState()).toBeNull();
+    });
+
+    it("resumes a context the browser created suspended on the first sound", () => {
+      const audio = createAudioManager();
+      (mock.ctx as unknown as { state: AudioContextState }).state = "suspended";
+      audio.prewarm();
+      expect(mock.ctx.resume).not.toHaveBeenCalled();
+      audio.playUi("confirm");
+      expect(mock.ctx.resume).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("plays the secret chime as a bell cascade, and nothing while muted", () => {
     const audio = createAudioManager();
     audio.setMuted(true);

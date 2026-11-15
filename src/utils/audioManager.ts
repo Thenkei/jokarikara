@@ -170,6 +170,13 @@ class AudioManager implements IAudioService {
     tension: number;
   } = { active: false, paused: false, world: 1, intensity: 0, tension: 0 };
 
+  prewarm(): void {
+    // The first AudioContext is expensive in Chromium (~150 ms measured:
+    // output device setup), and it used to be built inside the START tap.
+    if (this.muted || this.ctx) return;
+    this.init();
+  }
+
   init(): void {
     if (this.ctx) return;
     const Ctor =
