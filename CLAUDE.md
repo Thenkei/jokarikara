@@ -58,6 +58,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/gameplay/guide.ts` - PERFECT ghost guide rules (Zen + first level; reverse-aware)
 - `src/gameplay/timingCue.ts` - Opt-in timing cue (setting `timingCue`): pure reading/curve/stepper on the game clock, ticks via `playCue`; off in Heartbeat (its beat is the cue)
 - `src/gameplay/combo.ts` - Combo milestones (fanfare, banner, haptics)
+- `build/sw/` + `src/pwa/registerServiceWorker.ts` - Offline PWA: build-only Vite plugin emits `<base>sw.js` (precaches all of `dist/` into `shape-stack-<content hash>`; navigations network-first 3 s → cached index.html, `assets/` cache-first, rest stale-while-revalidate; no skipWaiting, so a new deploy plays offline once every tab closes); registered only in PROD non-`VITE_E2E` builds; offline proof `npm run test:offline` (production build + `vite preview` :6771, CI e2e shard 1)
 - `src/modes/daily.ts` - Daily Challenge helpers (date key, seed, share text)
 - `src/modes/dailyStreak.ts` - Daily habit loop: pure streak chip selection (≥2 days; kept vs at risk), next-local-midnight countdown (from date parts, DST-safe) and the Daily button view; `useWallClock.ts` ticks once a minute only while a countdown is shown (stops at midnight, then the button flips to the new day)
 - `src/modes/share.ts` - Share text for regular runs (mode, score, proportional emoji quality bar, game URL); reuses the Daily emoji legend

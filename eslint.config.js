@@ -21,6 +21,21 @@ export default defineConfig([
     },
   },
   {
+    // Service worker template (plain JS, runs in the worker global scope).
+    files: ['build/sw/sw.template.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: globals.serviceworker,
+    },
+  },
+  {
+    // Build-time code (Vite plugins) runs in Node.
+    files: ['build/**/*.ts'],
+    languageOptions: { globals: globals.node },
+  },
+  {
     // Playwright E2E tests: not React code.
     // - Fixtures receive a `use` callback that the React hooks rule mistakes for React's `use()`.
     // - Playwright reads the first parameter's destructuring to resolve fixture deps,
