@@ -71,8 +71,8 @@ test.describe("Dynamic soundtrack", () => {
     page,
     browserName,
   }) => {
-    // ~15 clicks through blurred overlays: software-rendered WebKit in CI
-    // spends 2.5-5 s per click waiting for stable frames, past 30 s total.
+    // Driven by keyboard (no actionability waits); still a long flow, and
+    // software-rendered WebKit in CI is slow, so keep the extra budget.
     test.slow(browserName === "webkit", "slow overlay rendering on CI WebKit");
     await page.goto("/");
     await page.click(".start-btn");
@@ -82,7 +82,7 @@ test.describe("Dynamic soundtrack", () => {
 
     /** Pause menu -> settings sheet (the run stays paused underneath). */
     const openPauseSettings = async () => {
-      await page.click(".pause-btn");
+      await page.keyboard.press("Escape");
       await expect(page.locator(".pause-overlay")).toBeVisible();
       await openSettings(page);
     };
@@ -112,7 +112,7 @@ test.describe("Dynamic soundtrack", () => {
     const music = settingSwitch(page, "Music");
     await openPauseSettings();
     await expect(music).toHaveAttribute("aria-checked", "true");
-    await music.click();
+    await music.press("Space");
     await expect(music).toHaveAttribute("aria-checked", "false");
     await closeAndResume();
     expect(await getMusicState(page)).toMatchObject({ enabled: false, playing: false });
@@ -124,13 +124,13 @@ test.describe("Dynamic soundtrack", () => {
     const state = await bridge.getState();
     await bridge.setActiveSize((state?.lastSize ?? 1) * 1.2);
     await bridge.tap();
-    await page.click(".retry-btn");
+    await page.locator(".retry-btn").press("Enter");
     await waitForBridge(page);
     expect(await getMusicState(page)).toMatchObject({ active: true, playing: false });
     await makeBridge(page).pause();
     await openPauseSettings();
     await expect(music).toHaveAttribute("aria-checked", "false");
-    await music.click();
+    await music.press("Space");
     await expect(music).toHaveAttribute("aria-checked", "true");
     await closeAndResume();
     expect((await getMusicState(page))?.playing).toBe(true);

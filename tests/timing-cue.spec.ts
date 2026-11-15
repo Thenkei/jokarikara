@@ -114,7 +114,7 @@ test.describe("Timing cue setting", () => {
     await page.goto("/");
     const bridge = await startPaused(page);
 
-    await page.click(".pause-btn");
+    await page.keyboard.press("Escape");
     await expect(page.locator(".pause-overlay")).toBeVisible();
     // Park the shape well inside the approach, then let the real rAF loop
     // run behind the pause overlay: nothing advances, nothing ticks.
@@ -148,7 +148,8 @@ test.describe("Timing cue setting", () => {
     expect((await bridge.getState())?.isGameOver).toBe(false);
 
     // Control: the very same approach ticks once sound is back.
-    await page.click(".pause-btn");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".pause-overlay")).toBeVisible();
     await openSettings(page);
     await flipSetting(page, "Sound");
     await expect(sound).toHaveAttribute("aria-checked", "true");
