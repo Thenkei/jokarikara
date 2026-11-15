@@ -530,7 +530,7 @@ function App() {
 
   // Reuse the level-up arpeggio (in the current world's key) as the cue.
   const playAchievementCue = useCallback(() => {
-    audioManager.playLevelUp(worldRef.current);
+    audioManager.playAchievement(worldRef.current);
   }, []);
   /** How-to line while a first-visit intro holds the game (its own world). */
   const introHowTo =
