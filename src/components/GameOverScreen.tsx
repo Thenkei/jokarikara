@@ -170,7 +170,9 @@ export function GameOverScreen({
     <div className="screen gameover-screen">
       <div className="gameover-body">
         <header className="gameover-hero">
-          <h1 className="title gameover-title">GAME OVER</h1>
+          <h1 className="title gameover-title">
+            {run?.stats.endReason === "finished" ? "SESSION COMPLETE" : "GAME OVER"}
+          </h1>
           {run?.practiceWorld && (
             <p className="practice-result-label">
               PRACTICE · FROM WORLD {run.practiceWorld}
