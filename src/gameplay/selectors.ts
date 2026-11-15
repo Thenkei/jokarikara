@@ -15,6 +15,9 @@ export const getGameplayConfig = (): GameplayConfig => gameplayConfig;
 const MAX_WORLD = getMaxNumericKey(gameplayConfig.worlds);
 const MAX_LEVEL = getMaxNumericKey(gameplayConfig.levels);
 
+/** Highest configured world (later worlds reuse its rules). */
+export const getWorldCount = (): number => MAX_WORLD;
+
 export const getWorldConfig = (world: number): WorldConfig => {
   const config = getGameplayConfig();
   return config.worlds[world] ?? config.worlds[MAX_WORLD];
