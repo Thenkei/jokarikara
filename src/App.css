@@ -1906,6 +1906,77 @@ button:focus-visible {
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
 }
 
+/* First visit to a world: the overlay teaches the mechanic and holds the
+   game until a tap (see gameplay/worldIntro), so it pops in and stays (no
+   fade-out), on a panel that keeps the how-to line readable over any stack.
+   Still pointer-events: none (inherited): a tap anywhere reaches the board. */
+.world-up-overlay--teach {
+  animation: worldUpTeachIn 0.6s ease-out both;
+  width: min(calc(100vw - 2rem), 26rem);
+  padding: 0.9rem 1.1rem 1rem;
+  border-radius: 1.1rem;
+  background: rgba(8, 10, 16, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+}
+
+.world-up-overlay--teach .world-up-text {
+  font-size: clamp(2.2rem, 15vw, 4.4rem);
+}
+
+.world-up-howto {
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #fff;
+}
+
+.world-up-continue {
+  margin-top: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--world-hud-primary) 30%, #ffffff 70%);
+  animation: worldUpContinuePulse 1.6s ease-in-out 0.6s infinite;
+}
+
+@keyframes worldUpTeachIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes worldUpContinuePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Reduced motion / reduced FX: the world overlay appears and goes, static. */
+.world-up-overlay.reduced-fx,
+.world-up-overlay.reduced-fx .world-up-continue {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-up-overlay,
+  .world-up-continue {
+    animation: none;
+  }
+}
+
 /* ---------- Settings: gear entry points + sheet ---------- */
 .settings-gear-btn {
   position: absolute;

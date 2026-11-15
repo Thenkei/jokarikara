@@ -88,7 +88,7 @@ Some stacks are boss shapes: they are white, cycle through hues, grow faster and
 
 ### 🌍 World Mechanics
 
-Effects are **cumulative**, and visual distortions only apply to stacked shapes, never to the shape you are timing. Each new world opens with its name and a one-line rule reminder. Worlds past 10 keep the Heartbeat rules.
+Effects are **cumulative**, and visual distortions only apply to stacked shapes, never to the shape you are timing. Each new world opens with its name and a one-line rule reminder. The **first time you ever reach a world**, the intro also explains how to play it (the same line as in the World atlas) and the game waits while you read: the new shape doesn't grow and the Time Attack clock stops until you tap (or press Space/Enter), or after 9 seconds. Taps in the first moment after the intro appears are ignored, so the tap that finished the last world can't skip it, and the tap that closes it never counts as a stack or a miss. Later visits only show the short intro. Worlds past 10 keep the Heartbeat rules.
 
 | World | Effect | Description |
 | --- | --- | --- |

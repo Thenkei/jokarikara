@@ -1,5 +1,10 @@
 import { test, expect } from "./fixtures";
-import { makeBridge, waitForBridge } from "./bridgeHelpers";
+import {
+  ALL_WORLDS_REACHED,
+  makeBridge,
+  seedBestWorld,
+  waitForBridge,
+} from "./bridgeHelpers";
 import type { Page } from "@playwright/test";
 
 /** Stack straight to the first stack of `world` (15 stacks per world). */
@@ -12,6 +17,9 @@ const reachWorld = async (page: Page, world: number) =>
   }, world);
 
 const start = async (page: Page, mode: "CLASSIC" | "ZEN" = "CLASSIC") => {
+  // A returning player: these worlds' mechanics, not their first-visit intro
+  // (which holds the game until a tap; see world-intro.spec.ts).
+  await seedBestWorld(page, ALL_WORLDS_REACHED);
   await page.goto("/");
   if (mode === "ZEN") await page.click('button:has-text("ZEN")');
   await page.click(".start-btn");

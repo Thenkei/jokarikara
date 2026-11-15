@@ -1,5 +1,10 @@
 import { test, expect } from "./fixtures";
-import { makeBridge, waitForBridge } from "./bridgeHelpers";
+import {
+  ALL_WORLDS_REACHED,
+  makeBridge,
+  seedBestWorld,
+  waitForBridge,
+} from "./bridgeHelpers";
 import { closeSettings, openSettings, settingSwitch } from "./settingsHelpers";
 
 const stackOnce = async (
@@ -119,6 +124,8 @@ test.describe("Gameplay Deterministic", () => {
   test("classic: fracture hazard tap triggers game over in world 3", async ({
     page,
   }) => {
+    // Returning player: no first-visit intro holding world 3's clock.
+    await seedBestWorld(page, ALL_WORLDS_REACHED);
     await page.goto("/");
     await page.click(".start-btn");
     await waitForBridge(page);
@@ -158,6 +165,8 @@ test.describe("Gameplay Deterministic", () => {
   test("time attack: a fracture hazard tap costs time in world 3", async ({
     page,
   }) => {
+    // Returning player: no first-visit intro holding world 3's clock.
+    await seedBestWorld(page, ALL_WORLDS_REACHED);
     await page.goto("/");
     await page.click('button:has-text("TIME")');
     await page.click(".start-btn");

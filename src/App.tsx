@@ -20,6 +20,7 @@ import {
   saveSettings,
   getDailyRecord,
   saveDailyResult,
+  getAchievementRecord,
 } from "./utils/storage";
 import type { HighScoresByMode } from "./utils/storage";
 import type { GameMode, MissMargin, RunStats, StyleUpdate, StackQuality } from "./types";
@@ -103,7 +104,8 @@ import {
 } from "./components/AchievementToaster";
 import { AchievementsPanel } from "./components/AchievementsPanel";
 import { WorldAtlas } from "./components/WorldAtlas";
-import { ATLAS_WORLD_COUNT, countRevealedWorlds } from "./gameplay/atlas";
+import { ATLAS_WORLD_COUNT, WORLD_HOW_TO, countRevealedWorlds } from "./gameplay/atlas";
+import { WORLD_INTRO_MS } from "./gameplay/worldIntro";
 import {
   GearIcon,
   SettingsSheet,
@@ -140,8 +142,6 @@ type StartPanel = "achievements" | "worlds";
 const HUD_REVEAL_DURATION_MS = 2000;
 /** Start backdrop flourish length: the CSS burst plus its last layer's delay. */
 const FLOURISH_MS = 1900;
-/** Long enough to read the world name and its rule reminder. */
-const WORLD_INTRO_MS = 2800;
 /** Time Attack timer turns critical (red, pulsing) at or below this. */
 const TIMER_CRITICAL_SECONDS = 10;
 
@@ -224,6 +224,17 @@ function App() {
   const [world, setWorld] = useState(1);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [showWorldUp, setShowWorldUp] = useState(false);
+  /**
+   * First-visit intro: the world whose how-to line holds the game (GameCanvas
+   * owns the hold, see gameplay/worldIntro); null otherwise.
+   */
+  const [introWorld, setIntroWorld] = useState<number | null>(null);
+  /**
+   * Lifetime best world when the run started (read fresh from storage, after
+   * the previous run is committed): worlds above it are taught on entry.
+   */
+  const [introTaughtThrough, setIntroTaughtThrough] = useState(1);
+  const worldUpTimeoutRef = useRef<number | null>(null);
   const [allScores, setAllScores] = useState<HighScoresByMode>(() =>
     getAllHighScores()
   );
@@ -295,7 +306,12 @@ function App() {
     pending.push(text);
     if (pending.length > 1) return;
     queueMicrotask(() => {
-      const joined = pending.splice(0).join(". ");
+      // "A." + "B" reads "A. B", never "A.. B".
+      const joined = pending
+        .splice(0)
+        .reduce((text, next) =>
+          /[.!?]$/.test(text) ? `${text} ${next}` : `${text}. ${next}`,
+        );
       setAnnouncement((current) => ({ text: joined, id: current.id + 1 }));
     });
   }, []);
@@ -494,6 +510,10 @@ function App() {
     audioManager.playLevelUp(worldRef.current);
   }, []);
   const worldConfig = useMemo(() => getWorldConfig(world), [world]);
+  /** How-to line while a first-visit intro holds the game (its own world). */
+  const introHowTo =
+    introWorld !== null && introWorld === world ? (WORLD_HOW_TO[introWorld] ?? null) : null;
+  const worldUpVisible = showWorldUp || introHowTo !== null;
   // Fixed seed: the start screen keeps the same look between visits.
   const backdropPalette = useMemo(
     () => getWorldPalette(1, 0, reducedFx, mono),
@@ -503,6 +523,34 @@ function App() {
     () => getWorldTheme(world, runSeed, reducedFx, mono),
     [world, runSeed, reducedFx, mono]
   );
+
+  const clearWorldUpTimeout = useCallback(() => {
+    if (worldUpTimeoutRef.current !== null) {
+      window.clearTimeout(worldUpTimeoutRef.current);
+      worldUpTimeoutRef.current = null;
+    }
+  }, []);
+
+  /**
+   * The short world overlay (name + tagline). One timer at a time, so an
+   * earlier entry's timer never cuts a later (or first-visit) overlay short.
+   */
+  const showWorldUpBriefly = useCallback(() => {
+    clearWorldUpTimeout();
+    setShowWorldUp(true);
+    worldUpTimeoutRef.current = window.setTimeout(() => {
+      worldUpTimeoutRef.current = null;
+      setShowWorldUp(false);
+    }, WORLD_INTRO_MS);
+  }, [clearWorldUpTimeout]);
+
+  const hideWorldUp = useCallback(() => {
+    clearWorldUpTimeout();
+    setShowWorldUp(false);
+    setIntroWorld(null);
+  }, [clearWorldUpTimeout]);
+
+  useEffect(() => clearWorldUpTimeout, [clearWorldUpTimeout]);
 
   const clearSecondaryHudTimeout = useCallback(() => {
     if (secondaryHudTimeoutRef.current !== null) {
@@ -606,6 +654,10 @@ function App() {
 
     // Commits a run left from the pause menu (RESTART) before starting anew.
     beginAchievementRun(runMode, todayKey, { practice });
+    // Fresh from storage, after that commit: the render's record may predate
+    // it, and a world met in the abandoned run is no longer new.
+    setIntroTaughtThrough(getAchievementRecord().lifetime.bestWorld);
+    hideWorldUp();
     // Read fresh (not from state): another tab or yesterday's Daily may have
     // moved the records since this screen was rendered.
     const previousBest = selectPreviousBest({
@@ -653,8 +705,7 @@ function App() {
     revealSecondaryHud();
     if (practice) {
       // Practice drops you mid-progression: show the world's rule up front.
-      setShowWorldUp(true);
-      window.setTimeout(() => setShowWorldUp(false), WORLD_INTRO_MS);
+      showWorldUpBriefly();
     }
   };
 
@@ -841,8 +892,7 @@ function App() {
   const handleWorldUp = useCallback((newWorld: number) => {
     setWorld(newWorld);
     setLevel(1);
-    setShowWorldUp(true);
-    setTimeout(() => setShowWorldUp(false), WORLD_INTRO_MS);
+    showWorldUpBriefly();
     revealSecondaryHud();
     if (markProgress("world", newWorld)) {
       const config = getWorldConfig(newWorld);
@@ -850,7 +900,27 @@ function App() {
         [`World ${newWorld}`, config.name, config.tagline].filter(Boolean).join(". "),
       );
     }
-  }, [revealSecondaryHud, announce, markProgress]);
+  }, [revealSecondaryHud, announce, markProgress, showWorldUpBriefly]);
+
+  /**
+   * First-visit intro (GameCanvas calls it right after onWorldUp, in the same
+   * task, so the announcement joins the world's). The overlay stays until the
+   * hold ends, then goes at once: the player asked to play.
+   */
+  const handleWorldIntro = useCallback(
+    (heldWorld: number | null) => {
+      if (heldWorld === null) {
+        hideWorldUp();
+        return;
+      }
+      clearWorldUpTimeout();
+      setShowWorldUp(true);
+      setIntroWorld(heldWorld);
+      const howTo = WORLD_HOW_TO[heldWorld];
+      if (howTo) announce(`${howTo} Tap or press Space to play.`);
+    },
+    [announce, clearWorldUpTimeout, hideWorldUp],
+  );
 
   const handleTimeUpdate = useCallback((time: number) => {
     setTimeRemaining(time);
@@ -1059,7 +1129,7 @@ function App() {
     setZenLives(null);
     previousZenLivesRef.current = null;
     setShowLevelUp(false);
-    setShowWorldUp(false);
+    hideWorldUp();
     setGameState("START");
   };
 
@@ -1426,6 +1496,8 @@ function App() {
               onStack={recordAchievementStack}
               onMiss={handleRunMiss}
               onResumeCountdown={handleResumeCountdown}
+              introTaughtThrough={introTaughtThrough}
+              onWorldIntro={handleWorldIntro}
             />
           </div>
 
@@ -1711,13 +1783,22 @@ function App() {
             </div>
           )}
 
-          {showLevelUp && !showWorldUp && (
+          {showLevelUp && !worldUpVisible && (
             <div className="level-up-overlay">
               <span className="level-up-text">LEVEL {level}</span>
             </div>
           )}
-          {showWorldUp && (
-            <div className="world-up-overlay" role="status">
+          {worldUpVisible && (
+            // Decorative: the live region announces the world (and, on a
+            // first visit, its how-to line). pointer-events: none, so a tap
+            // anywhere reaches the board, which dismisses a first-visit hold.
+            <div
+              className={`world-up-overlay${introHowTo ? " world-up-overlay--teach" : ""}${
+                reducedFx ? " reduced-fx" : ""
+              }`}
+              data-testid="world-up"
+              aria-hidden="true"
+            >
               <span className="world-up-title">NEW WORLD</span>
               <span className="world-up-text">WORLD {world}</span>
               {worldConfig.name && (
@@ -1725,6 +1806,14 @@ function App() {
               )}
               {worldConfig.tagline && (
                 <span className="world-up-tagline">{worldConfig.tagline}</span>
+              )}
+              {introHowTo && (
+                <>
+                  <span className="world-up-howto" data-testid="world-up-howto">
+                    {introHowTo}
+                  </span>
+                  <span className="world-up-continue">TAP TO PLAY</span>
+                </>
               )}
             </div>
           )}

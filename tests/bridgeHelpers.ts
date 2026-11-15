@@ -44,6 +44,8 @@ export const makeBridge = (page: Page) => ({
   /** Skip the player-facing "3 · 2 · 1" after RESUME (no-op if not counting). */
   finishResumeCountdown: () =>
     page.evaluate(() => window.__GAME_TEST__?.finishResumeCountdown()),
+  /** End a first-visit world intro hold (no-op when not holding). */
+  dismissWorldIntro: () => page.evaluate(() => window.__GAME_TEST__?.dismissWorldIntro()),
   setActiveSize: (size: number) =>
     page.evaluate((value) => window.__GAME_TEST__?.setActiveSize(value), size),
   setTimeRemaining: (time: number) =>
@@ -59,3 +61,21 @@ export const makeBridge = (page: Page) => ({
   showDiagnostics: () => page.evaluate(() => window.__GAME_TEST__?.showDiagnostics()),
   hideDiagnostics: () => page.evaluate(() => window.__GAME_TEST__?.hideDiagnostics()),
 });
+
+/**
+ * Seed the lifetime best world (`shape-stack-achievements-v1`). Register it
+ * after the fixture's script (which clears storage on every navigation).
+ * Entering a world above it shows the first-visit intro, which holds the
+ * game until a tap; specs that stack across worlds for other reasons seed
+ * the last world so they keep the short overlay and a running loop.
+ */
+export const seedBestWorld = (page: Page, bestWorld: number) =>
+  page.addInitScript((world) => {
+    localStorage.setItem(
+      "shape-stack-achievements-v1",
+      JSON.stringify({ unlocked: {}, lifetime: { bestWorld: world } }),
+    );
+  }, bestWorld);
+
+/** Every world met: no first-visit intro holds the game. */
+export const ALL_WORLDS_REACHED = 10;

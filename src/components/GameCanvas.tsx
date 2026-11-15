@@ -47,6 +47,8 @@ import {
 } from "../gameplay/heartbeat";
 import { installGameTestBridge } from "../utils/testBridge";
 import { useResumeCountdown, type ResumeGoSource } from "../gameplay/useResumeCountdown";
+import { useWorldIntroHold } from "../gameplay/useWorldIntroHold";
+import { FIRST_VISIT_MAX_HOLD_MS, getFirstVisitHowTo } from "../gameplay/worldIntro";
 import { getWorldTheme, toMonoColor } from "../visual/theme";
 import { haptic } from "../utils/haptics";
 import {
@@ -126,6 +128,18 @@ interface GameCanvasProps {
    * (re-pause): the caller initiated it.
    */
   onResumeCountdown?: (digit: number | null) => void;
+  /**
+   * Highest world the player has already met (lifetime best world when the
+   * run starts). Entering a world above it holds the game on a first-visit
+   * intro (see gameplay/worldIntro). Read once per run (GameCanvas is keyed
+   * by run); omitted = never hold.
+   */
+  introTaughtThrough?: number;
+  /**
+   * First-visit intro: the world the game is held on, once when the hold
+   * starts, then null when play resumes (tap, timeout, pause, Zen action).
+   */
+  onWorldIntro?: (world: number | null) => void;
   /** Optional audio service for dependency injection (testing) */
   audioService?: IAudioService;
 }
@@ -146,7 +160,10 @@ export interface GameCanvasHandle {
    * keeps the running count. A run that is over resumes at once.
    */
   resumeWithCountdown: () => void;
-  /** Programmatic tap (keyboard). No-op while paused or after game over. */
+  /**
+   * Programmatic tap (keyboard). No-op while paused or after game over;
+   * during a first-visit intro hold it only dismisses the intro.
+   */
   tap: () => void;
   /**
    * Zen FINISH RUN: ends the run as a regular game over (reason "finished")
@@ -218,6 +235,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onStack,
       onMiss,
       onResumeCountdown,
+      introTaughtThrough = Number.POSITIVE_INFINITY,
+      onWorldIntro,
       audioService = defaultAudioManager,
     },
     ref,
@@ -250,6 +269,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     // Presentation only, read by the renderer: a ref keeps the loop and its
     // callbacks independent from it (it only changes on the start screen).
     const monoRef = useRef(mono);
+    // Max wait of a first-visit hold; only the E2E bridge changes it (slow CI
+    // browsers would otherwise hit the timeout mid-test).
+    const introMaxHoldRef = useRef(FIRST_VISIT_MAX_HOLD_MS);
+    // First-visit intros: raised by every world taught this run, so a world
+    // is taught once per run at most (a Zen undo can re-enter it).
+    const taughtThroughRef = useRef(introTaughtThrough);
 
     useEffect(() => {
       reducedFxRef.current = reducedFx;
@@ -363,22 +388,53 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       isGameOver: () => stateRef.current?.isGameOver ?? true,
     });
 
+    // First-visit world intro: while holding, the loop keeps rendering but
+    // skips the simulation (no growth, clock, timer, cue or containment
+    // check), and taps only dismiss it. See gameplay/worldIntro.
+    const worldIntro = useWorldIntroHold({
+      onHold: (world) => onWorldIntro?.(world),
+      onRelease: (reason) => {
+        // The player's own "go": same soft tick as the resume countdown's.
+        if (reason === "tap") {
+          audioService.playTick(true, true);
+          haptic("tap");
+        }
+        onWorldIntro?.(null);
+      },
+      maxHoldMs: () => introMaxHoldRef.current,
+    });
+
+    /** Hold on the intro when `world` is entered for the first time ever. */
+    const teachWorldOnEntry = useCallback(
+      (world: number) => {
+        if (getFirstVisitHowTo(world, taughtThroughRef.current) === null) return;
+        taughtThroughRef.current = world;
+        worldIntro.start(world);
+      },
+      [worldIntro],
+    );
+
     useImperativeHandle(
       ref,
       () => ({
         restartShape: () => {
           if (!stateRef.current || stateRef.current.isGameOver) return;
+          worldIntro.release("board");
           restartRequestedRef.current = true;
           // A fresh shape starts small: no reason to keep the player waiting.
           resumeCountdown.finish("skipped");
         },
         undo: () => {
           if (!stateRef.current || stateRef.current.isGameOver) return;
+          worldIntro.release("board");
           undoRequestedRef.current = true;
           resumeCountdown.finish("skipped");
         },
         setPaused: (paused: boolean) => {
           resumeCountdown.cancel();
+          // Pausing ends an intro hold: RESUME's 3 · 2 · 1 protects the
+          // restart, and two centred overlays would fight for the screen.
+          if (paused) worldIntro.release("pause");
           setLoopPaused(paused);
         },
         resumeWithCountdown: () => {
@@ -400,6 +456,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           if (finished === state) return false;
           stateRef.current = finished;
           resumeCountdown.cancel();
+          worldIntro.cancel();
           if (gameOverTimerRef.current) {
             clearTimeout(gameOverTimerRef.current);
             gameOverTimerRef.current = null;
@@ -418,7 +475,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           return true;
         },
       }),
-      [setLoopPaused, resumeCountdown, onResumeCountdown, audioService, onGameOver],
+      [
+        setLoopPaused,
+        resumeCountdown,
+        worldIntro,
+        onResumeCountdown,
+        audioService,
+        onGameOver,
+      ],
     );
 
     const setManualMode = useCallback((manual: boolean) => {
@@ -493,6 +557,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         !stateRef.current.activeShape
       )
         return;
+
+      // A tap during a first-visit intro only dismisses it (after a short
+      // grace): never a stack, a miss or an early tap.
+      if (worldIntro.tap() !== "play") return;
 
       const state = stateRef.current;
       const lastShape = state.shapes[state.shapes.length - 1];
@@ -574,6 +642,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         if (result.worldUp) {
           onWorldUp(result.state.world);
           audioService.playWorldUp(result.state.world);
+          teachWorldOnEntry(result.state.world);
         } else {
           onLevelUp(result.newLevel);
           audioService.playLevelUp(result.state.world);
@@ -595,6 +664,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       reducedFx,
       audioService,
       syncMusic,
+      worldIntro,
+      teachWorldOnEntry,
     ]);
 
     useEffect(() => {
@@ -631,6 +702,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         if (result.leveledUp) {
           if (result.worldUp) {
             onWorldUp(result.state.world);
+            teachWorldOnEntry(result.state.world);
           } else {
             onLevelUp(result.newLevel);
           }
@@ -642,7 +714,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         stateRef.current = spawnActiveShape(stateRef.current, reducedFx);
       },
-      [onScore, onLevelUp, onWorldUp, onStyleUpdate, onStack, reducedFx, syncMusic],
+      [
+        onScore,
+        onLevelUp,
+        onWorldUp,
+        onStyleUpdate,
+        onStack,
+        reducedFx,
+        syncMusic,
+        teachWorldOnEntry,
+      ],
     );
 
     const tick = useCallback(
@@ -697,7 +778,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           syncMusic(state);
         }
 
-        if (dt > 0 && !wasOver) {
+        // First-visit intro: the frame still renders (new world look, effects)
+        // but the game itself waits for the player.
+        const held = worldIntro.isHolding();
+
+        if (dt > 0 && !wasOver && !held) {
           const clockBefore = state.elapsedTime;
           state = advanceClock(state, dt);
           // Heartbeat worlds: audible beat, driven by the same game clock as
@@ -761,7 +846,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         stateRef.current = state;
 
         // Check auto-fail if shape starts poking out
-        if (!wasOver && !checkContainment(state)) {
+        if (!wasOver && !held && !checkContainment(state)) {
           miss("overflow");
           return;
         }
@@ -769,7 +854,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         // Timing cue: the pure stepper decides on the game clock, the loop
         // only plays. Paused frames never reach this point; muted or disabled
         // forgets the phase so re-enabling starts a clean approach.
-        if (dt > 0 && !wasOver) {
+        if (dt > 0 && !wasOver && !held) {
           if (timingCueRef.current && !audioService.isMuted()) {
             const cue = advanceTimingCue(cueClockRef.current, state);
             cueClockRef.current = cue.clock;
@@ -921,6 +1006,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         onWorldUp,
         reducedFx,
         syncMusic,
+        worldIntro,
       ],
     );
 
@@ -1015,6 +1101,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         isPaused: () => pausedRef.current,
         getResumeCountdown: () => resumeCountdown.digit(),
         finishResumeCountdown: () => resumeCountdown.finish("test"),
+        getWorldIntro: () => worldIntro.world(),
+        dismissWorldIntro: () => worldIntro.release("test"),
+        setWorldIntroMaxHold: (ms: number) => {
+          introMaxHoldRef.current = ms;
+        },
         getTheme: () =>
           stateRef.current
             ? getWorldTheme(
@@ -1046,6 +1137,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       forceStack,
       reducedFx,
       resumeCountdown,
+      worldIntro,
     ]);
     // pointerdown fires on contact; click waits for release (and on touch
     // devices for gesture disambiguation), adding 50-150 ms of latency to a

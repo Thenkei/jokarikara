@@ -3,6 +3,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GameCanvas } from "./GameCanvas";
 import type { GameCanvasHandle } from "./GameCanvas";
 import type { IAudioService } from "../audio/types";
+import { LEVELS_PER_WORLD, STACKS_PER_LEVEL } from "../constants/game";
+import {
+  FIRST_VISIT_GRACE_MS,
+  FIRST_VISIT_MAX_HOLD_MS,
+} from "../gameplay/worldIntro";
 import {
   RESUME_COUNTDOWN_STEP_MS,
   RESUME_COUNTDOWN_TOTAL_MS,
@@ -608,6 +613,129 @@ describe("GameCanvas", () => {
         unmount();
         expect(vi.getTimerCount()).toBe(0);
         expect(onResumeCountdown).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("first-visit world intro", () => {
+      beforeEach(() => {
+        vi.useFakeTimers({
+          toFake: ["setTimeout", "clearTimeout", "Date", "performance"],
+        });
+      });
+      afterEach(() => vi.useRealTimers());
+
+      const STACKS_PER_WORLD = STACKS_PER_LEVEL * LEVELS_PER_WORLD;
+
+      const renderRun = (
+        props: Partial<Parameters<typeof GameCanvas>[0]> = {},
+      ) => {
+        const ref = { current: null as GameCanvasHandle | null };
+        const onWorldIntro = vi.fn();
+        const onMiss = vi.fn();
+        const onGameOver = vi.fn();
+        const utils = render(
+          <GameCanvas
+            ref={ref}
+            mode="CLASSIC"
+            introTaughtThrough={1}
+            onScore={vi.fn()}
+            onGameOver={onGameOver}
+            onLevelUp={vi.fn()}
+            onWorldUp={vi.fn()}
+            onWorldIntro={onWorldIntro}
+            onMiss={onMiss}
+            audioService={mockAudioService}
+            {...props}
+          />
+        );
+        const canvas = utils.container.querySelector("canvas")!;
+        const stacks = () => ref.current?.getRunStats()?.stackCount ?? 0;
+        // A freshly spawned shape is small: an instant tap always fits.
+        const reachWorld2 = () => {
+          for (let i = 0; i < STACKS_PER_WORLD; i += 1) tap(canvas);
+          expect(stacks()).toBe(STACKS_PER_WORLD);
+        };
+        return { ...utils, ref, canvas, stacks, reachWorld2, onWorldIntro, onMiss, onGameOver };
+      };
+
+      it("holds a new world: frames neither grow nor fail, taps only dismiss", () => {
+        const { canvas, stacks, reachWorld2, onWorldIntro, onMiss, onGameOver } =
+          renderRun();
+        reachWorld2();
+        expect(onWorldIntro.mock.calls).toEqual([[2]]);
+
+        // 20 s of frames would overflow any shape; held, nothing happens.
+        runFrames(1000, 1200, 1000 / 60);
+        expect(onMiss).not.toHaveBeenCalled();
+        expect(onGameOver).not.toHaveBeenCalled();
+        expect(mockAudioService.playCue).not.toHaveBeenCalled();
+
+        // The finger that completed the world is swallowed (grace period).
+        const stacksBefore = vi.mocked(mockAudioService.playStack).mock.calls.length;
+        tap(canvas);
+        expect(stacks()).toBe(STACKS_PER_WORLD);
+        expect(onWorldIntro).toHaveBeenCalledTimes(1);
+
+        // A deliberate tap dismisses: no stack, no miss, a soft "go" tick.
+        act(() => vi.advanceTimersByTime(FIRST_VISIT_GRACE_MS));
+        tap(canvas);
+        expect(onWorldIntro).toHaveBeenLastCalledWith(null);
+        expect(stacks()).toBe(STACKS_PER_WORLD);
+        expect(mockAudioService.playStack).toHaveBeenCalledTimes(stacksBefore);
+        expect(mockAudioService.playEarlyClickSound).not.toHaveBeenCalled();
+        expect(mockAudioService.playTick).toHaveBeenLastCalledWith(true, true);
+        expect(onMiss).not.toHaveBeenCalled();
+
+        // Play resumes: left alone, the shape now overflows.
+        runFrames(30000, 1200, 1000 / 60);
+        expect(onMiss).toHaveBeenCalledWith(true, expect.anything());
+      });
+
+      it("plays on by itself after the max wait", () => {
+        const { reachWorld2, onWorldIntro } = renderRun();
+        reachWorld2();
+        act(() => vi.advanceTimersByTime(FIRST_VISIT_MAX_HOLD_MS));
+        expect(onWorldIntro).toHaveBeenLastCalledWith(null);
+        expect(mockAudioService.playTick).not.toHaveBeenCalled();
+      });
+
+      it("does not hold a world already reached (or without the prop)", () => {
+        const reached = renderRun({ introTaughtThrough: 5 });
+        reached.reachWorld2();
+        expect(reached.onWorldIntro).not.toHaveBeenCalled();
+        reached.unmount();
+
+        const { reachWorld2, onWorldIntro } = renderRun({ introTaughtThrough: undefined });
+        reachWorld2();
+        expect(onWorldIntro).not.toHaveBeenCalled();
+      });
+
+      it("keeps the Time Attack timer frozen while held", () => {
+        const onTimeUpdate = vi.fn();
+        const { canvas, reachWorld2 } = renderRun({ mode: "TIME_ATTACK", onTimeUpdate });
+        reachWorld2();
+        runFrames(1000, 180, 1000 / 60);
+        expect(onTimeUpdate).not.toHaveBeenCalled();
+        act(() => vi.advanceTimersByTime(FIRST_VISIT_GRACE_MS));
+        tap(canvas);
+        runFrames(5000, 180, 1000 / 60);
+        expect(onTimeUpdate).toHaveBeenCalled();
+      });
+
+      it("pausing ends the hold (the resume countdown takes over)", () => {
+        const { ref, reachWorld2, onWorldIntro } = renderRun();
+        reachWorld2();
+        act(() => ref.current?.setPaused(true));
+        expect(onWorldIntro).toHaveBeenLastCalledWith(null);
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it("unmounting drops a pending hold", () => {
+        const { reachWorld2, onWorldIntro, unmount } = renderRun();
+        reachWorld2();
+        unmount();
+        expect(vi.getTimerCount()).toBe(0);
+        expect(onWorldIntro).toHaveBeenCalledTimes(1);
       });
     });
   });
