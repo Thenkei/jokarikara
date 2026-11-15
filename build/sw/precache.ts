@@ -29,6 +29,7 @@ const EXCLUDED = [
   /^sw\.js$/, // the worker itself: browsers fetch it outside the SW cache
   /\.map$/, // source maps: devtools only
   /(^|\/)\./, // dotfiles (.DS_Store, .vite/ build metadata)
+  /^og-image\.jpg$/, // link preview image: fetched by crawlers, never by the game
 ];
 
 const VERSION_LENGTH = 12;
