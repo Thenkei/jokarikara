@@ -1304,15 +1304,40 @@ function App() {
           </button>
 
           <div className="hud">
-            <div
-              className={`hud-row hud-primary ${
-                personalBestPassed ? `is-record${reducedFx ? " reduced-fx" : ""}` : ""
-              }`}
-            >
-              <span className="score score-readout">{score}</span>
-              {/* A single goal chip, no earned-medal glyph: the pill is already
-                  as wide as a 375 px phone allows (the lane pill and the game
-                  over carry the medal itself). */}
+            {/* Row 1: the score and the one vital readout (Time Attack timer or
+                Zen lives), in a band that reserves the PAUSE corner so they can
+                never slide under it (see .hud-top). Everything else lives in
+                the always-visible meta row below. */}
+            <div className="hud-top">
+              <div
+                className={`hud-row hud-primary ${
+                  personalBestPassed ? `is-record${reducedFx ? " reduced-fx" : ""}` : ""
+                }`}
+              >
+                <span className="score score-readout">{score}</span>
+                {mode === "TIME_ATTACK" && timeRemaining !== null && (
+                  <span
+                    className={`timer-badge ${
+                      timeRemaining <= TIMER_CRITICAL_SECONDS ? "critical" : ""
+                    }`}
+                    role="timer"
+                    aria-label={`${Math.ceil(timeRemaining)} seconds left`}
+                  >
+                    {Math.ceil(timeRemaining)}s
+                  </span>
+                )}
+                {mode === "ZEN" && (
+                  <span
+                    className={`lives-badge ${(zenLives ?? 0) <= 3 ? "critical" : ""}`}
+                  >
+                    LIVES {zenLives ?? 0}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="hud-row hud-meta">
+              {/* A single goal chip, no earned-medal glyph (the lane pill and
+                  the game over carry the medal itself). */}
               {hudGoal?.kind === "best" && (
                 <span className="pb-target" data-testid="pb-target">
                   BEST {hudGoal.score}
@@ -1332,24 +1357,6 @@ function App() {
               <span className="world-badge">W {world}</span>
               <span className="level-badge">L {level}</span>
               {dailyKey && <span className="daily-badge">DAILY</span>}
-              {mode === "TIME_ATTACK" && timeRemaining !== null && (
-                <span
-                  className={`timer-badge ${
-                    timeRemaining <= TIMER_CRITICAL_SECONDS ? "critical" : ""
-                  }`}
-                  role="timer"
-                  aria-label={`${Math.ceil(timeRemaining)} seconds left`}
-                >
-                  {Math.ceil(timeRemaining)}s
-                </span>
-              )}
-              {mode === "ZEN" && (
-                <span
-                  className={`lives-badge ${(zenLives ?? 0) <= 3 ? "critical" : ""}`}
-                >
-                  LIVES {zenLives ?? 0}
-                </span>
-              )}
             </div>
             <div
               className={`hud-row hud-secondary ${showSecondaryHud ? "revealed" : "hidden"}`}
