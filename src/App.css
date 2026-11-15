@@ -697,6 +697,65 @@ button:active {
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Resume countdown ("3 · 2 · 1" after RESUME): centred over the frozen
+   board, under the pause menu, never intercepting taps. The digit is keyed,
+   so each one replays the pop; the step length comes from
+   RESUME_COUNTDOWN_STEP_MS via --resume-step. */
+.resume-countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.resume-countdown-digit {
+  font-size: clamp(4.5rem, 26vw, 8rem);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  /* Must read over any stack colour: light fill, dark outline, soft glow. */
+  color: color-mix(in srgb, var(--world-hud-primary) 18%, #ffffff 82%);
+  -webkit-text-stroke: 0.06em rgba(5, 7, 12, 0.7);
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 22px color-mix(in srgb, var(--world-hud-primary) 55%, transparent),
+    0 3px 14px rgba(0, 0, 0, 0.6);
+  animation: resumeCountdownPop var(--resume-step, 550ms) ease-out both;
+}
+
+@keyframes resumeCountdownPop {
+  0% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+  22% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0.7;
+    transform: scale(0.92);
+  }
+}
+
+/* Reduced motion / reduced FX: digits still shown, static (no pop). */
+.resume-countdown-digit.reduced-fx {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume-countdown-digit {
+    animation: none;
+  }
+}
+
 .pause-title {
   font-size: clamp(2rem, 10vw, 3.2rem);
   font-weight: 900;

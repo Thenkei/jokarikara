@@ -28,6 +28,10 @@ import { haptic, isHapticsSupported, setHapticsEnabled } from "./utils/haptics";
 import { StartBackdrop } from "./components/StartBackdrop";
 import { getTimeBonus } from "./core/gameState";
 import { getComboTier, isComboMilestone } from "./gameplay/combo";
+import {
+  RESUME_COUNTDOWN_FROM,
+  RESUME_COUNTDOWN_STEP_MS,
+} from "./gameplay/resumeCountdown";
 import { getEndInsight, getQualityBreakdown } from "./modes/runInsights";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
@@ -219,6 +223,12 @@ function App() {
   );
   const [lastRun, setLastRun] = useState<GameOverRun | null>(null);
   const [paused, setPaused] = useState(false);
+  /**
+   * Resume countdown digit on screen (3, 2, 1) after RESUME; null otherwise.
+   * The pause menu is already closed, the run stays frozen until "go".
+   * Changes once per digit (GameCanvas drives it).
+   */
+  const [resumeDigit, setResumeDigit] = useState<number | null>(null);
   const [runId, setRunId] = useState(0);
   const [mode, setMode] = useState<GameMode>("CLASSIC");
   /** Date key of the running Daily Challenge, null for a regular run. */
@@ -569,6 +579,7 @@ function App() {
     setDailyKey(todayKey);
     setShareStatus("idle");
     setPaused(false);
+    setResumeDigit(null);
     setLastRun(null);
     setRunId((current) => current + 1);
     audioManager.init();
@@ -671,6 +682,7 @@ function App() {
         });
       }
       setPaused(false);
+      setResumeDigit(null);
       setScore(finalScore);
       setWorld(finalWorld);
       setLevel(finalLevel);
@@ -809,17 +821,39 @@ function App() {
     [revealSecondaryHud]
   );
 
+  /**
+   * Pausing is immediate (and cancels a resume countdown). Resuming closes the
+   * menu at once but keeps the run frozen through a "3 · 2 · 1" so the player
+   * is back on the board before the shape grows (see handleResumeCountdown).
+   */
   const applyPaused = useCallback(
     (next: boolean) => {
       setPaused(next);
+      if (next) {
+        setResumeDigit(null);
+        announce("Paused");
+        canvasRef.current?.setPaused(true);
+        // Paused time does not count towards play-time achievements.
+        setAchievementsPaused(true);
+        return;
+      }
       // The sheet only exists over the pause menu; never reopen it on a later pause.
-      if (!next) setShowSettings(false);
-      announce(next ? "Paused" : "Resumed");
-      canvasRef.current?.setPaused(next);
-      // Paused time does not count towards play-time achievements.
-      setAchievementsPaused(next);
+      setShowSettings(false);
+      if (canvasRef.current) canvasRef.current.resumeWithCountdown();
+      else setAchievementsPaused(false);
     },
     [setAchievementsPaused, announce]
+  );
+
+  const handleResumeCountdown = useCallback(
+    (digit: number | null) => {
+      setResumeDigit(digit);
+      // Announced once, not every digit (the live region would stutter).
+      if (digit === RESUME_COUNTDOWN_FROM) announce(`Resuming in ${digit}`);
+      // Play time counts again only once the run actually runs.
+      if (digit === null) setAchievementsPaused(false);
+    },
+    [announce, setAchievementsPaused]
   );
 
   const handleRestartShape = () => {
@@ -922,6 +956,7 @@ function App() {
     // No-op after a game over (already committed); counts an abandoned run.
     abandonAchievementRun();
     setPaused(false);
+    setResumeDigit(null);
     setShowSettings(false);
     setDailyKey(null);
     setKnownDailyRecord(readDailyRecordForToday());
@@ -1289,6 +1324,7 @@ function App() {
               onZenLivesChange={handleZenLivesChange}
               onStack={recordAchievementStack}
               onMiss={handleRunMiss}
+              onResumeCountdown={handleResumeCountdown}
             />
           </div>
 
@@ -1431,6 +1467,25 @@ function App() {
               <button className="pause-menu-btn menu-btn" data-ui-sound="back" onClick={handleMainMenu}>
                 MAIN MENU
               </button>
+            </div>
+          )}
+
+          {resumeDigit !== null && (
+            // Decorative: the live region announces "Resuming in 3" once.
+            // pointer-events: none, so taps reach the (frozen) board and are
+            // ignored there like any tap while paused.
+            <div
+              className="resume-countdown"
+              data-testid="resume-countdown"
+              aria-hidden="true"
+              style={{ "--resume-step": `${RESUME_COUNTDOWN_STEP_MS}ms` } as CSSProperties}
+            >
+              <span
+                key={resumeDigit}
+                className={`resume-countdown-digit${reducedFx ? " reduced-fx" : ""}`}
+              >
+                {resumeDigit}
+              </span>
             </div>
           )}
 

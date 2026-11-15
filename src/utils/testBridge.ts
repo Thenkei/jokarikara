@@ -20,7 +20,10 @@ export type GameTestBridgeState = {
   streak: number;
   bestStreak: number;
   perfectCount: number;
+  /** Simulation frozen: pause menu open or resume countdown running. */
   paused: boolean;
+  /** Resume countdown digit on screen (3, 2, 1), null when not counting. */
+  resumeCountdown: number | null;
   zenLivesRemaining?: number;
   lastStackQuality: GameState["lastStackQuality"];
   themeId?: string;
@@ -37,8 +40,13 @@ export type GameTestBridge = {
   forceStack: (sizeRatio: number) => void;
   tap: () => void;
   step: (dtSeconds: number) => void;
+  /** Manual stepping mode (independent from the player-facing pause). */
   pause: () => void;
   resume: () => void;
+  /** Whether the player-facing resume countdown ("3 · 2 · 1") is running. */
+  isResumeCountdownRunning: () => boolean;
+  /** Skip the resume countdown: play resumes now (no-op when not counting). */
+  finishResumeCountdown: () => void;
   showDiagnostics: () => void;
   hideDiagnostics: () => void;
 };
@@ -63,6 +71,8 @@ type InstallArgs = {
   forceStack: (sizeRatio: number) => void;
   getTheme: () => WorldTheme | null;
   isPaused: () => boolean;
+  getResumeCountdown: () => number | null;
+  finishResumeCountdown: () => void;
 };
 
 const isE2eMode = (): boolean =>
@@ -144,6 +154,8 @@ export const installGameTestBridge = ({
   forceStack,
   getTheme,
   isPaused,
+  getResumeCountdown,
+  finishResumeCountdown,
 }: InstallArgs): (() => void) | undefined => {
   if (!isE2eMode()) return undefined;
 
@@ -178,6 +190,7 @@ export const installGameTestBridge = ({
         bestStreak: state?.bestStreak ?? 0,
         perfectCount: state?.perfectCount ?? 0,
         paused: isPaused(),
+        resumeCountdown: getResumeCountdown(),
         zenLivesRemaining: state?.zenLivesRemaining,
         lastStackQuality: state?.lastStackQuality ?? null,
         themeId: theme?.id,
@@ -210,6 +223,8 @@ export const installGameTestBridge = ({
     },
     pause: () => setManualMode(true),
     resume: () => setManualMode(false),
+    isResumeCountdownRunning: () => getResumeCountdown() !== null,
+    finishResumeCountdown: () => finishResumeCountdown(),
     showDiagnostics: () => {
       panel = createDiagnosticsPanel();
       updateDiagnosticsPanel(panel, bridge.getState());

@@ -45,6 +45,7 @@ import {
   getHeartbeatPulse,
 } from "../gameplay/heartbeat";
 import { installGameTestBridge } from "../utils/testBridge";
+import { useResumeCountdown, type ResumeGoSource } from "../gameplay/useResumeCountdown";
 import { getWorldTheme, toMonoColor } from "../visual/theme";
 import { haptic } from "../utils/haptics";
 import {
@@ -115,6 +116,12 @@ interface GameCanvasProps {
   onStack?: (event: StackEvent) => void;
   /** After a miss; `terminal` is true when it ended the run. */
   onMiss?: (terminal: boolean) => void;
+  /**
+   * Resume countdown (see `resumeWithCountdown`): the digit on screen (3, 2,
+   * 1), once per digit, then null when play resumes. Not called on cancel
+   * (re-pause): the caller initiated it.
+   */
+  onResumeCountdown?: (digit: number | null) => void;
   /** Optional audio service for dependency injection (testing) */
   audioService?: IAudioService;
 }
@@ -128,6 +135,13 @@ export interface GameCanvasHandle {
    * the e2e bridge's manual stepping mode.
    */
   setPaused: (paused: boolean) => void;
+  /**
+   * Player-facing resume: stays frozen through a short "3 · 2 · 1" (reported
+   * via `onResumeCountdown`, soft ticks + light haptics), then resumes play
+   * and the soundtrack. Re-pausing cancels it; a second call while counting
+   * keeps the running count. A run that is over resumes at once.
+   */
+  resumeWithCountdown: () => void;
   /** Programmatic tap (keyboard). No-op while paused or after game over. */
   tap: () => void;
 }
@@ -178,6 +192,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onZenLivesChange,
       onStack,
       onMiss,
+      onResumeCountdown,
       audioService = defaultAudioManager,
     },
     ref,
@@ -289,29 +304,71 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       [onGameOver],
     );
 
+    const setLoopPaused = useCallback(
+      (paused: boolean) => {
+        pausedRef.current = paused;
+        // Drop the stale timestamp so the first frame after resume is a
+        // baseline frame (dt = 0) instead of one huge delta.
+        lastTimeRef.current = 0;
+        // No-op after game over: stopMusic already cleared the intent.
+        if (paused) audioService.pauseMusic();
+        else audioService.resumeMusic();
+      },
+      [audioService],
+    );
+
+    // Resume countdown: the loop simply stays paused (no clock, growth, cue
+    // ticks or Time Attack timer) until "go"; taps are already ignored while
+    // paused, so they never count as misses or early taps.
+    const resumeCountdown = useResumeCountdown({
+      onDigit: (digit) => {
+        audioService.playTick(false, true);
+        haptic("tap");
+        onResumeCountdown?.(digit);
+      },
+      onGo: (source: ResumeGoSource) => {
+        setLoopPaused(false);
+        // A skip (Zen restart/undo, test bridge) has its own feedback.
+        if (source === "countdown") {
+          audioService.playTick(true, true);
+          haptic("tap");
+        }
+        onResumeCountdown?.(null);
+      },
+      isGameOver: () => stateRef.current?.isGameOver ?? true,
+    });
+
     useImperativeHandle(
       ref,
       () => ({
         restartShape: () => {
           if (!stateRef.current || stateRef.current.isGameOver) return;
           restartRequestedRef.current = true;
+          // A fresh shape starts small: no reason to keep the player waiting.
+          resumeCountdown.finish("skipped");
         },
         undo: () => {
           if (!stateRef.current || stateRef.current.isGameOver) return;
           undoRequestedRef.current = true;
+          resumeCountdown.finish("skipped");
         },
         setPaused: (paused: boolean) => {
-          pausedRef.current = paused;
-          // Drop the stale timestamp so the first frame after resume is a
-          // baseline frame (dt = 0) instead of one huge delta.
-          lastTimeRef.current = 0;
-          // No-op after game over: stopMusic already cleared the intent.
-          if (paused) audioService.pauseMusic();
-          else audioService.resumeMusic();
+          resumeCountdown.cancel();
+          setLoopPaused(paused);
+        },
+        resumeWithCountdown: () => {
+          if (!pausedRef.current) return;
+          if (!stateRef.current || stateRef.current.isGameOver) {
+            resumeCountdown.cancel();
+            setLoopPaused(false);
+            onResumeCountdown?.(null);
+            return;
+          }
+          resumeCountdown.start();
         },
         tap: () => handleTapRef.current(),
       }),
-      [audioService],
+      [setLoopPaused, resumeCountdown, onResumeCountdown],
     );
 
     const setManualMode = useCallback((manual: boolean) => {
@@ -897,6 +954,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         setManualMode,
         forceStack,
         isPaused: () => pausedRef.current,
+        getResumeCountdown: () => resumeCountdown.digit(),
+        finishResumeCountdown: () => resumeCountdown.finish("test"),
         getTheme: () =>
           stateRef.current
             ? getWorldTheme(
@@ -927,6 +986,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       handleTap,
       forceStack,
       reducedFx,
+      resumeCountdown,
     ]);
     // pointerdown fires on contact; click waits for release (and on touch
     // devices for gesture disambiguation), adding 50-150 ms of latency to a

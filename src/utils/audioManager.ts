@@ -39,6 +39,7 @@ import {
   MUSIC_REVERB_SEND_DB,
   SFX_REVERB_SEND_DB,
   SFX_TRIM_DB,
+  SOFT_TICK_DB,
   STACK_REVERB_BOOST_DB,
   type SfxId,
 } from "../audio/mix";
@@ -686,13 +687,15 @@ class AudioManager implements IAudioService {
     ]);
   }
 
-  playTick(urgent: boolean): void {
+  playTick(urgent: boolean, soft = false): void {
     // Wood-block style: a sine body plus a short click partial. Square waves
     // at this level were harsh, and at the old level inaudible.
     const freq = urgent ? 1320 : 880;
+    // Soft (resume countdown): the same voice a few dB down.
+    const gain = soft ? dbToGain(SOFT_TICK_DB) : 1;
     this.play("tick", [
-      { freq, type: "sine", duration: 0.12, peak: urgent ? 1 : 0.55, attack: 0.002 },
-      { freq: freq * 2.5, type: "triangle", duration: 0.03, peak: 0.12, attack: 0.001 },
+      { freq, type: "sine", duration: 0.12, peak: (urgent ? 1 : 0.55) * gain, attack: 0.002 },
+      { freq: freq * 2.5, type: "triangle", duration: 0.03, peak: 0.12 * gain, attack: 0.001 },
     ]);
   }
 

@@ -25,7 +25,7 @@ test("sound effects and music keep their mix relationships", async ({
       playFailSound: () => void;
       playMissSound: () => void;
       playEarlyClickSound: () => void;
-      playTick: (urgent: boolean) => void;
+      playTick: (urgent: boolean, soft?: boolean) => void;
       playTimeBonus: () => void;
       playHeartbeat: () => void;
       playComboMilestone: (tier: number, world: number) => void;
@@ -109,6 +109,8 @@ test("sound effects and music keep their mix relationships", async ({
       early: await measure(1, (a) => a.playEarlyClickSound()),
       tick: await measure(0.5, (a) => a.playTick(false)),
       tickUrgent: await measure(0.5, (a) => a.playTick(true)),
+      resumeTick: await measure(0.5, (a) => a.playTick(false, true)),
+      resumeGo: await measure(0.5, (a) => a.playTick(true, true)),
       timeBonus: await measure(1, (a) => a.playTimeBonus()),
       heartbeat: await measure(0.6, (a) => a.playHeartbeat()),
       combo: await measure(1.2, (a) => a.playComboMilestone(5, 1)),
@@ -163,6 +165,11 @@ test("sound effects and music keep their mix relationships", async ({
   expect(levels.fail.rmsDb).toBeGreaterThan(levels.ok.rmsDb + 2);
   // Urgent countdown is louder than the regular tick.
   expect(levels.tickUrgent.rmsDb).toBeGreaterThan(levels.tick.rmsDb + 1.5);
+  // Resume countdown: the same ticks, quieter; its "go" a notch brighter.
+  expect(levels.resumeTick.rmsDb).toBeLessThan(levels.tick.rmsDb - 3);
+  // (The urgent tick hits the bus compressor, so its soft twin gains back ~2 dB.)
+  expect(levels.resumeGo.rmsDb).toBeLessThan(levels.tickUrgent.rmsDb - 2);
+  expect(levels.resumeGo.rmsDb).toBeGreaterThan(levels.resumeTick.rmsDb + 1.5);
   // A combo milestone is a celebration: louder than a plain stack, no louder
   // than the new-world chord.
   expect(levels.combo.rmsDb).toBeGreaterThan(levels.ok.rmsDb);

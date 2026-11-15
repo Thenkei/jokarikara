@@ -133,6 +133,7 @@ test.describe("Timing cue setting", () => {
       await page.keyboard.press("Escape");
       await expect(page.locator(".pause-overlay")).toBeHidden();
       await bridge.pause();
+      await bridge.finishResumeCountdown();
       await clearCueCalls(page);
     };
 
