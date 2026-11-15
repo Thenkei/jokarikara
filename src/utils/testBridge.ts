@@ -24,6 +24,8 @@ export type GameTestBridgeState = {
   paused: boolean;
   /** Resume countdown digit on screen (3, 2, 1), null when not counting. */
   resumeCountdown: number | null;
+  /** World whose first-visit intro holds the game, null when not holding. */
+  worldIntro: number | null;
   zenLivesRemaining?: number;
   lastStackQuality: GameState["lastStackQuality"];
   themeId?: string;
@@ -49,6 +51,13 @@ export type GameTestBridge = {
   isResumeCountdownRunning: () => boolean;
   /** Skip the resume countdown: play resumes now (no-op when not counting). */
   finishResumeCountdown: () => void;
+  /** End a first-visit intro hold: play resumes now (no-op when not holding). */
+  dismissWorldIntro: () => void;
+  /**
+   * Max wait of the next first-visit holds (ms). Slow CI browsers can spend
+   * the real 9 s between two assertions; tests of the tap path lengthen it.
+   */
+  setWorldIntroMaxHold: (ms: number) => void;
   showDiagnostics: () => void;
   hideDiagnostics: () => void;
 };
@@ -75,6 +84,9 @@ type InstallArgs = {
   isPaused: () => boolean;
   getResumeCountdown: () => number | null;
   finishResumeCountdown: () => void;
+  getWorldIntro: () => number | null;
+  dismissWorldIntro: () => void;
+  setWorldIntroMaxHold: (ms: number) => void;
 };
 
 const isE2eMode = (): boolean =>
@@ -158,6 +170,9 @@ export const installGameTestBridge = ({
   isPaused,
   getResumeCountdown,
   finishResumeCountdown,
+  getWorldIntro,
+  dismissWorldIntro,
+  setWorldIntroMaxHold,
 }: InstallArgs): (() => void) | undefined => {
   if (!isE2eMode()) return undefined;
 
@@ -193,6 +208,7 @@ export const installGameTestBridge = ({
         perfectCount: state?.perfectCount ?? 0,
         paused: isPaused(),
         resumeCountdown: getResumeCountdown(),
+        worldIntro: getWorldIntro(),
         zenLivesRemaining: state?.zenLivesRemaining,
         lastStackQuality: state?.lastStackQuality ?? null,
         themeId: theme?.id,
@@ -228,6 +244,8 @@ export const installGameTestBridge = ({
     resume: () => setManualMode(false),
     isResumeCountdownRunning: () => getResumeCountdown() !== null,
     finishResumeCountdown: () => finishResumeCountdown(),
+    dismissWorldIntro: () => dismissWorldIntro(),
+    setWorldIntroMaxHold: (ms: number) => setWorldIntroMaxHold(ms),
     showDiagnostics: () => {
       panel = createDiagnosticsPanel();
       updateDiagnosticsPanel(panel, bridge.getState());

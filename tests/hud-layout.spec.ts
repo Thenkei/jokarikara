@@ -1,6 +1,11 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
-import { makeBridge, waitForBridge } from "./bridgeHelpers";
+import {
+  ALL_WORLDS_REACHED,
+  makeBridge,
+  seedBestWorld,
+  waitForBridge,
+} from "./bridgeHelpers";
 
 /**
  * Phone HUD regression: the score pill used to grow under the PAUSE button
@@ -99,6 +104,8 @@ test.describe("HUD layout on phones", { tag: "@cross-browser" }, () => {
     }) => {
       await page.setViewportSize(viewport);
       await seedBest(page, "TIME_ATTACK", 99999);
+      // Returning player: the timer keeps running past world 10's entry.
+      await seedBestWorld(page, ALL_WORLDS_REACHED);
       await page.goto("/");
       await page.getByRole("radio", { name: "Time Attack mode" }).click();
       await page.click(".start-btn");
@@ -132,6 +139,7 @@ test.describe("HUD layout on phones", { tag: "@cross-browser" }, () => {
 
     test(`Zen lives stay clear of PAUSE at ${viewport.width}px`, async ({ page }) => {
       await page.setViewportSize(viewport);
+      await seedBestWorld(page, ALL_WORLDS_REACHED);
       await page.goto("/");
       await page.getByRole("radio", { name: "Zen mode" }).click();
       await page.click(".start-btn");

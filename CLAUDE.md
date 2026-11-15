@@ -113,6 +113,7 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 - Keep React state updates out of the per-frame path (e.g. the Time Attack timer only reports when the displayed second changes).
 - The loop effect must stay single-instance (per-effect `cancelled` flag + `rafIdRef`).
 - Player resume = 3·2·1 countdown (`src/gameplay/resumeCountdown.ts` pure + `useResumeCountdown.ts` timer driver in GameCanvas): the loop stays paused until "go", one React update per digit; re-pause/unmount cancel it. E2E: `finishResumeCountdown()` after Escape/RESUME (bridge `pause()`/`resume()` manual mode is unaffected).
+- First-visit world intro (`src/gameplay/worldIntro.ts` pure + `useWorldIntroHold.ts` driver in GameCanvas): entering a world above `lifetime.bestWorld` (read fresh at run start, prop `introTaughtThrough`) shows the atlas how-to line and holds the game: `tick` keeps rendering but skips the simulation (also under bridge `step`) until a tap/Space/Enter after a 600 ms grace (taps only dismiss), 9 s, pause or a Zen action. E2E specs that cross worlds for other reasons `seedBestWorld(page, ALL_WORLDS_REACHED)` (`tests/bridgeHelpers.ts`); bridge `getState().worldIntro` / `dismissWorldIntro()` / `setWorldIntroMaxHold(ms)` (WebKit in CI can outlast the real 9 s).
 
 ### Performance rules
 Measured with `npm run perf` and Chromium DevTools at 4× CPU throttle:
