@@ -104,6 +104,7 @@ export const en = {
   // ---------------------------------------------------------------- pause menu
   "pause.dialog": "Game paused",
   "pause.title": "PAUSED",
+  "pause.score": "SCORE {score}",
   "pause.resume": "RESUME",
   "pause.restart": "RESTART",
   "pause.finish": "FINISH RUN",

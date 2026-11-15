@@ -111,6 +111,7 @@ export const fr: Catalog = {
   // ---------------------------------------------------------------- pause menu
   "pause.dialog": "Jeu en pause",
   "pause.title": "PAUSE",
+  "pause.score": "SCORE {score}",
   "pause.resume": "REPRENDRE",
   "pause.restart": "RECOMMENCER",
   "pause.finish": "FINIR LA PARTIE",

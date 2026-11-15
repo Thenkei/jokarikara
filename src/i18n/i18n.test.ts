@@ -26,6 +26,7 @@ const placeholders = (message: Message): string[] => {
  */
 const SAME_IN_FRENCH: ReadonlySet<MessageKey> = new Set<MessageKey>([
   "app.title",
+  "pause.score",
   "quality.PERFECT",
   "quality.GREAT",
   "quality.GOOD",
