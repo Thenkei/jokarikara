@@ -90,6 +90,21 @@ const CELL_GAP = 10;
 const CELL_RADIUS = 10;
 const MAX_CELLS = 15;
 
+/** Separator between the share text's stats ("1240 pts · 42 stacks · W3 L2"). */
+const STATS_SEPARATOR = " · ";
+
+/**
+ * The stats line without its score segment: the card already shows the score
+ * as its headline. Drops only the first segment that starts with the score
+ * ("1240 pts"), so a run of 0 points keeps its "0 stacks".
+ */
+export const statsWithoutScore = (stats: string, score: number): string => {
+  const segments = stats.split(STATS_SEPARATOR);
+  const index = segments.findIndex((segment) => segment.startsWith(`${score} `));
+  if (index === -1) return stats;
+  return segments.filter((_, i) => i !== index).join(STATS_SEPARATOR);
+};
+
 /** Shrinks the font until `text` fits `maxWidth` (long French titles). */
 const fitFont = (
   ctx: CanvasRenderingContext2D,
@@ -170,14 +185,16 @@ export const drawShareCard = (
 
   y += 132;
   ctx.fillStyle = TEXT_MAIN;
-  const scoreText = String(Math.max(0, Math.floor(Number.isFinite(score) ? score : 0)));
+  const shownScore = Math.max(0, Math.floor(Number.isFinite(score) ? score : 0));
+  const scoreText = String(shownScore);
   fitFont(ctx, scoreText, 800, 136, fontFamily, textWidth);
   ctx.fillText(scoreText, W / 2, y);
 
   y += 62;
   ctx.fillStyle = TEXT_MUTED;
-  fitFont(ctx, content.stats, 600, 36, fontFamily, textWidth);
-  ctx.fillText(content.stats, W / 2, y);
+  const stats = statsWithoutScore(content.stats, shownScore);
+  fitFont(ctx, stats, 600, 36, fontFamily, textWidth);
+  ctx.fillText(stats, W / 2, y);
 
   const cells = content.qualities.slice(0, MAX_CELLS);
   if (cells.length > 0) {
