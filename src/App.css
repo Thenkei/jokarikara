@@ -3324,3 +3324,47 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/* ---------- Sound shortcut pill (M) ---------- */
+.sound-toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(12, 12, 16, 0.92);
+  color: #f5f8ff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: soundToast 1.2s ease-out forwards;
+}
+
+@keyframes soundToast {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+  }
+  15%,
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound-toast {
+    animation: none;
+  }
+}

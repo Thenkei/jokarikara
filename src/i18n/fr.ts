@@ -139,6 +139,10 @@ export const fr: Catalog = {
 
   // ---------------------------------------------------------------- screen reader announcements
   "announce.paused": "En pause",
+  "announce.soundOn": "Son activé",
+  "announce.soundOff": "Son coupé",
+  "toast.soundOn": "SON ACTIVÉ",
+  "toast.soundOff": "SON COUPÉ",
   "announce.resuming": "Reprise dans {seconds}",
   "announce.finishConfirm":
     "Finir la partie\u202f? Appuie encore pour la terminer et garder ton score",
