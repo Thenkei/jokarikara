@@ -102,11 +102,8 @@ import { StartScreen, type StartPanel } from "./components/StartScreen";
 import { countRevealedWorlds } from "./gameplay/atlas";
 import { getWorldHowTo, getWorldName, getWorldTagline } from "./gameplay/worldText";
 import { WORLD_INTRO_MS } from "./gameplay/worldIntro";
-import {
-  GearIcon,
-  SettingsSheet,
-  type SettingId,
-} from "./components/SettingsSheet";
+import { SettingsSheet, type SettingId } from "./components/SettingsSheet";
+import { PauseMenu } from "./components/PauseMenu";
 import {
   GameOverScreen,
   type GameOverRun,
@@ -1516,53 +1513,16 @@ function App() {
             </div>
 
             {paused && (
-              <div
-                className="pause-overlay"
-                role="dialog"
-                aria-modal="true"
-                aria-label={t("pause.dialog")}
-              >
-                <h2 className="pause-title">{t("pause.title")}</h2>
-                <button
-                  className="pause-resume-btn" data-ui-sound="confirm"
-                  onClick={() => applyPaused(false)}
-                  autoFocus
-                >
-                  {t("pause.resume")}
-                </button>
-                <button
-                  className="pause-restart-btn menu-btn" data-ui-sound="confirm"
-                  onClick={restartRun}
-                >
-                  {t("pause.restart")}
-                </button>
-                {canFinishRun(mode) && (
-                  <button
-                    className={`pause-finish-btn menu-btn${finishArmed ? " armed" : ""}`}
-                    // Armed: the finish cue replaces the generic click.
-                    data-ui-sound={finishArmed ? "none" : "select"}
-                    onClick={handleFinishPress}
-                    onKeyDown={(event) => {
-                      // A held Enter repeats clicks: it must not arm and confirm.
-                      if (event.repeat && event.key === "Enter") event.preventDefault();
-                    }}
-                  >
-                    {t(finishArmed ? "pause.finishArmed" : "pause.finish")}
-                  </button>
-                )}
-                <button
-                  ref={settingsTriggerRef}
-                  className="pause-settings-btn menu-btn"
-                  onClick={() => setShowSettings(true)}
-                  aria-haspopup="dialog"
-                >
-                  <GearIcon />
-                  {t("pause.settings")}
-                </button>
-                <button className="pause-menu-btn menu-btn" data-ui-sound="back" onClick={handleMainMenu}>
-                  {t("pause.mainMenu")}
-                </button>
-              </div>
+              <PauseMenu
+                canFinish={canFinishRun(mode)}
+                finishArmed={finishArmed}
+                onResume={() => applyPaused(false)}
+                onRestart={restartRun}
+                onFinishPress={handleFinishPress}
+                onOpenSettings={() => setShowSettings(true)}
+                onMainMenu={handleMainMenu}
+                settingsTriggerRef={settingsTriggerRef}
+              />
             )}
 
             {resumeDigit !== null && (
