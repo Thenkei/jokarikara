@@ -8,7 +8,8 @@ import {
   drawPerfectGuide,
   PERFECT_GUIDE_ALPHA,
   drawArena,
-  FAUX_GLOW,
+  CAST_SHADOW,
+  ECLIPSE_GROUND_LIGHT,
 } from "./shapeRenderer";
 import type { Shape } from "../utils/geometry";
 import { getWorldMechanics } from "../constants/game";
@@ -87,16 +88,77 @@ describe("shapeRenderer", () => {
       expect(ctx.fill).not.toHaveBeenCalled();
     });
 
-    it("draws a faux glow (extra wide strokes), never shadow blur", () => {
+    it("casts its shadow with offset strokes, never shadow blur", () => {
       const ctx = createMockContext();
       drawShape(ctx, shape, 0, 0, 1, defaultMechanics);
       expect(ctx.shadowBlur).toBe(0);
-      // FAUX_GLOW passes + the outline itself.
-      expect(ctx.stroke).toHaveBeenCalledTimes(FAUX_GLOW.length + 1);
-      expect(ctx.globalAlpha).toBe(1); // restored after the glow passes
+      // CAST_SHADOW passes + the rim itself.
+      expect(ctx.stroke).toHaveBeenCalledTimes(CAST_SHADOW.length + 1);
+      expect(ctx.globalAlpha).toBe(1); // restored after the shadow passes
     });
 
-    it("does not set shadow blur when glow is disabled", () => {
+    it("draws the shadow under the fill, lower on screen", () => {
+      const ctx = createMockContext();
+      const order: string[] = [];
+      (ctx.stroke as ReturnType<typeof vi.fn>).mockImplementation(() => order.push("stroke"));
+      (ctx.fill as ReturnType<typeof vi.fn>).mockImplementation(() => order.push("fill"));
+      drawShape(ctx, shape, 0, 0, 1, defaultMechanics);
+
+      // Shadow strokes first, then the fill that hides their inner half, then the rim.
+      expect(order).toEqual([...CAST_SHADOW.map(() => "stroke"), "fill", "stroke"]);
+      const arcs = (ctx.arc as ReturnType<typeof vi.fn>).mock.calls;
+      CAST_SHADOW.forEach((pass, i) => {
+        expect(arcs[i][0]).toBeCloseTo(0);
+        expect(arcs[i][1]).toBeGreaterThan(0); // +y is down on a canvas
+        expect(arcs[i][1]).toBeCloseTo(arcs[0][1] * (pass.offset / CAST_SHADOW[0].offset));
+      });
+      // The shape itself stays centred.
+      expect(arcs[CAST_SHADOW.length].slice(0, 2)).toEqual([0, 0]);
+    });
+
+    it("keeps the shadow falling down the screen when the shape is rotated", () => {
+      const ctx = createMockContext();
+      // A quarter turn: screen-down is +x in the shape's own frame.
+      drawShape(ctx, { ...shape, rotation: Math.PI / 2 }, 0, 0, 1, defaultMechanics);
+      const [x, y] = (ctx.arc as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(x).toBeGreaterThan(0);
+      expect(y).toBeCloseTo(0);
+    });
+
+    it("gives the growing shape a brighter, heavier rim than a stacked layer", () => {
+      const rim = (isStacked: boolean) => {
+        const ctx = createMockContext();
+        drawShape(ctx, shape, 0, 0, 1, defaultMechanics, 0, isStacked);
+        return { width: ctx.lineWidth, style: String(ctx.strokeStyle) };
+      };
+      const active = rim(false);
+      const stacked = rim(true);
+      expect(active.width).toBeGreaterThan(stacked.width);
+      expect(active.style).not.toBe(stacked.style);
+    });
+
+    it("uses the theme's material (shadow colour, depth, rims)", () => {
+      const theme = getWorldTheme(3, 42, false);
+      const ctx = createMockContext();
+      const styles: string[] = [];
+      const widths: number[] = [];
+      (ctx.stroke as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        styles.push(String(ctx.strokeStyle));
+        widths.push(ctx.lineWidth);
+      });
+      drawShape(ctx, shape, 0, 0, 1, defaultMechanics, 0, true, 0, false, theme);
+
+      expect(styles).toEqual([
+        ...CAST_SHADOW.map(() => theme.shape.shadow),
+        theme.shape.stroke,
+      ]);
+      expect(widths).toEqual([
+        ...CAST_SHADOW.map((pass) => theme.shape.depth * pass.width),
+        theme.shape.lineWidth,
+      ]);
+    });
+
+    it("draws only the rim when the cast shadow is disabled", () => {
       const ctx = createMockContext();
       drawShape(
         ctx,
@@ -224,8 +286,8 @@ describe("shapeRenderer", () => {
         },
       );
 
-      // One arc for shape path + two arcs for fracture sectors.
-      expect(ctx.arc).toHaveBeenCalledTimes(3);
+      // Shadow outlines + the shape path + two arcs for fracture sectors.
+      expect(ctx.arc).toHaveBeenCalledTimes(CAST_SHADOW.length + 1 + 2);
     });
 
     it.each([
@@ -277,7 +339,8 @@ describe("shapeRenderer", () => {
         },
       );
 
-      expect(ctx.arc).toHaveBeenCalledTimes(1);
+      // Shadow outlines + the shape path, no fracture arcs.
+      expect(ctx.arc).toHaveBeenCalledTimes(CAST_SHADOW.length + 1);
     });
   });
 
@@ -297,6 +360,26 @@ describe("shapeRenderer", () => {
 
       expect(ctx.createRadialGradient).toHaveBeenCalled();
       expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 800, 600);
+    });
+
+    it("dims the ground's centre light during an eclipse", () => {
+      const ctx = createMockContext();
+      const alphas: number[] = [];
+      (ctx.fillRect as ReturnType<typeof vi.fn>).mockImplementation(() =>
+        alphas.push(ctx.globalAlpha),
+      );
+      drawBackground(
+        ctx,
+        800,
+        600,
+        0.5,
+        { ...defaultMechanics, eclipseEffect: true },
+        getWorldTheme(6, 42, false),
+      );
+
+      // Ground at full strength, then its lit centre at a fraction.
+      expect(alphas).toEqual([1, ECLIPSE_GROUND_LIGHT]);
+      expect(ctx.globalAlpha).toBe(1);
     });
   });
 
