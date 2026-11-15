@@ -2,6 +2,9 @@ import { getWorldConfig } from "../gameplay/selectors";
 import type { WorldVisualProfile } from "../gameplay/types";
 
 const PALETTE_SIZE = 6;
+/** Rim widths in CSS px (the canvas is scaled by the device pixel ratio). */
+const SHAPE_RIM_WIDTH = 1.25;
+const ACTIVE_RIM_WIDTH = 2;
 
 const DEFAULT_PROFILE: WorldVisualProfile = {
   hueCenter: 220,
@@ -40,11 +43,21 @@ export interface WorldTheme {
     text: string;
     subtleText: string;
   };
+  /**
+   * Layer material: each shape is an opaque cut-out with a lit rim, lifted
+   * off the layer below by a cast shadow (see CAST_SHADOW in the renderer).
+   */
   shape: {
+    /** Lit rim of a stacked layer. */
     stroke: string;
-    glow: string;
-    glowBlur: number;
     lineWidth: number;
+    /** Brighter, heavier rim of the growing shape: the edge the player times. */
+    activeStroke: string;
+    activeLineWidth: number;
+    /** Cast shadow colour; the renderer scales its alpha per pass. */
+    shadow: string;
+    /** Cast shadow distance in CSS px (0 = flat). */
+    depth: number;
   };
   fx: {
     hueShiftMultiplier: number;
@@ -204,19 +217,6 @@ const contrastRatio = (hexA: string, hexB: string): number => {
   return (lighter + 0.05) / (darker + 0.05);
 };
 
-const mixHex = (from: string, to: string, ratio: number): string => {
-  const clamped = clamp(ratio, 0, 1);
-  const a = hexToRgb(from);
-  const b = hexToRgb(to);
-
-  const blend = (start: number, end: number) =>
-    toInteger(start + (end - start) * clamped)
-      .toString(16)
-      .padStart(2, "0");
-
-  return `#${blend(a.r, b.r)}${blend(a.g, b.g)}${blend(a.b, b.b)}`;
-};
-
 const withAlpha = (hex: string, alpha: number): string => {
   const { r, g, b } = hexToRgb(hex);
   const normalized = clamp(alpha, 0, 1);
@@ -261,11 +261,87 @@ const resolveProfile = (
   };
 };
 
-const createBackgroundBase = (profile: WorldVisualProfile): HslColor => ({
-  h: normalizeHue(profile.hueCenter + 180),
-  s: clamp(26 + profile.neonBias * 28, 20, 65),
-  l: clamp(11 + profile.neonBias * 10, 8, 26),
-});
+/**
+ * Ground under the stack: a deep tone of the world's own hue, so the world
+ * reads as "the blue one" or "the amber one" before a single shape lands.
+ * (It used to be the darkened complement, which turned to maroon and olive.)
+ */
+const createGround = (profile: WorldVisualProfile): { base: HslColor; lift: HslColor } => {
+  const hue = normalizeHue(profile.hueCenter);
+  const saturation = groundSaturationScale(hue);
+  return {
+    base: {
+      h: hue,
+      s: clamp(34 + profile.neonBias * 8, 20, 50) * saturation,
+      l: clamp(8 + profile.neonBias * 1.5, 6, 11),
+    },
+    /** Centre of the ground, lit from above the stack. */
+    lift: {
+      h: hue,
+      s: clamp(44 + profile.neonBias * 8, 25, 60) * saturation,
+      l: clamp(16 + profile.neonBias * 3, 12, 21),
+    },
+  };
+};
+
+/** A dark, saturated yellow is olive: the ground greys out around this hue. */
+const OLIVE_HUE = 65;
+const OLIVE_BAND = 45;
+const OLIVE_DESATURATION = 0.55;
+
+/** Saturation multiplier for the ground: 1 away from yellow, lower inside it. */
+const groundSaturationScale = (hue: number): number => {
+  const distance = Math.abs(((hue - OLIVE_HUE + 540) % 360) - 180);
+  const yellowness = Math.max(0, 1 - distance / OLIVE_BAND);
+  return 1 - OLIVE_DESATURATION * yellowness;
+};
+
+const FULL_WHEEL = 360;
+/** A profile spread at or above this is a full-spectrum world. */
+const FULL_WHEEL_SPREAD = 90;
+/** Narrowest sweep: six slots this far apart are still six distinct colours. */
+const MIN_PALETTE_ARC = 120;
+
+/**
+ * Width (degrees) of the hue sweep the palette slots are spread across.
+ * Worlds 1-4 sweep a wide but one-sided arc around their hue (a cool world,
+ * a warm world) that widens with the profile's spread; the neon worlds
+ * (spread >= FULL_WHEEL_SPREAD) take the whole wheel.
+ */
+export const getPaletteArc = (profile: Pick<WorldVisualProfile, "hueSpread">): number =>
+  profile.hueSpread >= FULL_WHEEL_SPREAD
+    ? FULL_WHEEL
+    : MIN_PALETTE_ARC + Math.max(0, profile.hueSpread);
+
+/**
+ * Share of the world's lightness range per slot, indexed by the slot's rank
+ * along the sweep. Neighbouring hues never share a tone, so two layers stay
+ * apart by tone as well as hue.
+ */
+const SLOT_TONES: readonly number[] = [0.74, 0.39, 0.17, 0.61, 1, 0];
+/** Extra lightness range around the profile's bounds, for the tone steps. */
+const TONE_MARGIN = { below: 4, above: 5 } as const;
+/**
+ * Rank along the sweep of each palette index. An arc lists its two central
+ * slots first and its two ends at indices 2 and 4, so the HUD colours
+ * (palette[0], [2], [4]) are the world's own hue and both ends of its range.
+ */
+const ARC_SLOT_RANK: readonly number[] = [2, 3, 0, 4, 5, 1];
+const WHEEL_SLOT_RANK: readonly number[] = [0, 1, 2, 3, 4, 5];
+/** Seeded hue wobble per slot, as a share of the gap between slots. */
+const SLOT_HUE_JITTER = 0.18;
+/** Seeded shift of the whole sweep, capped so a world keeps its temperature. */
+const MAX_ARC_ANCHOR_JITTER = 18;
+const WHEEL_ANCHOR_JITTER = 30;
+/**
+ * Pure hues differ a lot in brightness (yellow ~0.93, blue ~0.07): nudging
+ * lightness against it keeps yellows from glaring and blues from sinking.
+ */
+const HUE_LUMINANCE_PIVOT = 0.35;
+const HUE_LUMINANCE_GAIN = 13;
+
+const hueLuminance = (hue: number): number =>
+  relativeLuminance(hslToHex({ h: hue, s: 100, l: 50 }));
 
 const ensureContrast = (
   color: HslColor,
@@ -288,55 +364,66 @@ const ensureContrast = (
   return candidate;
 };
 
+/**
+ * Six colours swept across the world's hue arc (see getPaletteArc), each on
+ * its own tone step. The run seed shifts the sweep and wobbles each slot, so
+ * two runs of a world are siblings, not copies.
+ */
 const createPalette = (
   world: number,
   profile: WorldVisualProfile,
   seed: number,
-): { palette: string[]; backgroundBase: string } => {
+): { palette: string[]; groundBase: string; groundLift: string } => {
   const rng = mulberry32(seed);
-  const baseHue = normalizeHue(
-    profile.hueCenter + randomBetween(rng, -profile.hueSpread, profile.hueSpread),
-  );
-  const backgroundBaseHex = hslToHex(createBackgroundBase(profile));
+  const arc = getPaletteArc(profile);
+  const fullWheel = arc >= FULL_WHEEL;
+  const anchorJitter = fullWheel
+    ? WHEEL_ANCHOR_JITTER
+    : Math.min(profile.hueSpread * 0.5, MAX_ARC_ANCHOR_JITTER);
+  const anchor = profile.hueCenter + randomBetween(rng, -anchorJitter, anchorJitter);
+  const step = arc / PALETTE_SIZE;
+  // An arc is centred on the anchor; the wheel starts on it.
+  const firstHue = fullWheel ? anchor : anchor - (arc - step) / 2;
+  const ranks = fullWheel ? WHEEL_SLOT_RANK : ARC_SLOT_RANK;
+
+  const ground = createGround(profile);
+  const groundBase = hslToHex(ground.base);
+  const toneMin = profile.lightnessMin - TONE_MARGIN.below;
+  const toneMax = profile.lightnessMax + TONE_MARGIN.above;
+  const neonKick = world >= 5 ? profile.neonBias * 12 : profile.neonBias * 5;
   const palette: string[] = [];
 
   for (let i = 0; i < PALETTE_SIZE; i += 1) {
-    const slotHueNoise = randomBetween(
-      rng,
-      -profile.hueSpread * 0.35,
-      profile.hueSpread * 0.35,
+    const rank = ranks[i % ranks.length];
+    const hue = normalizeHue(
+      firstHue + rank * step + randomBetween(rng, -step, step) * SLOT_HUE_JITTER,
     );
-    const slotHue = normalizeHue(baseHue + i * (360 / PALETTE_SIZE) + slotHueNoise);
-
-    const neonKick = world >= 5 ? profile.neonBias * 12 : profile.neonBias * 5;
-    const slotSaturation = clamp(
-      randomBetween(rng, profile.saturationMin, profile.saturationMax) + neonKick,
+    const saturation = clamp(
+      randomBetween(
+        rng,
+        (profile.saturationMin + profile.saturationMax) / 2,
+        profile.saturationMax,
+      ) + neonKick,
       15,
       100,
     );
-    const slotLightness = randomBetween(
-      rng,
-      profile.lightnessMin,
-      profile.lightnessMax,
-    );
+    const lightness =
+      toneMin +
+      (toneMax - toneMin) * SLOT_TONES[rank % SLOT_TONES.length] +
+      (HUE_LUMINANCE_PIVOT - hueLuminance(hue)) * HUE_LUMINANCE_GAIN;
 
-    const adjusted = ensureContrast(
-      {
-        h: slotHue,
-        s: slotSaturation,
-        l: slotLightness,
-      },
-      backgroundBaseHex,
-      profile.contrastFloor,
+    palette.push(
+      hslToHex(
+        ensureContrast(
+          { h: hue, s: saturation, l: clamp(lightness, 20, 82) },
+          groundBase,
+          profile.contrastFloor,
+        ),
+      ),
     );
-
-    palette.push(hslToHex(adjusted));
   }
 
-  return {
-    palette,
-    backgroundBase: backgroundBaseHex,
-  };
+  return { palette, groundBase, groundLift: hslToHex(ground.lift) };
 };
 
 // ---------------------------------------------------------------------------
@@ -487,8 +574,8 @@ const toMonoTheme = (base: WorldTheme): WorldTheme => {
     },
     shape: {
       ...base.shape,
-      stroke: withAlpha(monoShade(88, 100), reducedFx ? 0.24 : 0.4),
-      glow: withAlpha(primary, reducedFx ? 0.2 : 0.38),
+      stroke: withAlpha(monoShade(88, 100), reducedFx ? 0.26 : 0.4),
+      activeStroke: withAlpha(monoShade(92, 100), 0.9),
     },
     // Colour shift would rotate shapes out of the tint.
     fx: { ...base.fx, hueShiftMultiplier: 0 },
@@ -515,7 +602,7 @@ export const getWorldTheme = (
 
   const profile = resolveProfile(world, reducedFx);
   const themeSeed = hashSeed(runSeed, world);
-  const { palette, backgroundBase } = createPalette(world, profile, themeSeed);
+  const { palette, groundBase, groundLift } = createPalette(world, profile, themeSeed);
 
   const primary = palette[0] ?? "#3b82f6";
   const secondary = palette[2] ?? "#ec4899";
@@ -529,9 +616,9 @@ export const getWorldTheme = (
     mono: false,
     palette,
     background: {
-      base: mixHex(backgroundBase, "#050507", 0.35),
-      innerGlow: withAlpha(primary, reducedFx ? 0.11 : 0.18),
-      outerGlow: withAlpha(secondary, reducedFx ? 0.06 : 0.12),
+      base: groundBase,
+      innerGlow: withAlpha(groundLift, reducedFx ? 0.6 : 0.8),
+      outerGlow: withAlpha(groundLift, 0),
       vignette: withAlpha("#000000", reducedFx ? 0.24 : 0.36),
     },
     hud: {
@@ -542,10 +629,14 @@ export const getWorldTheme = (
       subtleText: "#c7cedb",
     },
     shape: {
-      stroke: withAlpha("#ffffff", reducedFx ? 0.24 : 0.4),
-      glow: withAlpha(primary, reducedFx ? 0.2 : 0.38),
-      glowBlur: reducedFx ? 8 : 16 + profile.glowIntensity * 18,
-      lineWidth: reducedFx ? 2 : 2.5 + profile.glowIntensity,
+      // Translucent white over the fill reads as a lighter tint of that fill:
+      // a lit rim in any palette colour, with no per-colour string to derive.
+      stroke: withAlpha("#ffffff", reducedFx ? 0.26 : 0.3 + profile.neonBias * 0.12),
+      lineWidth: SHAPE_RIM_WIDTH,
+      activeStroke: withAlpha("#ffffff", 0.88),
+      activeLineWidth: ACTIVE_RIM_WIDTH,
+      shadow: withAlpha("#000000", reducedFx ? 0.2 : 0.26),
+      depth: reducedFx ? 2.5 : 3.5 + profile.glowIntensity * 3,
     },
     fx: {
       hueShiftMultiplier: reducedFx ? 0.55 : 1 + profile.neonBias * 0.25,

@@ -52,7 +52,11 @@ export interface WorldMechanics {
 export interface WorldVisualProfile {
   /** Base hue center for this world (0-359) */
   hueCenter: number;
-  /** Random spread around hueCenter */
+  /**
+   * How much of the hue wheel the world's palette covers: below 90 it widens
+   * a one-sided arc around hueCenter, from 90 the palette is the full wheel
+   * (see getPaletteArc in visual/theme.ts).
+   */
   hueSpread: number;
   /** Saturation bounds (%) */
   saturationMin: number;
@@ -62,7 +66,10 @@ export interface WorldVisualProfile {
   lightnessMax: number;
   /** Extra neon intensity for world look (0-1) */
   neonBias: number;
-  /** Baseline glow intensity for rendering (0-1) */
+  /**
+   * Relief of the layer material (0-1): how far each layer's cast shadow
+   * falls. (Named for the glow it used to drive.)
+   */
   glowIntensity: number;
   /** Minimum color/background contrast ratio */
   contrastFloor: number;

@@ -23,13 +23,15 @@ export const drawRegularPolygonPath = (
   ctx: CanvasRenderingContext2D,
   sides: number,
   size: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
 ): void => {
   const radius = size / 2;
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
     const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
+    const x = offsetX + Math.cos(angle) * radius;
+    const y = offsetY + Math.sin(angle) * radius;
     if (i === 0) {
       ctx.moveTo(x, y);
     } else {
@@ -45,9 +47,11 @@ export const drawRegularPolygonPath = (
 export const drawCirclePath = (
   ctx: CanvasRenderingContext2D,
   size: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
 ): void => {
   ctx.beginPath();
-  ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+  ctx.arc(offsetX, offsetY, size / 2, 0, Math.PI * 2);
 };
 
 /**
@@ -56,9 +60,11 @@ export const drawCirclePath = (
 export const drawSquarePath = (
   ctx: CanvasRenderingContext2D,
   size: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
 ): void => {
   ctx.beginPath();
-  ctx.rect(-size / 2, -size / 2, size, size);
+  ctx.rect(offsetX - size / 2, offsetY - size / 2, size, size);
 };
 
 /**
@@ -67,10 +73,12 @@ export const drawSquarePath = (
 export const drawRectanglePath = (
   ctx: CanvasRenderingContext2D,
   size: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
 ): void => {
   const height = size * 0.6;
   ctx.beginPath();
-  ctx.rect(-size / 2, -height / 2, size, height);
+  ctx.rect(offsetX - size / 2, offsetY - height / 2, size, height);
 };
 
 /**
@@ -79,13 +87,15 @@ export const drawRectanglePath = (
 export const drawDiamondPath = (
   ctx: CanvasRenderingContext2D,
   size: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
 ): void => {
   const height = size * 0.7;
   ctx.beginPath();
-  ctx.moveTo(0, -height / 2);
-  ctx.lineTo(size / 2, 0);
-  ctx.lineTo(0, height / 2);
-  ctx.lineTo(-size / 2, 0);
+  ctx.moveTo(offsetX, offsetY - height / 2);
+  ctx.lineTo(offsetX + size / 2, offsetY);
+  ctx.lineTo(offsetX, offsetY + height / 2);
+  ctx.lineTo(offsetX - size / 2, offsetY);
   ctx.closePath();
 };
 
@@ -95,12 +105,14 @@ export const drawDiamondPath = (
 export const drawStarPath = (
   ctx: CanvasRenderingContext2D,
   size: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
 ): void => {
   const starVertices = getStarVertices(size, 0);
   ctx.beginPath();
   starVertices.forEach((p, i) => {
-    if (i === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
+    if (i === 0) ctx.moveTo(offsetX + p.x, offsetY + p.y);
+    else ctx.lineTo(offsetX + p.x, offsetY + p.y);
   });
   ctx.closePath();
 };
@@ -148,44 +160,46 @@ const hexToHsl = (hexColor: string): Hsl => {
 };
 
 /**
- * Trace the path of a shape of the given type centred at the origin.
- * Caller is responsible for transforms, fill and stroke.
+ * Trace the path of a shape of the given type, centred at the origin or at
+ * an offset in the current (rotated) frame. Caller is responsible for
+ * transforms, fill and stroke.
  */
 export const traceShapePath = (
   ctx: CanvasRenderingContext2D,
   type: Shape["type"],
   size: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
 ): void => {
   switch (type) {
     case "circle":
-      drawCirclePath(ctx, size);
+      drawCirclePath(ctx, size, offsetX, offsetY);
       break;
     case "square":
-      drawSquarePath(ctx, size);
+      drawSquarePath(ctx, size, offsetX, offsetY);
       break;
     case "triangle":
-      drawRegularPolygonPath(ctx, 3, size);
+      drawRegularPolygonPath(ctx, 3, size, offsetX, offsetY);
       break;
     case "rectangle":
-      drawRectanglePath(ctx, size);
+      drawRectanglePath(ctx, size, offsetX, offsetY);
       break;
     case "pentagon":
-      drawRegularPolygonPath(ctx, 5, size);
+      drawRegularPolygonPath(ctx, 5, size, offsetX, offsetY);
       break;
     case "hexagon":
-      drawRegularPolygonPath(ctx, 6, size);
+      drawRegularPolygonPath(ctx, 6, size, offsetX, offsetY);
       break;
     case "octagon":
-      drawRegularPolygonPath(ctx, 8, size);
+      drawRegularPolygonPath(ctx, 8, size, offsetX, offsetY);
       break;
     case "diamond":
-      drawDiamondPath(ctx, size);
+      drawDiamondPath(ctx, size, offsetX, offsetY);
       break;
     case "star":
-      drawStarPath(ctx, size);
+      drawStarPath(ctx, size, offsetX, offsetY);
       break;
   }
-
 };
 
 /** Visual weight of the PERFECT guide: idle vs. while inside the band. */
@@ -269,16 +283,37 @@ const shiftHue = (hexColor: string, hueShift: number): string => {
 };
 
 /**
- * Glow without shadowBlur. A Gaussian shadow blur is a full convolution of
- * the stroke area on every frame: measured with 4x CPU throttling on a
- * world-5 stack, it dropped the game to 8-15 FPS versus 61 FPS without it.
- * Two wider translucent strokes under the outline read as a glow at a
- * fraction of the cost (plain path rasterisation).
+ * Cast shadow without shadowBlur. A Gaussian shadow blur is a full
+ * convolution of the shape on every frame: measured with 4x CPU throttling on
+ * a world-5 stack, it dropped the game to 8-15 FPS versus 61 FPS without it.
+ *
+ * Instead the shape's outline is stroked a little lower, under its own fill:
+ * the fill hides the half that falls inside, and what is left is a dark band
+ * along the lower edge, on the layer below. Two passes (a wide faint one, a
+ * narrow darker one against the edge) read as a soft shadow for the cost of
+ * two outline strokes: perimeter, not area.
+ *
+ * `offset` and `width` are in units of the theme's shadow depth; `alpha`
+ * scales the theme's shadow colour.
  */
-export const FAUX_GLOW: ReadonlyArray<{ spread: number; alpha: number }> = [
-  { spread: 0.6, alpha: 0.12 },
-  { spread: 0.25, alpha: 0.28 },
+export const CAST_SHADOW: ReadonlyArray<{
+  offset: number;
+  width: number;
+  alpha: number;
+}> = [
+  { offset: 1, width: 2, alpha: 0.55 },
+  { offset: 0.5, width: 1, alpha: 1 },
 ];
+
+/** Without a theme (tests, fallbacks): a neutral shadow and rim. */
+const DEFAULT_MATERIAL = {
+  stroke: "rgba(255, 255, 255, 0.34)",
+  lineWidth: 1.25,
+  activeStroke: "rgba(255, 255, 255, 0.88)",
+  activeLineWidth: 2,
+  shadow: "rgba(0, 0, 0, 0.26)",
+  depth: 4,
+} as const;
 
 /**
  * Below this alpha a shape contributes nothing visible; skipping it saves a
@@ -317,7 +352,7 @@ const drawFractureOverlay = (
       correctedCenter + halfWidth,
     );
     if (!reducedFx) {
-      // Faux glow (wide faint stroke) instead of shadowBlur; see FAUX_GLOW.
+      // Wide faint stroke instead of shadowBlur (see CAST_SHADOW).
       ctx.strokeStyle = colors.glow;
       ctx.lineWidth = lineWidth + Math.max(10, size * 0.07);
       ctx.stroke();
@@ -341,8 +376,9 @@ const drawFractureOverlay = (
  * @param time - Time in seconds (for animations)
  * @param isStacked - Whether this is a stacked shape (vs active)
  * @param stackIndex - Index of shape in stack (for phase offsets)
- * @param glow - Apply the theme glow. Rendered as a "faux glow" (wider,
- *   translucent strokes) rather than shadowBlur: see FAUX_GLOW.
+ * @param castShadow - Lift the shape off the layer below with a cast
+ *   shadow (two offset strokes, never shadowBlur: see CAST_SHADOW). Off for
+ *   deep layers, which are mostly covered.
  */
 export const drawShape = (
   ctx: CanvasRenderingContext2D,
@@ -357,7 +393,7 @@ export const drawShape = (
   isContainer: boolean = false,
   theme?: WorldTheme,
   fractureOverlay?: FractureOverlay,
-  glow: boolean = true,
+  castShadow: boolean = true,
 ): void => {
   if (shape.opacity < MIN_VISIBLE_OPACITY) return;
 
@@ -406,13 +442,34 @@ export const drawShape = (
   }
 
   const size = shape.size * zoom * sizeMultiplier;
+  const material = theme?.shape ?? DEFAULT_MATERIAL;
+
+  if (castShadow && material.depth > 0) {
+    // "Down" on screen, expressed in the shape's rotated frame, so the
+    // shadow falls the same way whatever the shape's angle. The offset goes
+    // into the path itself: no extra transform per pass.
+    const downX = Math.sin(shape.rotation) * material.depth;
+    const downY = Math.cos(shape.rotation) * material.depth;
+    const baseAlpha = ctx.globalAlpha;
+    ctx.lineJoin = "round"; // wide strokes must not grow spiky miters
+    ctx.strokeStyle = material.shadow;
+    for (const pass of CAST_SHADOW) {
+      traceShapePath(ctx, shape.type, size, downX * pass.offset, downY * pass.offset);
+      ctx.globalAlpha = baseAlpha * pass.alpha;
+      ctx.lineWidth = material.depth * pass.width;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = baseAlpha;
+  }
 
   traceShapePath(ctx, shape.type, size);
 
   ctx.fill();
 
-  let strokeStyle = theme?.shape.stroke ?? "rgba(255, 255, 255, 0.4)";
-  let lineWidth = theme?.shape.lineWidth ?? 3;
+  // Lit rim: the growing shape's is brighter and heavier, since its edge is
+  // the one the player times.
+  let strokeStyle = isStacked ? material.stroke : material.activeStroke;
+  let lineWidth = isStacked ? material.lineWidth : material.activeLineWidth;
 
   if (mechanics.eclipseEffect && isContainer) {
     // Pulse the outline of the container shape
@@ -423,18 +480,6 @@ export const drawShape = (
     lineWidth = 4;
   }
 
-  if (glow) {
-    const spread = theme?.shape.glowBlur ?? 15;
-    const baseAlpha = ctx.globalAlpha;
-    ctx.lineJoin = "round"; // wide strokes must not grow spiky miters
-    ctx.strokeStyle = theme?.shape.glow ?? "rgba(0, 0, 0, 0.5)";
-    for (const pass of FAUX_GLOW) {
-      ctx.globalAlpha = baseAlpha * pass.alpha;
-      ctx.lineWidth = lineWidth + spread * pass.spread;
-      ctx.stroke();
-    }
-    ctx.globalAlpha = baseAlpha;
-  }
   ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
@@ -453,8 +498,11 @@ export const drawShape = (
   ctx.restore();
 };
 
+/** Share of the ground's centre light left during an eclipse. */
+export const ECLIPSE_GROUND_LIGHT = 0.3;
+
 /**
- * Draw the pulsating background gradient.
+ * Draw the ground: a deep tone of the world's hue, lit at the centre.
  */
 export const drawBackground = (
   ctx: CanvasRenderingContext2D,
@@ -468,11 +516,10 @@ export const drawBackground = (
   const centerY = height / 2;
 
   if (mechanics?.eclipseEffect) {
-    // Pitch black background for Eclipse
+    // Lights out: the ground keeps only a trace of its lit centre.
     ctx.fillStyle = theme?.background.base ?? "#100e0eff";
     ctx.fillRect(0, 0, width, height);
 
-    // Very subtle center glow
     const grad = ctx.createRadialGradient(
       centerX,
       centerY,
@@ -483,8 +530,11 @@ export const drawBackground = (
     );
     grad.addColorStop(0, theme?.background.innerGlow ?? `rgba(255, 255, 255, ${0.01 + pulse * 0.005})`);
     grad.addColorStop(1, theme?.background.vignette ?? "rgba(0, 0, 0, 0)");
+    const baseAlpha = ctx.globalAlpha;
+    if (theme) ctx.globalAlpha = baseAlpha * ECLIPSE_GROUND_LIGHT;
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = baseAlpha;
     return;
   }
 

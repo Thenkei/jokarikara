@@ -106,10 +106,10 @@ export const MAX_FRAME_DT = 0.05;
 export const MAX_DEVICE_PIXEL_RATIO = 2;
 
 /**
- * Only the newest stacked layers get the (expensive) shadow-blur glow. Deeper
- * layers are mostly covered and fade out anyway.
+ * Only the newest stacked layers cast a shadow (two extra outline strokes
+ * each). Deeper layers are mostly covered or off screen.
  */
-export const GLOW_LAYER_DEPTH = 5;
+export const SHADOW_LAYER_DEPTH = 8;
 
 interface GameCanvasProps {
   mode?: GameMode;
@@ -999,7 +999,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
 
         drawBackground(ctx, width, height, scenePulse, mechanics, theme);
 
-        const glowFloor = state.shapes.length - GLOW_LAYER_DEPTH;
+        const shadowFloor = state.shapes.length - SHADOW_LAYER_DEPTH;
         const drawStacked = (index: number) => {
           const shape = state.shapes[index];
           const isContainer = index === state.shapes.length - 1;
@@ -1016,7 +1016,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             isContainer,
             theme,
             isContainer ? (fractureOverlay ?? undefined) : undefined,
-            index >= glowFloor,
+            index >= shadowFloor,
           );
         };
 

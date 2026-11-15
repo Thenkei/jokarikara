@@ -4,6 +4,7 @@ import {
   ARENA_RAMP_STEPS,
   arenaDangerColor,
   DEFAULT_DANGER,
+  getPaletteArc,
   getWorldPalette,
   getWorldTheme,
   MONO_DANGER,
@@ -92,11 +93,12 @@ describe("world theme", () => {
     expect(avgSat(world5)).toBeGreaterThan(avgSat(world3));
   });
 
-  it("reduced fx reduces glow intensity and hue shift speed", () => {
+  it("reduced fx flattens the relief and slows the hue shift", () => {
     const normal = getWorldTheme(7, 99, false);
     const reduced = getWorldTheme(7, 99, true);
 
-    expect(reduced.shape.glowBlur).toBeLessThan(normal.shape.glowBlur);
+    expect(reduced.shape.depth).toBeLessThan(normal.shape.depth);
+    expect(reduced.shape.depth).toBeGreaterThan(0);
     expect(reduced.fx.hueShiftMultiplier).toBeLessThan(
       normal.fx.hueShiftMultiplier,
     );
@@ -108,6 +110,117 @@ describe("world theme", () => {
     theme.palette.forEach((color) => {
       expect(color).toMatch(/^#[0-9a-f]{6}$/i);
     });
+  });
+});
+
+describe("palette arc and ground", () => {
+  beforeEach(() => {
+    __resetThemeCacheForTests();
+  });
+
+  const hueOf = (hex: string) => (rgbToHsl(hexToRgb(hex)).h + 360) % 360;
+  const hueDistance = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180);
+  /** Degrees of the wheel a palette covers: 360 minus its widest empty gap. */
+  const hueSpan = (palette: string[]) => {
+    const hues = palette.map(hueOf).sort((a, b) => a - b);
+    const gaps = hues.map((hue, i) => (hues[(i + 1) % hues.length] - hue + 360) % 360);
+    return 360 - Math.max(...gaps);
+  };
+  const luminance = (hex: string) => {
+    const lin = (c: number) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    const { r, g, b } = hexToRgb(hex);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const SEEDS = [0, 1, 42, 777, 123456, 4242, 99, 31337];
+
+  it("widens with the world's hue spread and takes the whole wheel from 90", () => {
+    expect(getPaletteArc({ hueSpread: 24 })).toBe(144);
+    expect(getPaletteArc({ hueSpread: 55 })).toBe(175);
+    expect(getPaletteArc({ hueSpread: 89 })).toBeLessThan(360);
+    expect(getPaletteArc({ hueSpread: 90 })).toBe(360);
+    expect(getPaletteArc({ hueSpread: 200 })).toBe(360);
+  });
+
+  it("worlds 1-4 keep a wide but one-sided sweep of six distinct colours", () => {
+    for (const world of [1, 2, 3, 4]) {
+      for (const seed of SEEDS) {
+        const palette = getWorldPalette(world, seed, false);
+        expect(new Set(palette).size).toBe(6);
+        const span = hueSpan(palette);
+        // Rich (well beyond one hue family) yet never the full wheel.
+        expect(span, `world ${world} seed ${seed}`).toBeGreaterThan(90);
+        expect(span, `world ${world} seed ${seed}`).toBeLessThan(210);
+      }
+    }
+  });
+
+  it("worlds 5+ spread their colours around the whole wheel", () => {
+    for (const world of [5, 6, 7, 8, 9, 10]) {
+      for (const seed of SEEDS) {
+        // Six slots 60 degrees apart (plus jitter): no gap near a third of the wheel.
+        expect(hueSpan(getWorldPalette(world, seed, false)), `world ${world} seed ${seed}`).toBeGreaterThan(250);
+      }
+    }
+  });
+
+  it("keeps an arc world's HUD colour on the world's own hue", () => {
+    const worldHue: Record<number, number> = { 1: 215, 2: 150, 3: 36, 4: 330 };
+    for (const [world, hue] of Object.entries(worldHue)) {
+      for (const seed of SEEDS) {
+        const { hud } = getWorldTheme(Number(world), seed, false);
+        expect(hueDistance(hueOf(hud.primary), hue), `world ${world} seed ${seed}`).toBeLessThan(45);
+      }
+    }
+  });
+
+  it("puts neighbouring hues on different tones", () => {
+    const lightnessOf = (hex: string) => rgbToHsl(hexToRgb(hex)).l;
+    for (const world of [1, 5, 9]) {
+      const byHue = [...getWorldPalette(world, 42, false)].sort((a, b) => hueOf(a) - hueOf(b));
+      for (let i = 0; i + 1 < byHue.length; i += 1) {
+        const apart =
+          Math.abs(lightnessOf(byHue[i]) - lightnessOf(byHue[i + 1])) +
+          hueDistance(hueOf(byHue[i]), hueOf(byHue[i + 1]));
+        expect(apart, `world ${world} slots ${i}/${i + 1}`).toBeGreaterThan(20);
+      }
+    }
+  });
+
+  it("grounds each world in a deep tone of its own hue", () => {
+    const worldHue: Record<number, number> = { 1: 215, 4: 330, 5: 290, 10: 350 };
+    for (const [world, hue] of Object.entries(worldHue)) {
+      const { background } = getWorldTheme(Number(world), 42, false);
+      const ground = rgbToHsl(hexToRgb(background.base));
+      expect(hueDistance((ground.h + 360) % 360, hue), `world ${world}`).toBeLessThan(12);
+      expect(ground.l).toBeLessThan(12);
+    }
+  });
+
+  it("greys the ground out near yellow, where a dark tone turns olive", () => {
+    const saturationOf = (world: number) =>
+      rgbToHsl(hexToRgb(getWorldTheme(world, 42, false).background.base)).s;
+    // World 9 sits on yellow (hue 60); world 5 (hue 290) is far from it.
+    expect(saturationOf(9)).toBeLessThan(saturationOf(5) * 0.7);
+  });
+
+  it("keeps every shape colour clear of the ground", () => {
+    for (let world = 1; world <= 10; world += 1) {
+      for (const seed of SEEDS) {
+        for (const reducedFx of [false, true]) {
+          const theme = getWorldTheme(world, seed, reducedFx);
+          for (const color of theme.palette) {
+            expect(contrast(color, theme.background.base), theme.id).toBeGreaterThanOrEqual(2.4);
+          }
+        }
+      }
+    }
   });
 });
 

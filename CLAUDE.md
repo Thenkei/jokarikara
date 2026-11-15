@@ -50,7 +50,8 @@ The game uses a functional, immutable state pattern without external state libra
 ### Module Responsibilities
 - `src/shapes/` - Shape factory functions (`createActiveShape`, `createInitialShape`)
 - `src/utils/geometry.ts` - Containment logic using vertex-in-polygon and ray casting algorithms
-- `src/rendering/shapeRenderer.ts` - Pure drawing functions (no state mutation); glow uses `FAUX_GLOW` strokes, never `shadowBlur`
+- `src/rendering/shapeRenderer.ts` - Pure drawing functions (no state mutation). Layer material ("Strata"): opaque fill, lit rim (brighter and heavier on the growing shape), cast shadow from `CAST_SHADOW` offset strokes under the fill, never `shadowBlur`
+- `src/visual/theme.ts` - Seeded world look (`getWorldTheme`, cached): six-colour palette swept across a hue arc (`getPaletteArc`: a one-sided arc that widens with `hueSpread` in worlds 1-4, the full wheel from 90, i.e. world 5+), each slot on its own tone step; ground = deep tone of the world's own hue (greyed out near yellow); shape material (`shape.stroke`/`activeStroke`/`shadow`/`depth`); Mono variant; danger colours
 - `src/rendering/effects.ts` - Pure, dt-based canvas juice (rings, particles, shake, flash); never touches gameplay state
 - `src/constants/game.ts` - Game balance constants, world mechanics, boss configurations, shape unlocks
 - `src/gameplay/config.ts` - Per-world mechanics (names and taglines are catalog text); `builder.ts`, `fracture.ts`, `selectors.ts` support them
@@ -133,8 +134,8 @@ Every user-facing string goes through the catalogs: visible text, `aria-label`s,
 
 ### Performance rules
 Measured with `npm run perf` and Chromium DevTools at 4× CPU throttle:
-- Never use canvas `shadowBlur`/`shadowColor` in the render path: on a full world-5 stack it dropped to ~13 FPS vs ~50 FPS with faux glow strokes. Fake glows with wider translucent strokes.
-- Cap the canvas device pixel ratio at 2 and keep `GLOW_LAYER_DEPTH` limited (only the top stacked layers glow).
+- Never use canvas `shadowBlur`/`shadowColor` in the render path: on a full world-5 stack it dropped to ~13 FPS vs ~50 FPS with plain strokes. Fake soft edges (the cast shadow) with offset translucent strokes: perimeter cost, not area.
+- Cap the canvas device pixel ratio at 2 and keep `SHADOW_LAYER_DEPTH` limited (only the top stacked layers cast a shadow).
 - Cache derived colours (hsl strings) rather than rebuilding them per frame.
 - HUD `backdrop-filter` and the background gradient were profiled and are not bottlenecks; don't optimise them blindly.
 - Input uses `pointerdown` (no click delay).
