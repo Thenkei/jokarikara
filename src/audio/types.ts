@@ -43,6 +43,11 @@ export interface MusicState {
   playing: boolean;
   intensity: MusicIntensity;
   world: number;
+  /**
+   * Time Attack clock tension, 0 (calm) .. 1 (last second); always 0 in
+   * other modes (see `getMusicTension`).
+   */
+  tension: number;
 }
 
 /**
@@ -138,6 +143,13 @@ export interface IAudioService {
 
   /** Fade rhythmic layers in/out to match the player's momentum. */
   setMusicIntensity(level: MusicIntensity): void;
+
+  /**
+   * Time Attack tension (0..1) from the clock: the bed tightens (filter,
+   * tremolo, pedal, forced pulse) and eases back out when it drops. Call it
+   * when the quantised value changes, not per frame (deduplicated anyway).
+   */
+  setMusicTension(tension: number): void;
 
   /** Crossfade the drone (and layer notes) to the new world's key. */
   setMusicWorld(world: number): void;

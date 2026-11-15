@@ -1,5 +1,6 @@
 import type { GameMode } from "../types";
 import { PENTATONIC } from "./music";
+import { dbToGain } from "./mix";
 import type { MusicIntensity } from "./types";
 
 /**
@@ -41,6 +42,11 @@ export const LAYER_LEVELS: Readonly<Record<1 | 2, number>> = {
   1: 0.5,
   2: 0.32,
 };
+
+/** Base cutoff of the drone low-pass (Hz); tension opens it from here. */
+export const DRONE_FILTER_HZ = 520;
+/** Resonance of the drone low-pass while calm (just under Butterworth). */
+export const DRONE_FILTER_Q = 0.7;
 
 /** Fade timings (seconds). Long enough to never click, short enough to feel responsive. */
 export const MUSIC_FADE_IN_SECONDS = 1.5;
@@ -156,3 +162,132 @@ export const chooseArpeggioNote = (
   }
   return PENTATONIC[index];
 };
+
+/**
+ * Lead before the first note a freshly armed scheduler places: a hair ahead
+ * of the audio clock so the note is never scheduled in the past.
+ */
+export const SCHEDULE_LEAD_SECONDS = 0.02;
+
+/**
+ * Every rhythmic event (pulse/arpeggio steps, the tension tremolo's peaks)
+ * sits on one eighth-note grid anchored at the session's `origin`, so layers
+ * armed at different times stay in phase. Returns the first grid point at or
+ * after `from` and its step in the bar.
+ */
+export const alignToGrid = (
+  origin: number,
+  from: number,
+  stepSeconds: number,
+): { time: number; step: number } => {
+  // Tolerance: a `from` exactly on a grid point must not skip to the next one
+  // through floating point noise.
+  const index = Math.ceil((from - origin) / stepSeconds - 1e-9);
+  return {
+    time: origin + index * stepSeconds,
+    step: ((index % STEPS_PER_BAR) + STEPS_PER_BAR) % STEPS_PER_BAR,
+  };
+};
+
+// --- Time Attack tension ------------------------------------------------
+
+/**
+ * Seconds left on the Time Attack clock at which the music starts to tighten.
+ * Tension is quantised to the displayed (whole) second, the same granularity
+ * at which GameCanvas reports the clock, so the audio manager is only ever
+ * told about it ~once per second, never per frame.
+ */
+export const TENSION_FROM_SECONDS = 10;
+
+/**
+ * Musical tension (0..1) for the run clock. 0 outside Time Attack and above
+ * `TENSION_FROM_SECONDS`; then one step per displayed second, reaching 1 on
+ * the last second. A time bonus that lifts the clock back above the
+ * threshold brings it back to 0 (the engine eases out).
+ *
+ *   displayed 11+ -> 0, 10 -> 0.1, 9 -> 0.2, ..., 1 -> 1 (and 0 -> 1)
+ */
+export const getMusicTension = (
+  mode: GameMode,
+  timeRemaining: number | undefined,
+): number => {
+  if (mode !== "TIME_ATTACK") return 0;
+  if (timeRemaining === undefined || Number.isNaN(timeRemaining)) return 0;
+  const displayed = Math.max(0, Math.ceil(timeRemaining));
+  const steps = TENSION_FROM_SECONDS + 1 - displayed;
+  if (steps <= 0) return 0;
+  return Math.min(steps, TENSION_FROM_SECONDS) / TENSION_FROM_SECONDS;
+};
+
+/** Clamp an external tension value to [0, 1]; anything invalid is calm. */
+export const sanitizeTension = (tension: number): number =>
+  Number.isFinite(tension) ? Math.min(1, Math.max(0, tension)) : 0;
+
+/** Drone low-pass at full tension: this many octaves above `DRONE_FILTER_HZ`. */
+export const TENSION_FILTER_OCTAVES = 1.3;
+/**
+ * Drone low-pass resonance at full tension: a soft peak that makes the slow
+ * cutoff sweep audible as the filter opens (well short of self-oscillation).
+ */
+export const TENSION_FILTER_Q = 2.5;
+/**
+ * Drone tremolo depth at full tension: the drone gain dips by up to this
+ * much on every eighth note (it never rises above its calm level).
+ */
+export const TENSION_TREMOLO_DEPTH = 0.4;
+/**
+ * Dominant pedal (a fifth above the world root, inside the drone's filter)
+ * level at full tension, relative to the drone voices' `DRONE_LEVEL`.
+ */
+export const TENSION_PEDAL_LEVEL = 0.08;
+/** Music bus lift at full tension, kept inside the mix budget (see mix.ts). */
+export const TENSION_BUS_LIFT_DB = 0.5;
+/** Tension at or above which the bass pulse plays whatever the streak. */
+export const TENSION_PULSE_FROM = 0.1;
+/** Glide toward a higher tension: ~one displayed second, so steps blend into a ramp. */
+export const TENSION_ATTACK_SECONDS = 0.9;
+/** Ease-out after a time bonus lifts the clock back: slower, a release. */
+export const TENSION_RELEASE_SECONDS = 2;
+
+export interface TensionParams {
+  /** Base cutoff of the drone low-pass (the slow LFO still sweeps around it). */
+  filterHz: number;
+  /** Resonance of the drone low-pass. */
+  filterQ: number;
+  /** Drone tremolo depth, 0..1 (gain swings within [1 - depth, 1]). */
+  tremoloDepth: number;
+  /** Dominant pedal gain (0 = silent). */
+  pedalLevel: number;
+  /** Music bus gain (1 = calm level). */
+  busGain: number;
+}
+
+/**
+ * Musical parameters for a tension. Every curve is monotonic and equals the
+ * calm soundtrack at 0, so releasing tension is just gliding back:
+ * - the filter opens exponentially (even steps per second to the ear) and
+ *   gains a little resonance,
+ * - the tremolo deepens linearly,
+ * - the pedal comes in late (quadratic) so the first seconds stay subtle,
+ * - the bus lift is linear in dB.
+ */
+export const getTensionParams = (tension: number): TensionParams => {
+  const t = sanitizeTension(tension);
+  return {
+    filterHz: DRONE_FILTER_HZ * Math.pow(2, TENSION_FILTER_OCTAVES * t),
+    filterQ: DRONE_FILTER_Q + (TENSION_FILTER_Q - DRONE_FILTER_Q) * t,
+    tremoloDepth: TENSION_TREMOLO_DEPTH * t,
+    pedalLevel: TENSION_PEDAL_LEVEL * t * t,
+    busGain: dbToGain(TENSION_BUS_LIFT_DB * t),
+  };
+};
+
+/**
+ * Layers actually played: the streak's intensity, with the bass pulse forced
+ * in once the clock is tense (a ticking heart under the countdown).
+ */
+export const getEffectiveIntensity = (
+  intensity: MusicIntensity,
+  tension: number,
+): MusicIntensity =>
+  sanitizeTension(tension) >= TENSION_PULSE_FROM && intensity < 1 ? 1 : intensity;

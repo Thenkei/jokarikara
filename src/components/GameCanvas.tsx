@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
-import { getMusicIntensity } from "../audio/soundtrack";
+import { getMusicIntensity, getMusicTension } from "../audio/soundtrack";
 import type { GameState, MissReason, RunStats, StackEvent, StackQuality, StyleUpdate } from "../types";
 import {
   createInitialState,
@@ -671,6 +671,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
               const previous = lastReportedSecondRef.current;
               lastReportedSecondRef.current = wholeSecond;
               onTimeUpdate?.(remaining);
+              // Same once-per-displayed-second cadence: the soundtrack
+              // tightens over the last seconds and eases back out when a
+              // bonus lifts the clock (the manager drops repeats).
+              audioService.setMusicTension(getMusicTension(state.mode, remaining));
               if (
                 previous !== null &&
                 wholeSecond < previous &&

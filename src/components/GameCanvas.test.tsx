@@ -32,6 +32,7 @@ const mockAudioService: IAudioService = {
   getContextState: vi.fn(() => null),
   startMusic: vi.fn(),
   setMusicIntensity: vi.fn(),
+  setMusicTension: vi.fn(),
   setMusicWorld: vi.fn(),
   pauseMusic: vi.fn(),
   resumeMusic: vi.fn(),
@@ -45,6 +46,7 @@ const mockAudioService: IAudioService = {
     playing: false,
     intensity: 0 as const,
     world: 1,
+    tension: 0,
   })),
 };
 
@@ -350,6 +352,27 @@ describe("GameCanvas", () => {
       expect(onTimeUpdate.mock.calls.length).toBeLessThanOrEqual(3);
       const displayed = onTimeUpdate.mock.calls.map(([t]) => Math.ceil(t));
       expect(new Set(displayed).size).toBe(displayed.length);
+      // The soundtrack hears the clock at the same cadence (calm at 60 s).
+      expect(mockAudioService.setMusicTension).toHaveBeenCalledTimes(
+        onTimeUpdate.mock.calls.length,
+      );
+      expect(mockAudioService.setMusicTension).toHaveBeenLastCalledWith(0);
+    });
+
+    it("never tells the soundtrack about a clock outside Time Attack", () => {
+      vi.mocked(mockAudioService.setMusicTension).mockClear();
+      render(
+        <GameCanvas
+          mode="CLASSIC"
+          onScore={vi.fn()}
+          onGameOver={vi.fn()}
+          onLevelUp={vi.fn()}
+          onWorldUp={vi.fn()}
+          audioService={mockAudioService}
+        />
+      );
+      runFrames(1000, 90, 1000 / 60);
+      expect(mockAudioService.setMusicTension).not.toHaveBeenCalled();
     });
 
     it("plays an audible beat in sync with the Heartbeat world's tempo", () => {

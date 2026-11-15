@@ -1,23 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { PENTATONIC } from "./music";
 import {
+  alignToGrid,
   ARPEGGIO_DENSITY,
   ARPEGGIO_LAYER_THRESHOLD,
   ARPEGGIO_STEPS,
   chooseArpeggioNote,
+  DRONE_FILTER_HZ,
+  DRONE_FILTER_Q,
+  getEffectiveIntensity,
   getLayerTargets,
   getMusicIntensity,
+  getMusicTension,
   getPulseNote,
   getStepSeconds,
+  getTensionParams,
   LAYER_LEVELS,
   MUSIC_TEMPO_BPM,
   MUSIC_VOLUME,
   PULSE_LAYER_THRESHOLD,
   resyncStepTime,
+  sanitizeTension,
   SCHEDULE_AHEAD_SECONDS,
   SCHEDULER_INTERVAL_MS,
   STEPS_PER_BAR,
+  TENSION_ATTACK_SECONDS,
+  TENSION_BUS_LIFT_DB,
+  TENSION_FROM_SECONDS,
+  TENSION_RELEASE_SECONDS,
 } from "./soundtrack";
+import { dbToGain } from "./mix";
 
 describe("soundtrack", () => {
   describe("getMusicIntensity", () => {
@@ -142,6 +154,130 @@ describe("soundtrack", () => {
           expect(chooseArpeggioNote(1, rand, previous)).not.toBe(previous);
         }
       }
+    });
+  });
+
+  describe("alignToGrid", () => {
+    const step = getStepSeconds();
+
+    it("returns the first grid point at or after a time, with its bar step", () => {
+      expect(alignToGrid(1, 1, step)).toEqual({ time: 1, step: 0 });
+      const next = alignToGrid(1, 1 + step * 2.5, step);
+      expect(next.time).toBeCloseTo(1 + step * 3, 10);
+      expect(next.step).toBe(3);
+      // Wraps the bar.
+      expect(alignToGrid(0, step * (STEPS_PER_BAR + 1), step).step).toBe(1);
+    });
+
+    it("does not skip a grid point through floating point noise", () => {
+      const at = 0.02 + 7 * step;
+      expect(alignToGrid(0.02, at, step).time).toBeCloseTo(at, 10);
+    });
+
+    it("handles times before the origin", () => {
+      const before = alignToGrid(10, 10 - step * 1.5, step);
+      expect(before.time).toBeCloseTo(10 - step, 10);
+      expect(before.step).toBe(STEPS_PER_BAR - 1);
+    });
+  });
+
+  describe("Time Attack tension", () => {
+    const ta = (remaining: number | undefined) => getMusicTension("TIME_ATTACK", remaining);
+
+    it("stays calm above the threshold", () => {
+      expect(TENSION_FROM_SECONDS).toBe(10);
+      expect(ta(60)).toBe(0);
+      expect(ta(15)).toBe(0);
+      expect(ta(10.01)).toBe(0);
+    });
+
+    it("rises one step per displayed second to 1 on the last second", () => {
+      expect(ta(10)).toBe(0.1);
+      expect(ta(9.5)).toBe(0.1); // displayed 10
+      expect(ta(8)).toBe(0.3);
+      expect(ta(3)).toBe(0.8);
+      expect(ta(1)).toBe(1);
+      expect(ta(0.2)).toBe(1);
+      expect(ta(0)).toBe(1);
+      expect(ta(-2)).toBe(1);
+      // Monotonic: less time is never calmer.
+      let previous = 0;
+      for (let t = 12; t >= 0; t -= 0.25) {
+        const tension = ta(t);
+        expect(tension).toBeGreaterThanOrEqual(previous);
+        previous = tension;
+      }
+    });
+
+    it("drops back to 0 when a bonus lifts the clock above the threshold", () => {
+      expect(ta(3)).toBe(0.8);
+      expect(ta(3 + 5 + 5)).toBe(0);
+    });
+
+    it("is always 0 outside Time Attack, and for a missing or invalid clock", () => {
+      expect(getMusicTension("CLASSIC", 3)).toBe(0);
+      expect(getMusicTension("ZEN", 0)).toBe(0);
+      expect(ta(undefined)).toBe(0);
+      expect(ta(Number.NaN)).toBe(0);
+    });
+
+    it("sanitises external values to [0, 1]", () => {
+      expect(sanitizeTension(-1)).toBe(0);
+      expect(sanitizeTension(2)).toBe(1);
+      expect(sanitizeTension(Number.NaN)).toBe(0);
+      expect(sanitizeTension(Number.POSITIVE_INFINITY)).toBe(0);
+      expect(sanitizeTension(0.4)).toBe(0.4);
+    });
+
+    it("maps calm to the unchanged soundtrack", () => {
+      expect(getTensionParams(0)).toEqual({
+        filterHz: DRONE_FILTER_HZ,
+        filterQ: DRONE_FILTER_Q,
+        tremoloDepth: 0,
+        pedalLevel: 0,
+        busGain: 1,
+      });
+    });
+
+    it("tightens every parameter monotonically and stays within its bounds", () => {
+      let previous = getTensionParams(0);
+      for (let i = 1; i <= 10; i += 1) {
+        const params = getTensionParams(i / 10);
+        expect(params.filterHz).toBeGreaterThan(previous.filterHz);
+        expect(params.filterQ).toBeGreaterThan(previous.filterQ);
+        expect(params.tremoloDepth).toBeGreaterThan(previous.tremoloDepth);
+        expect(params.pedalLevel).toBeGreaterThan(previous.pedalLevel);
+        expect(params.busGain).toBeGreaterThan(previous.busGain);
+        previous = params;
+      }
+      const full = getTensionParams(1);
+      // A soft resonance, far from self-oscillation.
+      expect(full.filterQ).toBeLessThanOrEqual(4);
+      // A dip-only tremolo: depth must stay below full silence.
+      expect(full.tremoloDepth).toBeLessThan(1);
+      expect(full.busGain).toBeCloseTo(dbToGain(TENSION_BUS_LIFT_DB), 10);
+      // The lift is a nudge (mix budget guarded by tests/audio-levels.spec.ts).
+      expect(TENSION_BUS_LIFT_DB).toBeLessThanOrEqual(2);
+      expect(getTensionParams(5)).toEqual(full);
+    });
+
+    it("brings the pedal in late: quieter than linear early on", () => {
+      const full = getTensionParams(1).pedalLevel;
+      expect(getTensionParams(0.3).pedalLevel).toBeLessThan(full * 0.3);
+    });
+
+    it("forces the bass pulse in when tense, never lowers the streak's layers", () => {
+      expect(getEffectiveIntensity(0, 0)).toBe(0);
+      expect(getEffectiveIntensity(0, 0.1)).toBe(1);
+      expect(getEffectiveIntensity(0, 1)).toBe(1);
+      expect(getEffectiveIntensity(1, 0.5)).toBe(1);
+      expect(getEffectiveIntensity(2, 0.5)).toBe(2);
+      expect(getEffectiveIntensity(2, 0)).toBe(2);
+    });
+
+    it("eases out more slowly than it tightens, and tightens within a displayed second", () => {
+      expect(TENSION_ATTACK_SECONDS).toBeLessThanOrEqual(1);
+      expect(TENSION_RELEASE_SECONDS).toBeGreaterThan(TENSION_ATTACK_SECONDS);
     });
   });
 });

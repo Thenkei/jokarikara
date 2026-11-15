@@ -12,6 +12,9 @@ import type { StackQuality } from "../types";
  *   timing cue ≈ -31 / PERFECT tick ≈ -28: well under any stack, ≥ 3 dB above
  *   the music bed so the bed never masks it
  *   music bed ≈ 10 dB under a plain stack, so it never masks feedback
+ *   (Time Attack tension, last 10 s: ≈ -34.7 at full tension vs ≈ -34.5
+ *   calm: it recolours the bed (filter, pedal, eighth-note tremolo, forced
+ *   pulse) without raising it; the cue keeps its ≥ 3 dB, measured ≈ 3.6)
  *   secret chime (start screen) ≈ -21: above menu clicks, under a level up
  *   personal best ("record") ≈ -16: above a PERFECT stack, ≈ combo, ≤ world up
  *   worst simultaneous burst: peak ≤ -1 dBFS (measured ≈ -4.5, no clipping)

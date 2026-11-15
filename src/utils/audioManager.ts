@@ -10,6 +10,7 @@ import {
   MUSIC_VOLUME,
   MUTE_FADE_SECONDS,
   PAUSE_FADE_SECONDS,
+  sanitizeTension,
   STOP_FADE_SECONDS,
 } from "../audio/soundtrack";
 import type { StackQuality } from "../types";
@@ -151,7 +152,9 @@ class AudioManager implements IAudioService {
     paused: boolean;
     world: number;
     intensity: MusicIntensity;
-  } = { active: false, paused: false, world: 1, intensity: 0 };
+    /** Time Attack clock tension (0..1); survives pause/mute rebuilds. */
+    tension: number;
+  } = { active: false, paused: false, world: 1, intensity: 0, tension: 0 };
 
   init(): void {
     if (this.ctx) return;
@@ -374,7 +377,7 @@ class AudioManager implements IAudioService {
   // --- Soundtrack -------------------------------------------------------
 
   startMusic(world: number): void {
-    this.musicIntent = { active: true, paused: false, world, intensity: 0 };
+    this.musicIntent = { active: true, paused: false, world, intensity: 0, tension: 0 };
     this.reconcileMusic(STOP_FADE_SECONDS);
   }
 
@@ -382,6 +385,18 @@ class AudioManager implements IAudioService {
     if (this.musicIntent.intensity === level) return;
     this.musicIntent.intensity = level;
     this.music?.setIntensity(level);
+  }
+
+  /**
+   * Intent only, like the intensity: never wakes the context or rebuilds the
+   * graph, so a tense clock cannot keep audio alive while the music is
+   * paused, muted or off; a later rebuild (resume, unmute) picks it up.
+   */
+  setMusicTension(tension: number): void {
+    const value = sanitizeTension(tension);
+    if (this.musicIntent.tension === value) return;
+    this.musicIntent.tension = value;
+    this.music?.setTension(value);
   }
 
   setMusicWorld(world: number): void {
@@ -401,7 +416,7 @@ class AudioManager implements IAudioService {
   }
 
   stopMusic(): void {
-    this.musicIntent = { ...this.musicIntent, active: false, paused: false };
+    this.musicIntent = { ...this.musicIntent, active: false, paused: false, tension: 0 };
     this.reconcileMusic(STOP_FADE_SECONDS);
   }
 
@@ -415,7 +430,7 @@ class AudioManager implements IAudioService {
   }
 
   getMusicState(): MusicState {
-    const { active, paused, intensity, world } = this.musicIntent;
+    const { active, paused, intensity, world, tension } = this.musicIntent;
     return {
       active,
       paused,
@@ -423,6 +438,7 @@ class AudioManager implements IAudioService {
       playing: this.music?.isRunning() ?? false,
       intensity,
       world,
+      tension,
     };
   }
 
@@ -432,7 +448,7 @@ class AudioManager implements IAudioService {
    * oscillators, no scheduler timer. Audio failures never reach gameplay.
    */
   private reconcileMusic(fadeSeconds: number): void {
-    const { active, paused, world, intensity } = this.musicIntent;
+    const { active, paused, world, intensity, tension } = this.musicIntent;
     const shouldPlay = active && !paused && !this.muted && this.musicEnabled;
     try {
       if (!shouldPlay) {
@@ -451,7 +467,7 @@ class AudioManager implements IAudioService {
       if (!this.ctx || !this.musicGain) return;
       this.wake(this.ctx);
       this.music ??= new MusicEngine(this.ctx, this.musicGain);
-      this.music.start(world, intensity);
+      this.music.start(world, intensity, tension);
     } catch (error) {
       console.warn("Music unavailable", error);
       try {
