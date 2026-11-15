@@ -6,6 +6,7 @@
  * containment code. All functions are pure (they return a new EffectsState).
  */
 import type { StackQuality } from "../types";
+import { isE2eMode } from "../utils/e2e";
 
 export const MAX_PARTICLES = 48;
 export const MAX_RINGS = 6;
@@ -19,7 +20,7 @@ export const WORLD_FLASH_DURATION = 0.45;
 export const PUNCH_DURATION = 0.2;
 export const PUNCH_SCALE = 0.04;
 /** Delay before onGameOver so the fail feedback is visible; 0 under E2E. */
-const E2E = typeof import.meta !== "undefined" && import.meta.env?.VITE_E2E === "true";
+const E2E = isE2eMode();
 export const GAME_OVER_DELAY_MS = E2E ? 0 : 400;
 /**
  * Time Attack timeout: longer than a fail's beat so the "TIME!" banner and

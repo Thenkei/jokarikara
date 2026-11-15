@@ -111,9 +111,8 @@ import {
 } from "./i18n";
 import { I18nContext } from "./i18n/context";
 import "./App.css";
+import { isE2eMode } from "./utils/e2e";
 
-const isE2eMode = (): boolean =>
-  typeof import.meta !== "undefined" && import.meta.env?.VITE_E2E === "true";
 
 const createRunSeed = (): number => {
   if (isE2eMode()) {
