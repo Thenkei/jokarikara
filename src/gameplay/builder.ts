@@ -65,16 +65,6 @@ export class WorldBuilder {
     return this;
   }
 
-  name(name: string): this {
-    this.config.name = name;
-    return this;
-  }
-
-  tagline(text: string): this {
-    this.config.tagline = text;
-    return this;
-  }
-
   visualProfile(profile: Partial<WorldVisualProfile>): this {
     this.config.visualProfile = {
       ...(this.config.visualProfile ?? {}),

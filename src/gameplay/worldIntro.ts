@@ -1,4 +1,4 @@
-import { WORLD_HOW_TO } from "./atlas";
+import { getWorldCount } from "./selectors";
 
 /**
  * World intro: the overlay shown when a run enters a new world.
@@ -38,23 +38,21 @@ export const FIRST_VISIT_GRACE_MS = 600;
 export const FIRST_TAUGHT_WORLD = 2;
 
 /**
- * How-to line to teach on entering `world`, or null for the short overlay.
+ * Whether entering `world` teaches it (how-to line + hold) rather than
+ * showing the short overlay. The line itself is `getWorldHowTo` (worldText).
  *
  * `taughtThrough` is the highest world the player has already met: their
  * lifetime best world when the run started, raised by every world taught
  * during the run (so a Zen undo that steps back and forth never re-teaches).
  * A practice run starts at a reached world, so it only teaches beyond it.
  * Worlds past the last configured one (the game loops on its rules) have no
- * line of their own and are never taught.
+ * lesson of their own and are never taught.
  */
-export const getFirstVisitHowTo = (
-  world: number,
-  taughtThrough: number,
-): string | null => {
-  if (!Number.isInteger(world) || world < FIRST_TAUGHT_WORLD) return null;
-  if (world <= taughtThrough) return null;
-  return WORLD_HOW_TO[world] ?? null;
-};
+export const shouldTeachWorld = (world: number, taughtThrough: number): boolean =>
+  Number.isInteger(world) &&
+  world >= FIRST_TAUGHT_WORLD &&
+  world > taughtThrough &&
+  world <= getWorldCount();
 
 export type WorldIntroHold =
   | { readonly phase: "idle" }

@@ -5,6 +5,9 @@ import { ACHIEVEMENT_IDS } from "../progression/achievements";
 import { selectStreakLabel } from "../modes/dailyStreak";
 import { getMedalResult, MEDAL_THRESHOLDS } from "../modes/medals";
 import { getEndInsight } from "../modes/runInsights";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const RUN: GameOverRun = {
   mode: "CLASSIC",
@@ -22,7 +25,6 @@ const renderScreen = (overrides: Partial<Parameters<typeof GameOverScreen>[0]> =
     <GameOverScreen
       run={RUN}
       mode="CLASSIC"
-      modeLabel="CLASSIC"
       score={3300}
       world={5}
       level={3}
@@ -51,13 +53,12 @@ describe("GameOverScreen", () => {
   it("heads a Time Attack run that used its clock TIME!, not GAME OVER", () => {
     renderScreen({
       mode: "TIME_ATTACK",
-      modeLabel: "TIME ATTACK",
       run: {
         ...RUN,
         mode: "TIME_ATTACK",
         stats: { ...RUN.stats, endReason: "timeout", endMargin: null },
       },
-      endInsight: getEndInsight("timeout", 2),
+      endInsight: getEndInsight(EN, "timeout", 2),
     });
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("TIME!");
     // The rest of the card is unchanged.
@@ -122,13 +123,12 @@ describe("GameOverScreen", () => {
   it("shows a finished Zen session calmly: no danger styling, no margin", () => {
     const { container } = renderScreen({
       mode: "ZEN",
-      modeLabel: "ZEN",
       run: {
         ...RUN,
         mode: "ZEN",
         stats: { ...RUN.stats, endReason: "finished", endMargin: null },
       },
-      endInsight: getEndInsight("finished", 5, null, [140, 140, 90]),
+      endInsight: getEndInsight(EN, "finished", 5, null, [140, 140, 90]),
     });
     const card = container.querySelector(".end-insight");
     expect(card?.classList.contains("danger-signal")).toBe(false);
@@ -204,7 +204,7 @@ describe("GameOverScreen", () => {
   it("shows the streak and the countdown to the next Daily on the TODAY card", () => {
     const { container } = renderScreen({
       run: { ...RUN, daily: { dateKey: "2026-11-14", best: 3300, attempts: 1 } },
-      dailyStreak: selectStreakLabel(4, true),
+      dailyStreak: selectStreakLabel(EN, 4, true),
       nextDaily: {
         kind: "countdown",
         countdown: { text: "7h 12m", spoken: "7 hours 12 minutes" },
@@ -239,7 +239,7 @@ describe("GameOverScreen", () => {
   it("shows no Daily extras for a regular run", () => {
     const { container } = renderScreen({
       nextDaily: { kind: "ready" },
-      dailyStreak: selectStreakLabel(4, true),
+      dailyStreak: selectStreakLabel(EN, 4, true),
     });
     expect(container.querySelector(".daily-next")).toBeNull();
     expect(container.querySelector(".streak-chip")).toBeNull();
@@ -251,7 +251,6 @@ describe("GameOverScreen", () => {
       renderScreen({
         run: TA_RUN,
         mode: "TIME_ATTACK",
-        modeLabel: "TIME",
         score,
         medal: getMedalResult(score),
       });

@@ -17,10 +17,12 @@ vi.mock("./utils/audioManager", () => {
 
 import App from "./App";
 import { LEVELS_PER_WORLD, STACKS_PER_LEVEL } from "./constants/game";
-import { WORLD_HOW_TO } from "./gameplay/atlas";
+import { getWorldHowTo } from "./gameplay/worldText";
+import { getTranslator } from "./i18n";
 import { FIRST_VISIT_GRACE_MS, WORLD_INTRO_MS } from "./gameplay/worldIntro";
 
 const ACHIEVEMENTS_KEY = "shape-stack-achievements-v1";
+const HOW_TO_2 = getWorldHowTo(getTranslator("en"), 2);
 const overlay = () => screen.queryByTestId("world-up");
 const howTo = () => screen.queryByTestId("world-up-howto");
 const flushAnnouncements = () => act(async () => {});
@@ -52,12 +54,12 @@ describe("first-visit world intro (App)", () => {
 
   it("teaches a never-reached world, announces it, and Space dismisses it", async () => {
     const { container } = startAndReachWorld2();
-    expect(howTo()?.textContent).toBe(WORLD_HOW_TO[2]);
+    expect(howTo()?.textContent).toBe(HOW_TO_2);
     expect(screen.getByText("TAP TO PLAY")).toBeTruthy();
     await flushAnnouncements();
     expect(liveRegion(container)).toContain("World 2. Breathing.");
     expect(liveRegion(container)).toContain(
-      `${WORLD_HOW_TO[2]} Tap or press Space to play.`,
+      `${HOW_TO_2} Tap or press Space to play.`,
     );
     expect(liveRegion(container)).not.toContain("..");
 

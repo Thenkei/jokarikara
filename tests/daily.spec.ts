@@ -82,7 +82,8 @@ test.describe("Daily Challenge", () => {
     await page.click(".share-btn");
     await expect(page.locator(".share-status")).toHaveText("Copied to clipboard");
     const copied = await page.evaluate(() => navigator.clipboard.readText());
-    expect(copied).toMatch(/^Shape Stack Daily \d{4}-\d{2}-\d{2}\n140 pts · 1 stacks/);
+    // One stack, singular (plural forms come from the catalog).
+    expect(copied).toMatch(/^Shape Stack Daily \d{4}-\d{2}-\d{2}\n140 pts · 1 stack · /);
     expect(copied).toContain("🟨");
   });
 });

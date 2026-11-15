@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { makeBridge, seedBestWorld, waitForBridge } from "./bridgeHelpers";
-import { WORLD_HOW_TO } from "../src/gameplay/atlas";
+import { en } from "../src/i18n/en";
 import { FIRST_VISIT_GRACE_MS } from "../src/gameplay/worldIntro";
 
 /**
@@ -51,10 +51,10 @@ test.describe("First-visit world intro", () => {
     const held = await reachWorld(page, 2);
     expect(held.world).toBe(2);
     await expect(page.locator(".world-up-name")).toHaveText("Breathing");
-    await expect(page.getByTestId("world-up-howto")).toHaveText(WORLD_HOW_TO[2]);
+    await expect(page.getByTestId("world-up-howto")).toHaveText(en["world.2.howTo"]);
     await expect(page.locator(".world-up-continue")).toHaveText("TAP TO PLAY");
     await expect(page.locator(".sr-only[aria-live='polite']")).toContainText(
-      WORLD_HOW_TO[2],
+      en["world.2.howTo"],
     );
 
     // The real loop keeps rendering, but the shape does not grow.
@@ -106,7 +106,7 @@ test.describe("First-visit world intro", () => {
     // World 3 has the longest how-to line.
     await reachWorld(page, 3);
     const panel = page.getByTestId("world-up");
-    await expect(page.getByTestId("world-up-howto")).toHaveText(WORLD_HOW_TO[3]);
+    await expect(page.getByTestId("world-up-howto")).toHaveText(en["world.3.howTo"]);
     const box = await panel.boundingBox();
     const pause = await page.locator(".pause-btn").boundingBox();
     if (!box || !pause) throw new Error("missing layout box");

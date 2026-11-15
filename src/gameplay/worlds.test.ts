@@ -9,6 +9,8 @@ import {
   updateActiveShape,
 } from "../core/gameState";
 import { getGameplayConfig, getWorldConfig } from "./selectors";
+import { WORLD_TEXT_COUNT, getWorldName, getWorldTagline } from "./worldText";
+import { getTranslator } from "../i18n";
 import {
   getReverseZoom,
   REVERSE_SEED_RATIO,
@@ -39,9 +41,13 @@ const stackTo = (stacks: number, mode: GameMode = "CLASSIC"): GameState => {
 
 describe("world taglines", () => {
   it("every configured world explains its rule on entry", () => {
-    for (const config of Object.values(getGameplayConfig().worlds)) {
-      expect(config.name).toBeTruthy();
-      expect(config.tagline?.length ?? 0).toBeGreaterThan(10);
+    const en = getTranslator("en");
+    const worlds = Object.keys(getGameplayConfig().worlds).map(Number);
+    // Each configured world has its own catalog text (worldText.ts).
+    expect(worlds).toHaveLength(WORLD_TEXT_COUNT);
+    for (const world of worlds) {
+      expect(getWorldName(en, world)).toBeTruthy();
+      expect(getWorldTagline(en, world).length).toBeGreaterThan(10);
     }
   });
 });

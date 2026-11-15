@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type RefObject } from "react";
+import { useI18n } from "../i18n/context";
 
 export type SettingId = "fx" | "sound" | "music" | "haptics" | "timingCue";
 
@@ -74,6 +75,7 @@ export function SettingsSheet({
   onClose,
   returnFocusRef,
 }: SettingsSheetProps) {
+  const { t } = useI18n();
   const idPrefix = useId();
   const headingId = `${idPrefix}-heading`;
   const panelRef = useRef<HTMLElement>(null);
@@ -126,32 +128,32 @@ export function SettingsSheet({
   const rows: SettingRow[] = [
     {
       id: "fx",
-      title: "Visual effects",
-      description: "Particles, flashes and screen shake.",
+      title: t("settings.fx.title"),
+      description: t("settings.fx.description"),
     },
     {
       id: "sound",
-      title: "Sound",
-      description: "Every game and menu sound.",
+      title: t("settings.sound.title"),
+      description: t("settings.sound.description"),
       uiSound: "none",
     },
     {
       id: "music",
-      title: "Music",
-      description: "Soundtrack that builds as you climb.",
+      title: t("settings.music.title"),
+      description: t("settings.music.description"),
     },
     {
       id: "haptics",
-      title: "Haptics",
+      title: t("settings.haptics.title"),
       description: hapticsSupported
-        ? "Vibrate on stacks, misses and combos."
-        : "Not available on this device.",
+        ? t("settings.haptics.description")
+        : t("settings.haptics.unsupported"),
       disabled: !hapticsSupported,
     },
     {
       id: "timingCue",
-      title: "Timing cue",
-      description: "Ticks that speed up toward PERFECT.",
+      title: t("settings.timingCue.title"),
+      description: t("settings.timingCue.description"),
       uiSound: "none",
     },
   ];
@@ -168,7 +170,7 @@ export function SettingsSheet({
         aria-labelledby={headingId}
       >
         <h2 id={headingId} className="settings-heading">
-          SETTINGS
+          {t("settings.title")}
         </h2>
         <ul className="settings-list">
           {rows.map((row) => {
@@ -206,7 +208,7 @@ export function SettingsSheet({
           })}
         </ul>
         <button className="settings-done-btn" data-ui-sound="back" onClick={onClose}>
-          DONE
+          {t("settings.done")}
         </button>
       </section>
     </div>

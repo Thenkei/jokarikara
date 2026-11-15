@@ -1,16 +1,19 @@
 import { useState } from "react";
+import { useI18n } from "../i18n/context";
+import { Rich } from "../i18n/Rich";
 import type { GameMode, RunStats } from "../types";
 import type { HighScore } from "../utils/storage";
 import type { EndInsight, QualityBreakdown } from "../modes/runInsights";
 import { QUALITY_ORDER } from "../modes/runInsights";
 import { formatDailyLabel } from "../modes/daily";
 import { LEVELS_PER_WORLD } from "../constants/game";
-import { getAchievement, type AchievementId } from "../progression/achievements";
+import { getAchievementTitle, type AchievementId } from "../progression/achievements";
 import type { DailyCountdown, DailyStreakLabel } from "../modes/dailyStreak";
 import { StreakChip } from "./StreakChip";
 import { MedalGlyph } from "./MedalGlyph";
-import { MEDAL_LABELS, type MedalResult } from "../modes/medals";
+import { getMedalName, getMedalTitle, type MedalResult } from "../modes/medals";
 import { getGameOverHeadline } from "../modes/endFeedback";
+import { formatScoreDate } from "../modes/scoreDate";
 
 export type ShareStatus = "idle" | "copied" | "shared" | "failed";
 
@@ -44,8 +47,6 @@ export interface GameOverRun {
 interface GameOverScreenProps {
   run: GameOverRun | null;
   mode: GameMode;
-  /** Short mode label for the leaderboard heading ("CLASSIC", "TIME"...). */
-  modeLabel: string;
   score: number;
   world: number;
   level: number;
@@ -74,14 +75,15 @@ const VISIBLE_UNLOCKS = 4;
 const levelsReached = (world: number, level: number): number =>
   (world - 1) * LEVELS_PER_WORLD + level;
 
-const SHARE_STATUS_TEXT: Record<ShareStatus, string> = {
-  idle: "",
-  copied: "Copied to clipboard",
-  shared: "Shared!",
-  failed: "Sharing unavailable",
-};
+const SHARE_STATUS_KEYS = {
+  copied: "share.copied",
+  shared: "share.shared",
+  failed: "share.failed",
+} as const;
 
 function RunAchievements({ ids }: { ids: readonly AchievementId[] }) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const [expanded, setExpanded] = useState(false);
   const collapsible = ids.length > VISIBLE_UNLOCKS + 1;
   const shown = collapsible && !expanded ? ids.slice(0, VISIBLE_UNLOCKS) : ids;
@@ -90,11 +92,12 @@ function RunAchievements({ ids }: { ids: readonly AchievementId[] }) {
   return (
     <section className="run-achievements gameover-card" aria-labelledby="run-achievements-heading">
       <h3 id="run-achievements-heading">
-        UNLOCKED THIS RUN <span className="run-achievements-count">{ids.length}</span>
+        {t("gameOver.unlocked")}{" "}
+        <span className="run-achievements-count">{ids.length}</span>
       </h3>
       <ul id="run-achievements-list">
         {shown.map((id) => (
-          <li key={id}>{getAchievement(id).title}</li>
+          <li key={id}>{getAchievementTitle(i18n, id)}</li>
         ))}
         {collapsible && (
           <li className="run-achievements-more">
@@ -105,7 +108,9 @@ function RunAchievements({ ids }: { ids: readonly AchievementId[] }) {
               aria-controls="run-achievements-list"
               onClick={() => setExpanded((value) => !value)}
             >
-              {expanded ? "SHOW LESS" : `+${hiddenCount} MORE`}
+              {expanded
+                ? t("gameOver.showLess")
+                : t("gameOver.showMore", { count: hiddenCount })}
             </button>
           </li>
         )}
@@ -116,6 +121,8 @@ function RunAchievements({ ids }: { ids: readonly AchievementId[] }) {
 
 /** Medal under the score: earned metal (or an empty slot) and what is next. */
 function MedalSummary({ result }: { result: MedalResult }) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const { earned, next } = result;
   return (
     <div
@@ -125,15 +132,18 @@ function MedalSummary({ result }: { result: MedalResult }) {
       <MedalGlyph medal={earned} />
       <p className="gameover-medal-text">
         <span className="gameover-medal-title">
-          {earned ? `${MEDAL_LABELS[earned].toUpperCase()} MEDAL` : "NO MEDAL"}
+          {earned ? i18n.upper(getMedalTitle(i18n, earned)) : t("medal.none")}
         </span>
         {next && (
           <span className="gameover-medal-next">
             <span className="visually-hidden">. </span>
-            {MEDAL_LABELS[next.medal]} at {next.threshold}
+            {t("medal.nextAt", {
+              medal: getMedalName(i18n, next.medal),
+              threshold: next.threshold,
+            })}
             <span aria-hidden="true"> · </span>
             <span className="visually-hidden">, </span>
-            {next.toGo} to go
+            {t("medal.toGo", { points: next.toGo })}
           </span>
         )}
       </p>
@@ -149,7 +159,6 @@ function MedalSummary({ result }: { result: MedalResult }) {
 export function GameOverScreen({
   run,
   mode,
-  modeLabel,
   score,
   world,
   level,
@@ -165,43 +174,50 @@ export function GameOverScreen({
   onRetry,
   onMenu,
 }: GameOverScreenProps) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const breakdownTotal = QUALITY_ORDER.reduce((sum, q) => sum + breakdown[q], 0);
 
   return (
     <div className="screen gameover-screen">
       {/* Focusable: on a phone the cards scroll, and keyboard users need a
           stop to scroll them (there is no control inside to land on). */}
-      <div className="gameover-body" tabIndex={0} role="region" aria-label="Run summary">
+      <div
+        className="gameover-body"
+        tabIndex={0}
+        role="region"
+        aria-label={t("gameOver.summary")}
+      >
         <header className="gameover-hero">
           <h1 className="title gameover-title">
-            {getGameOverHeadline(run?.stats.endReason)}
+            {getGameOverHeadline(i18n, run?.stats.endReason)}
           </h1>
           {run?.practiceWorld && (
             <p className="practice-result-label">
-              PRACTICE · FROM WORLD {run.practiceWorld}
+              {t("gameOver.practiceFrom", { world: run.practiceWorld })}
             </p>
           )}
           {run?.daily && (
             <p className="daily-result-label">
-              DAILY · {formatDailyLabel(run.daily.dateKey)}
+              {t("gameOver.daily", { date: formatDailyLabel(i18n, run.daily.dateKey) })}
             </p>
           )}
           <p className="score-display">
-            <span className="visually-hidden">Score: </span>
+            <span className="visually-hidden">{t("gameOver.scoreLabel")}</span>
             {score}
           </p>
           <div className="gameover-meta">
             <p className="final-level">
-              WORLD {world}
+              {t("gameOver.world", { world })}
               <span className="gameover-meta-sep" aria-hidden="true">
                 {" · "}
               </span>
               <span className="visually-hidden">, </span>
-              LEVEL {level}
+              {t("gameOver.level", { level })}
             </p>
             {run?.isNewBest && (
               <span className="new-best-badge" role="status">
-                NEW BEST
+                {t("gameOver.newBest")}
               </span>
             )}
           </div>
@@ -210,24 +226,24 @@ export function GameOverScreen({
 
         <div className="gameover-cards">
           <div className="gameover-col">
-            <section className="gameover-card gameover-run" aria-label="Run stats">
+            <section className="gameover-card gameover-run" aria-label={t("gameOver.runStats")}>
               <dl className="run-stats">
                 <div>
-                  <dt>STACKS</dt>
+                  <dt>{t("gameOver.stacks")}</dt>
                   <dd className="stat-stacks">{stackCount}</dd>
                 </div>
                 <div>
-                  <dt>PERFECT</dt>
+                  <dt>{t("gameOver.perfect")}</dt>
                   <dd className="stat-perfect">{run?.stats.perfectCount ?? 0}</dd>
                 </div>
                 {mode !== "ZEN" && (
                   <div>
-                    <dt>BEST COMBO</dt>
+                    <dt>{t("gameOver.bestCombo")}</dt>
                     <dd className="stat-combo">x{run?.stats.bestStreak ?? 0}</dd>
                   </div>
                 )}
-                <div title="Levels reached across all worlds">
-                  <dt>LEVELS</dt>
+                <div title={t("gameOver.levelsHint")}>
+                  <dt>{t("gameOver.levels")}</dt>
                   <dd className="stat-levels">{levelsReached(world, level)}</dd>
                 </div>
               </dl>
@@ -236,7 +252,7 @@ export function GameOverScreen({
                 <div
                   className="quality-breakdown"
                   role="group"
-                  aria-label="Stack quality breakdown"
+                  aria-label={t("gameOver.breakdown")}
                 >
                   <div className="quality-breakdown-bar" aria-hidden="true">
                     {QUALITY_ORDER.map((q) =>
@@ -252,7 +268,7 @@ export function GameOverScreen({
                   <ul className="quality-breakdown-legend">
                     {QUALITY_ORDER.map((q) => (
                       <li key={q} className={`quality-legend--${q.toLowerCase()}`}>
-                        {q} <strong>{breakdown[q]}</strong>
+                        {t(`quality.${q}`)} <strong>{breakdown[q]}</strong>
                       </li>
                     ))}
                   </ul>
@@ -284,15 +300,20 @@ export function GameOverScreen({
             )}
             {run?.practiceWorld ? (
               <div className="leaderboard gameover-card practice-summary">
-                <h3>PRACTICE RUN</h3>
-                <p>Practice runs don't count toward scores or achievements.</p>
+                <h3>{t("gameOver.practiceTitle")}</h3>
+                <p>{t("gameOver.practiceBody")}</p>
               </div>
             ) : run?.daily ? (
               <div className="leaderboard gameover-card daily-summary">
-                <h3>TODAY</h3>
+                <h3>{t("gameOver.today")}</h3>
                 <p className="daily-summary-line">
-                  BEST <strong>{run.daily.best}</strong> · {run.daily.attempts}{" "}
-                  {run.daily.attempts === 1 ? "TRY" : "TRIES"}
+                  <Rich
+                    template={i18n.template("gameOver.dailyLine")}
+                    slots={{
+                      best: <strong>{run.daily.best}</strong>,
+                      tries: t("daily.tries", { count: run.daily.attempts }),
+                    }}
+                  />
                 </p>
                 {dailyStreak && (
                   <p className="daily-summary-streak">
@@ -303,22 +324,25 @@ export function GameOverScreen({
                 {nextDaily?.kind === "countdown" && (
                   <p className="daily-next">
                     <span aria-hidden="true">
-                      NEXT CHALLENGE IN <strong>{nextDaily.countdown.text}</strong>
+                      <Rich
+                        template={i18n.template("daily.nextIn")}
+                        slots={{ time: <strong>{nextDaily.countdown.text}</strong> }}
+                      />
                     </span>
                     <span className="visually-hidden">
-                      Next challenge in {nextDaily.countdown.spoken}.
+                      {t("daily.nextInSpoken", { time: nextDaily.countdown.spoken })}
                     </span>
                   </p>
                 )}
                 {nextDaily?.kind === "ready" && (
-                  <p className="daily-next daily-next--ready">NEXT CHALLENGE IS READY</p>
+                  <p className="daily-next daily-next--ready">{t("daily.nextReady")}</p>
                 )}
               </div>
             ) : (
               <div className="leaderboard gameover-card">
-                <h3>TOP SCORES - {modeLabel}</h3>
+                <h3>{t("gameOver.topScores", { mode: t(`mode.${mode}.label`) })}</h3>
                 {topScores.length === 0 ? (
-                  <p>No high scores yet!</p>
+                  <p>{t("gameOver.noScores")}</p>
                 ) : (
                   <ul>
                     {topScores.map((hs, idx) => (
@@ -328,7 +352,7 @@ export function GameOverScreen({
                       >
                         <span>#{idx + 1}</span>
                         <span>{hs.score}</span>
-                        <span>{hs.date}</span>
+                        <span>{formatScoreDate(i18n, hs.date)}</span>
                       </li>
                     ))}
                   </ul>
@@ -342,20 +366,20 @@ export function GameOverScreen({
       <div className="gameover-actions">
         {run && (
           <p className="share-status" role="status">
-            {SHARE_STATUS_TEXT[shareStatus]}
+            {shareStatus === "idle" ? "" : t(SHARE_STATUS_KEYS[shareStatus])}
           </p>
         )}
         <button className="retry-btn" data-ui-sound="confirm" onClick={onRetry}>
-          RETRY
+          {t("gameOver.retry")}
         </button>
         <div className="gameover-actions-secondary">
           {run && (
             <button className="share-btn" data-ui-sound="confirm" onClick={onShare}>
-              SHARE RESULT
+              {t("gameOver.share")}
             </button>
           )}
           <button className="menu-btn" data-ui-sound="back" onClick={onMenu}>
-            MAIN MENU
+            {t("gameOver.mainMenu")}
           </button>
         </div>
       </div>

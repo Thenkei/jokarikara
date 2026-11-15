@@ -1,10 +1,12 @@
+import type { Translator } from "../i18n";
 import { currentDailyStreak } from "../progression/stats";
 import { formatDailyLabel, getLocalDateKey } from "./daily";
 
 /**
  * Daily Challenge habit loop: streak label and the countdown to the next
- * challenge. Pure helpers only (no React, no storage, no clock): "now" is
- * always injected, so DST transitions and midnight roll-overs are testable.
+ * challenge. Pure helpers only (no React, no storage, no clock): "now" and
+ * the translator are always injected, so DST transitions, midnight roll-overs
+ * and every language are testable.
  */
 
 /** The countdown is shown in whole minutes, so it never needs a faster tick. */
@@ -46,30 +48,31 @@ const wholeMinutes = (ms: number): number =>
   Number.isFinite(ms) && ms > 0 ? Math.floor(ms / MINUTE_MS) : 0;
 
 /** Compact countdown: "7h 12m", "45m", "<1m" (floored, never overstates). */
-export const formatCountdown = (ms: number): string => {
+export const formatCountdown = ({ t }: Translator, ms: number): string => {
   const minutes = wholeMinutes(ms);
-  if (minutes < 1) return "<1m";
+  if (minutes < 1) return t("countdown.lessThanMinute");
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return hours > 0 ? `${hours}h ${rest}m` : `${rest}m`;
+  return hours > 0
+    ? t("countdown.hoursMinutes", { hours, minutes: rest })
+    : t("countdown.minutes", { minutes: rest });
 };
-
-const plural = (count: number, unit: string): string =>
-  `${count} ${unit}${count === 1 ? "" : "s"}`;
 
 /**
  * Screen-reader wording of `formatCountdown` ("7h" is read inconsistently):
  * "7 hours 12 minutes", "1 hour", "45 minutes", "less than a minute".
  */
-export const formatCountdownSpoken = (ms: number): string => {
+export const formatCountdownSpoken = ({ t }: Translator, ms: number): string => {
   const minutes = wholeMinutes(ms);
-  if (minutes < 1) return "less than a minute";
+  if (minutes < 1) return t("countdown.spoken.lessThanMinute");
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  if (hours === 0) return plural(rest, "minute");
+  const minutesText = t("countdown.spoken.minutes", { count: rest });
+  if (hours === 0) return minutesText;
+  const hoursText = t("countdown.spoken.hours", { count: hours });
   return rest === 0
-    ? plural(hours, "hour")
-    : `${plural(hours, "hour")} ${plural(rest, "minute")}`;
+    ? hoursText
+    : t("countdown.spoken.hoursMinutes", { hours: hoursText, minutes: minutesText });
 };
 
 export interface DailyCountdown {
@@ -79,9 +82,9 @@ export interface DailyCountdown {
   readonly spoken: string;
 }
 
-export const describeNextDaily = (now: Date): DailyCountdown => {
+export const describeNextDaily = (i18n: Translator, now: Date): DailyCountdown => {
   const ms = msUntilNextDaily(now);
-  return { text: formatCountdown(ms), spoken: formatCountdownSpoken(ms) };
+  return { text: formatCountdown(i18n, ms), spoken: formatCountdownSpoken(i18n, ms) };
 };
 
 export type StreakState = "kept" | "at-risk";
@@ -102,6 +105,7 @@ export interface DailyStreakLabel {
  * streak still counts yesterday (see `currentDailyStreak`) but is at risk.
  */
 export const selectStreakLabel = (
+  { t }: Translator,
   streak: number,
   playedToday: boolean,
 ): DailyStreakLabel | null => {
@@ -110,23 +114,25 @@ export const selectStreakLabel = (
     ? {
         state: "kept",
         days: streak,
-        text: `${streak}-DAY STREAK`,
-        spoken: `${streak}-day streak.`,
+        text: t("daily.streak.kept", { days: streak }),
+        spoken: t("daily.streak.keptSpoken", { days: streak }),
       }
     : {
         state: "at-risk",
         days: streak,
-        text: `KEEP YOUR ${streak}-DAY STREAK`,
-        spoken: `${streak}-day streak, play today to keep it.`,
+        text: t("daily.streak.atRisk", { days: streak }),
+        spoken: t("daily.streak.atRiskSpoken", { days: streak }),
       };
 };
 
 /** Streak label from the lifetime Daily history, as of `now`. */
 export const getDailyStreakLabel = (
+  i18n: Translator,
   dailyDates: readonly string[],
   now: Date,
 ): DailyStreakLabel | null =>
   selectStreakLabel(
+    i18n,
     currentDailyStreak(dailyDates, now),
     dailyDates.includes(getLocalDateKey(now)),
   );
@@ -146,33 +152,41 @@ export interface DailyButtonView {
   readonly ariaLabel: string;
 }
 
-const tries = (attempts: number): string => (attempts === 1 ? "TRY" : "TRIES");
-
 /** Everything the start screen's Daily button shows, for one instant. */
 export const describeDailyButton = ({
+  i18n,
   now,
   record,
   dailyDates,
 }: {
+  i18n: Translator;
   now: Date;
   record: DailyDayRecord;
   dailyDates: readonly string[];
 }): DailyButtonView => {
-  const dateLabel = formatDailyLabel(getLocalDateKey(now));
+  const { t } = i18n;
+  const dateLabel = formatDailyLabel(i18n, getLocalDateKey(now));
   const played = record.attempts > 0;
-  const streak = getDailyStreakLabel(dailyDates, now);
-  const next = played ? describeNextDaily(now) : null;
+  const streak = getDailyStreakLabel(i18n, dailyDates, now);
+  const next = played ? describeNextDaily(i18n, now) : null;
   const meta = played
-    ? `${dateLabel} · BEST ${record.best} · ${record.attempts} ${tries(record.attempts)}`
-    : `${dateLabel} · NOT PLAYED`;
+    ? t("daily.metaPlayed", {
+        date: dateLabel,
+        best: record.best,
+        tries: t("daily.tries", { count: record.attempts }),
+      })
+    : t("daily.metaNotPlayed", { date: dateLabel });
   const ariaLabel = [
-    `Daily challenge for ${dateLabel}.`,
-    "Same shapes for everyone today.",
+    t("daily.aria.title", { date: dateLabel }),
+    t("daily.aria.same"),
     played
-      ? `Best ${record.best}, ${record.attempts} ${tries(record.attempts).toLowerCase()}.`
-      : "Not played yet.",
+      ? t("daily.aria.played", {
+          best: record.best,
+          tries: t("daily.triesSpoken", { count: record.attempts }),
+        })
+      : t("daily.aria.notPlayed"),
     streak?.spoken,
-    next ? `Next challenge in ${next.spoken}.` : undefined,
+    next ? t("daily.nextInSpoken", { time: next.spoken }) : undefined,
   ]
     .filter(Boolean)
     .join(" ");

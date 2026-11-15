@@ -1,5 +1,12 @@
 import { DEFAULT_MECHANICS, GameplayBuilder } from "./builder";
 
+/**
+ * Per-world rules. A world's name, tagline and how-to line are player-facing
+ * text: they live in the i18n catalogs (`world.<n>.*` in src/i18n/en.ts,
+ * read through gameplay/worldText.ts), so keep them in sync when a world's
+ * mechanic changes.
+ */
+
 export const gameplayConfig = new GameplayBuilder()
   .progression({ stacksPerLevel: 3, levelsPerWorld: 5 })
   .growth({ minSpeed: 35, maxSpeed: 80, referenceInitialSize: 360 })
@@ -38,9 +45,7 @@ export const gameplayConfig = new GameplayBuilder()
   .level(4, { zoom: 4.5, unlocks: ["triangle"] })
   .level(5, { zoom: 12, unlocks: ["rectangle"] })
   .world(1, (w) =>
-    w.name("Baseline")
-      .tagline("Tap when the shape fills the space.")
-      .mechanics(DEFAULT_MECHANICS)
+    w.mechanics(DEFAULT_MECHANICS)
       .visualProfile({
         hueCenter: 215,
         hueSpread: 24,
@@ -56,8 +61,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(2, (w) =>
     w
       .inheritFrom(1)
-      .name("Breathing")
-      .tagline("The stack breathes. Trust the outline.")
       .visualProfile({
         hueCenter: 150,
         hueSpread: 30,
@@ -77,8 +80,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(3, (w) =>
     w
       .inheritFrom(2)
-      .name("Accelerating Growth")
-      .tagline("Faster growth. Red rim sectors block taps.")
       .visualProfile({
         hueCenter: 36,
         hueSpread: 42,
@@ -102,8 +103,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(4, (w) =>
     w
       .inheritFrom(3)
-      .name("Wave")
-      .tagline("The stack sways; your shape stays put.")
       .visualProfile({
         hueCenter: 330,
         hueSpread: 55,
@@ -123,8 +122,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(5, (w) =>
     w
       .inheritFrom(4)
-      .name("Color Shift")
-      .tagline("Colours drift. Shapes don't.")
       .visualProfile({
         hueCenter: 290,
         hueSpread: 170,
@@ -144,8 +141,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(6, (w) =>
     w
       .inheritFrom(5)
-      .name("The Eclipse")
-      .tagline("Darkness. Follow the pulsing outline.")
       .visualProfile({
         hueCenter: 205,
         hueSpread: 160,
@@ -164,8 +159,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(7, (w) =>
     w
       .inheritFrom(6)
-      .name("Gravity Drift")
-      .tagline("Your shape sinks as it grows.")
       .visualProfile({
         hueCenter: 128,
         hueSpread: 180,
@@ -184,8 +177,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(8, (w) =>
     w
       .inheritFrom(7)
-      .name("Rotation Inversion")
-      .tagline("Spin flips every other level.")
       .visualProfile({
         hueCenter: 18,
         hueSpread: 180,
@@ -204,8 +195,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(9, (w) =>
     w
       .inheritFrom(8)
-      .name("Reverse Stack")
-      .tagline("Grow outward: wrap the last shape, stay inside the ring.")
       .visualProfile({
         hueCenter: 60,
         hueSpread: 200,
@@ -227,8 +216,6 @@ export const gameplayConfig = new GameplayBuilder()
   .world(10, (w) =>
     w
       .inheritFrom(8)
-      .name("Heartbeat")
-      .tagline("Growth surges on the beat. Tap in rhythm.")
       .visualProfile({
         hueCenter: 350,
         hueSpread: 140,

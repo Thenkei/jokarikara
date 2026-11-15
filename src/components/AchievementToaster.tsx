@@ -5,7 +5,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { getAchievement, type AchievementId } from "../progression/achievements";
+import { getAchievementTitle, type AchievementId } from "../progression/achievements";
+import { useI18n } from "../i18n/context";
 
 /** How long one toast stays on screen. */
 export const ACHIEVEMENT_TOAST_MS = 2600;
@@ -36,6 +37,7 @@ export const AchievementToaster = forwardRef<
   AchievementToasterHandle,
   AchievementToasterProps
 >(({ onShow }, ref) => {
+  const i18n = useI18n();
   const [queue, setQueue] = useState<readonly QueuedToast[]>([]);
   const nextKeyRef = useRef(0);
   const lastShownKeyRef = useRef<number | null>(null);
@@ -78,12 +80,12 @@ export const AchievementToaster = forwardRef<
     <div className="achievement-toast-region" role="status" aria-live="polite">
       {current && (
         <div key={current.key} className="achievement-toast">
-          <span className="achievement-toast-label">ACHIEVEMENT</span>
+          <span className="achievement-toast-label">{i18n.t("achievements.toast")}</span>
           <span className="achievement-toast-sep" aria-hidden="true">
             {" · "}
           </span>
           <span className="achievement-toast-title">
-            {getAchievement(current.id).title}
+            {getAchievementTitle(i18n, current.id)}
           </span>
         </div>
       )}

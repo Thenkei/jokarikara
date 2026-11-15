@@ -1,6 +1,7 @@
 import type { GameMode, StackEvent } from "../types";
 import { LEVELS_PER_WORLD } from "../constants/game";
 import { MEDAL_THRESHOLDS } from "../modes/medals";
+import type { Translator } from "../i18n";
 
 /**
  * Achievements: a static catalogue plus pure evaluation.
@@ -108,13 +109,18 @@ export interface AchievementProgress {
   target: number;
 }
 
+/**
+ * Title and description come from the catalog (`achievement.<id>.title` /
+ * `.description`, see `getAchievementText`); the definition only holds rules
+ * and the numbers its description quotes.
+ */
 export interface AchievementDefinition {
   id: AchievementId;
-  title: string;
-  description: string;
+  /** Values for the description's placeholders (thresholds, world...). */
+  descriptionParams?: Readonly<Record<string, number>>;
   /**
-   * Secret: listed as "???" with `HIDDEN_ACHIEVEMENT_TEXT` until unlocked, so
-   * the panel never hints at how to get it. Still counted in the total.
+   * Secret: listed as "???" with the hidden text until unlocked, so the panel
+   * never hints at how to get it. Still counted in the total.
    */
   hidden?: boolean;
   /**
@@ -183,14 +189,9 @@ const capped = (current: number, target: number): AchievementProgress => ({
   target,
 });
 
-const worldAchievement = (
-  id: AchievementId,
-  world: number,
-  title: string,
-): AchievementDefinition => ({
+const worldAchievement = (id: AchievementId, world: number): AchievementDefinition => ({
   id,
-  title,
-  description: `Reach World ${world}.`,
+  descriptionParams: { world },
   isUnlocked: (ctx) => runValue(ctx, (r) => r.world) >= world,
 });
 
@@ -213,14 +214,11 @@ const lifetimeStacks = (ctx: AchievementContext): number =>
 export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
   {
     id: "first-stack",
-    title: "First Stack",
-    description: "Land your first shape.",
     isUnlocked: (ctx) => lifetimeStacks(ctx) >= 1,
   },
   {
     id: "perfect-alignment",
-    title: "Perfect Alignment",
-    description: `Land ${PERFECT_ALIGNMENT_RUN} PERFECT stacks in a row.`,
+    descriptionParams: { count: PERFECT_ALIGNMENT_RUN },
     isUnlocked: (ctx) =>
       runValue(ctx, (r) => r.bestConsecutivePerfects) >= PERFECT_ALIGNMENT_RUN,
     progress: (ctx) =>
@@ -234,8 +232,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
   },
   {
     id: "unbroken",
-    title: "Unbroken",
-    description: `Reach a x${UNBROKEN_COMBO} combo.`,
+    descriptionParams: { count: UNBROKEN_COMBO },
     isUnlocked: (ctx) => runValue(ctx, (r) => r.bestStreak) >= UNBROKEN_COMBO,
     progress: (ctx) =>
       capped(
@@ -243,28 +240,24 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
         UNBROKEN_COMBO,
       ),
   },
-  worldAchievement("world-2", 2, "New Horizons"),
-  worldAchievement("world-3", 3, "Fault Lines"),
-  worldAchievement("world-5", 5, "Prismatic"),
+  worldAchievement("world-2", 2),
+  worldAchievement("world-3", 3),
+  worldAchievement("world-5", 5),
   {
     id: "speed-demon",
-    title: "Speed Demon",
-    description: `Reach level ${SPEED_DEMON_LEVEL} in under ${SPEED_DEMON_MAX_SECONDS} seconds of play.`,
+    descriptionParams: { level: SPEED_DEMON_LEVEL, seconds: SPEED_DEMON_MAX_SECONDS },
     isUnlocked: (ctx) =>
       ctx.run?.speedSplitSeconds != null &&
       ctx.run.speedSplitSeconds < SPEED_DEMON_MAX_SECONDS,
   },
   {
     id: "giant-slayer",
-    title: "Giant Slayer",
-    description: "Successfully stack a boss shape.",
     isUnlocked: (ctx) =>
       ctx.lifetime.bossStacksCleared + runValue(ctx, (r) => r.bossStacksCleared) >= 1,
   },
   {
     id: "zen-master",
-    title: "Zen Master",
-    description: `Stack ${ZEN_MASTER_STACKS} shapes in a single Zen run.`,
+    descriptionParams: { count: ZEN_MASTER_STACKS },
     isUnlocked: (ctx) => zenStacks(ctx) >= ZEN_MASTER_STACKS,
     progress: (ctx) =>
       capped(
@@ -274,8 +267,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
   },
   {
     id: "gold-rush",
-    title: "Gold Rush",
-    description: `Earn a Time Attack gold medal (${GOLD_RUSH_SCORE} points).`,
+    descriptionParams: { score: GOLD_RUSH_SCORE },
     // TA has no Daily or practice variant, so a TA score is a medal score.
     isUnlocked: (ctx) => timeAttackScore(ctx) >= GOLD_RUSH_SCORE,
     progress: (ctx) =>
@@ -286,8 +278,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
   },
   {
     id: "time-lord",
-    title: "Time Lord",
-    description: `Score ${TIME_LORD_SCORE} points in Time Attack.`,
+    descriptionParams: { score: TIME_LORD_SCORE },
     isUnlocked: (ctx) => timeAttackScore(ctx) >= TIME_LORD_SCORE,
     progress: (ctx) =>
       capped(
@@ -297,33 +288,68 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
   },
   {
     id: "daily-devotee",
-    title: "Daily Devotee",
-    description: `Play the Daily Challenge on ${DAILY_DEVOTEE_DAYS} different days.`,
+    descriptionParams: { count: DAILY_DEVOTEE_DAYS },
     isUnlocked: (ctx) => distinctDailyDays(ctx) >= DAILY_DEVOTEE_DAYS,
     progress: (ctx) => capped(distinctDailyDays(ctx), DAILY_DEVOTEE_DAYS),
   },
   {
     id: "architect",
-    title: "Architect",
-    description: `Stack ${ARCHITECT_LIFETIME_STACKS} shapes in total.`,
+    descriptionParams: { count: ARCHITECT_LIFETIME_STACKS },
     isUnlocked: (ctx) => lifetimeStacks(ctx) >= ARCHITECT_LIFETIME_STACKS,
     progress: (ctx) => capped(lifetimeStacks(ctx), ARCHITECT_LIFETIME_STACKS),
   },
   {
     id: "curious-mind",
-    title: "Curious Mind",
-    description: "Found one of the start screen's secrets.",
     hidden: true,
     // Event-driven: granted by the start screen, never by a run.
     isUnlocked: () => false,
   },
 ] satisfies AchievementDefinition[]);
 
-/** What a hidden achievement shows until it is unlocked (no hints). */
-export const HIDDEN_ACHIEVEMENT_TEXT = Object.freeze({
-  title: "???",
-  description: "A hidden achievement.",
-});
+export interface AchievementText {
+  readonly title: string;
+  readonly description: string;
+}
+
+/**
+ * Title and description in the translator's language. A hidden achievement
+ * that is still locked gets the generic "???" text (no hints); pass
+ * `revealed: true` for one the player has (toasts, game over list).
+ */
+export const getAchievementText = (
+  i18n: Translator,
+  achievement: AchievementDefinition,
+  revealed = true,
+): AchievementText => {
+  const { t } = i18n;
+  if (achievement.hidden && !revealed) {
+    return {
+      title: t("achievements.hidden.title"),
+      description: t("achievements.hidden.description"),
+    };
+  }
+  const { id, descriptionParams } = achievement;
+  // Prose numbers follow the language ("1,000" / "1 000").
+  const params = descriptionParams
+    ? Object.fromEntries(
+        Object.entries(descriptionParams).map(([name, value]) => [name, i18n.number(value)]),
+      )
+    : undefined;
+  // Every description's placeholders are listed in `descriptionParams`
+  // (checked per id in the tests); the cast only bridges the dynamic key.
+  const describe = t as (
+    key: `achievement.${AchievementId}.description`,
+    params?: Readonly<Record<string, string>>,
+  ) => string;
+  return {
+    title: t(`achievement.${id}.title`),
+    description: describe(`achievement.${id}.description`, params),
+  };
+};
+
+/** Title of an unlocked achievement (toasts, game over list). */
+export const getAchievementTitle = (i18n: Translator, id: AchievementId): string =>
+  getAchievementText(i18n, getAchievement(id)).title;
 
 /** Unlocked by an event outside runs (see `grantAchievement`). */
 export const SECRET_ACHIEVEMENT_ID: AchievementId = "curious-mind";

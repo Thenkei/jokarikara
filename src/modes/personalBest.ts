@@ -1,4 +1,5 @@
 import type { GameMode } from "../types";
+import type { Translator } from "../i18n";
 
 /**
  * "Chase your best": the run's previous personal best (the target shown in
@@ -88,7 +89,8 @@ export const getVisibleTarget = (state: PersonalBestState): number | null =>
 
 /** Screen-reader text for the moment (the banner itself is decorative). */
 export const getPersonalBestAnnouncement = (
+  i18n: Translator,
   previousBest: number,
   daily: boolean,
 ): string =>
-  `${daily ? "New daily best" : "New personal best"}. Previous best ${previousBest} beaten`;
+  i18n.t(daily ? "announce.newDailyBest" : "announce.newBest", { score: previousBest });

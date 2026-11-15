@@ -9,6 +9,9 @@ import {
 import { QUALITY_EMOJI } from "./daily";
 import { MEDAL_THRESHOLDS } from "./medals";
 import type { QualityBreakdown } from "./runInsights";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const breakdown = (
   PERFECT: number,
@@ -68,7 +71,7 @@ describe("buildQualityBar", () => {
 
 describe("buildRunShareText", () => {
   it("formats a Classic run with combo, bar and URL", () => {
-    const text = buildRunShareText(base);
+    const text = buildRunShareText(EN, base);
     expect(text.split("\n")).toEqual([
       "Shape Stack · Classic",
       "1240 pts · 6 stacks · W3 L2 · combo x4",
@@ -79,16 +82,16 @@ describe("buildRunShareText", () => {
   });
 
   it("formats a Time Attack run (below Bronze: no medal)", () => {
-    const text = buildRunShareText({ ...base, mode: "TIME_ATTACK", score: 640 });
+    const text = buildRunShareText(EN, { ...base, mode: "TIME_ATTACK", score: 640 });
     expect(text.split("\n")[0]).toBe("Shape Stack · Time Attack");
     expect(text).toContain("combo x4");
     expectClean(text);
   });
 
   it("names the Time Attack medal in words in the title", () => {
-    const gold = buildRunShareText({ ...base, mode: "TIME_ATTACK", score: MEDAL_THRESHOLDS.GOLD });
+    const gold = buildRunShareText(EN, { ...base, mode: "TIME_ATTACK", score: MEDAL_THRESHOLDS.GOLD });
     expect(gold.split("\n")[0]).toBe("Shape Stack · Time Attack · Gold medal");
-    const bronze = buildRunShareText({
+    const bronze = buildRunShareText(EN, {
       ...base,
       mode: "TIME_ATTACK",
       score: MEDAL_THRESHOLDS.SILVER - 5,
@@ -100,31 +103,31 @@ describe("buildRunShareText", () => {
   });
 
   it("says nothing about medals below Bronze or outside Time Attack", () => {
-    const none = buildRunShareText({
+    const none = buildRunShareText(EN, {
       ...base,
       mode: "TIME_ATTACK",
       score: MEDAL_THRESHOLDS.BRONZE - 5,
     });
     expect(none).not.toMatch(/medal/i);
-    const classic = buildRunShareText({ ...base, score: MEDAL_THRESHOLDS.GOLD });
+    const classic = buildRunShareText(EN, { ...base, score: MEDAL_THRESHOLDS.GOLD });
     expect(classic.split("\n")[0]).toBe("Shape Stack · Classic");
     expect(classic).not.toMatch(/medal/i);
   });
 
   it("omits the combo in Zen, which has none", () => {
-    const text = buildRunShareText({ ...base, mode: "ZEN", bestCombo: 9 });
+    const text = buildRunShareText(EN, { ...base, mode: "ZEN", bestCombo: 9 });
     expect(text.split("\n")[0]).toBe("Shape Stack · Zen");
     expect(text).not.toContain("combo");
     expectClean(text);
   });
 
   it("labels Zen practice runs with their start world", () => {
-    const text = buildRunShareText({ ...base, mode: "ZEN", practiceWorld: 5 });
+    const text = buildRunShareText(EN, { ...base, mode: "ZEN", practiceWorld: 5 });
     expect(text.split("\n")[0]).toBe("Shape Stack · Zen practice from W5");
   });
 
   it("handles a run with zero stacks: no bar, no combo", () => {
-    const text = buildRunShareText({
+    const text = buildRunShareText(EN, {
       ...base,
       score: 0,
       world: 1,
@@ -142,12 +145,12 @@ describe("buildRunShareText", () => {
   });
 
   it("uses the singular for a single stack", () => {
-    const text = buildRunShareText({ ...base, stackCount: 1, breakdown: breakdown(1) });
+    const text = buildRunShareText(EN, { ...base, stackCount: 1, breakdown: breakdown(1) });
     expect(text).toContain(" · 1 stack · ");
   });
 
   it("keeps a very long run tweet-sized", () => {
-    const text = buildRunShareText({
+    const text = buildRunShareText(EN, {
       ...base,
       mode: "TIME_ATTACK",
       score: 987_654_321,
@@ -164,7 +167,7 @@ describe("buildRunShareText", () => {
   });
 
   it("never prints undefined / NaN for missing or broken inputs", () => {
-    const text = buildRunShareText({
+    const text = buildRunShareText(EN, {
       mode: "CLASSIC",
       score: NaN,
       world: Number.NaN,

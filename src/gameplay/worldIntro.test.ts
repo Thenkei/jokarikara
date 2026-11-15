@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WORLD_HOW_TO } from "./atlas";
 import {
   advanceWorldIntroHold,
   FIRST_VISIT_GRACE_MS,
   FIRST_VISIT_MAX_HOLD_MS,
-  getFirstVisitHowTo,
+  shouldTeachWorld,
   IDLE_HOLD,
   isWorldIntroHolding,
   releaseWorldIntroHold,
@@ -14,41 +13,41 @@ import {
 } from "./worldIntro";
 import { createWorldIntroHoldDriver } from "./useWorldIntroHold";
 
-describe("getFirstVisitHowTo", () => {
-  it("teaches a world above the lifetime best with its atlas line", () => {
-    expect(getFirstVisitHowTo(2, 1)).toBe(WORLD_HOW_TO[2]);
-    expect(getFirstVisitHowTo(9, 8)).toBe(WORLD_HOW_TO[9]);
+describe("shouldTeachWorld", () => {
+  it("teaches a world above the lifetime best", () => {
+    expect(shouldTeachWorld(2, 1)).toBe(true);
+    expect(shouldTeachWorld(9, 8)).toBe(true);
     // A run can cross several new worlds; each one is above the best.
-    expect(getFirstVisitHowTo(3, 1)).toBe(WORLD_HOW_TO[3]);
+    expect(shouldTeachWorld(3, 1)).toBe(true);
   });
 
   it("keeps the short overlay for worlds already reached", () => {
-    expect(getFirstVisitHowTo(2, 5)).toBeNull();
-    expect(getFirstVisitHowTo(5, 5)).toBeNull();
+    expect(shouldTeachWorld(2, 5)).toBe(false);
+    expect(shouldTeachWorld(5, 5)).toBe(false);
   });
 
   it("never teaches world 1 (the first-run hint covers it)", () => {
-    expect(getFirstVisitHowTo(1, 0)).toBeNull();
-    expect(getFirstVisitHowTo(1, 1)).toBeNull();
+    expect(shouldTeachWorld(1, 0)).toBe(false);
+    expect(shouldTeachWorld(1, 1)).toBe(false);
   });
 
   it("practice from a reached world only teaches beyond the best world", () => {
     // Practice starts at most at the best world (here 6, picked 4).
     for (let world = 4; world <= 6; world += 1) {
-      expect(getFirstVisitHowTo(world, 6)).toBeNull();
+      expect(shouldTeachWorld(world, 6)).toBe(false);
     }
-    expect(getFirstVisitHowTo(7, 6)).toBe(WORLD_HOW_TO[7]);
+    expect(shouldTeachWorld(7, 6)).toBe(true);
   });
 
   it("does not re-teach a world taught earlier in the run", () => {
     // The caller raises taughtThrough to each world it taught.
-    expect(getFirstVisitHowTo(3, 3)).toBeNull();
+    expect(shouldTeachWorld(3, 3)).toBe(false);
   });
 
   it("ignores worlds past the last configured one and bad input", () => {
-    expect(getFirstVisitHowTo(11, 10)).toBeNull();
-    expect(getFirstVisitHowTo(Number.NaN, 1)).toBeNull();
-    expect(getFirstVisitHowTo(2.5, 1)).toBeNull();
+    expect(shouldTeachWorld(11, 10)).toBe(false);
+    expect(shouldTeachWorld(Number.NaN, 1)).toBe(false);
+    expect(shouldTeachWorld(2.5, 1)).toBe(false);
   });
 });
 

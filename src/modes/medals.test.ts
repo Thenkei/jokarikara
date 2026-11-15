@@ -14,6 +14,9 @@ import {
   hasMedals,
   selectHudGoal,
 } from "./medals";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const { BRONZE, SILVER, GOLD } = MEDAL_THRESHOLDS;
 
@@ -156,14 +159,14 @@ describe("advanceMedalRun", () => {
 
 describe("labels", () => {
   it("share label is a plain phrase", () => {
-    expect(getMedalShareLabel("GOLD")).toBe("Gold medal");
-    expect(getMedalShareLabel("BRONZE")).toBe("Bronze medal");
+    expect(getMedalShareLabel(EN, "GOLD")).toBe("Gold medal");
+    expect(getMedalShareLabel(EN, "BRONZE")).toBe("Bronze medal");
   });
 
   it("announcement names the medal and the next goal", () => {
-    expect(getMedalAnnouncement("BRONZE")).toBe(`Bronze medal. Next: Silver at ${SILVER}`);
-    expect(getMedalAnnouncement("SILVER")).toBe(`Silver medal. Next: Gold at ${GOLD}`);
-    expect(getMedalAnnouncement("GOLD")).toBe("Gold medal. Top medal earned");
+    expect(getMedalAnnouncement(EN, "BRONZE")).toBe(`Bronze medal. Next: Silver at ${SILVER}`);
+    expect(getMedalAnnouncement(EN, "SILVER")).toBe(`Silver medal. Next: Gold at ${GOLD}`);
+    expect(getMedalAnnouncement(EN, "GOLD")).toBe("Gold medal. Top medal earned");
   });
 });
 

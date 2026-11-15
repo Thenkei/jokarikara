@@ -1,4 +1,5 @@
 import type { GameMode } from "../types";
+import type { Translator } from "../i18n";
 import { QUALITY_EMOJI } from "./daily";
 import { QUALITY_ORDER, type QualityBreakdown } from "./runInsights";
 import { getMedal, getMedalShareLabel, hasMedals } from "./medals";
@@ -20,11 +21,8 @@ export const GAME_URL = "https://thenkei.github.io/jokarikara/";
  */
 export const SHARE_BAR_LENGTH = 10;
 
-const MODE_SHARE_LABELS: Readonly<Record<GameMode, string>> = {
-  CLASSIC: "Classic",
-  ZEN: "Zen",
-  TIME_ATTACK: "Time Attack",
-};
+/** Modes with share wording; anything else (bad input) reads as Classic. */
+const GAME_MODE_KEYS: ReadonlySet<GameMode> = new Set<GameMode>(["CLASSIC", "ZEN", "TIME_ATTACK"]);
 
 /** Non-negative integer, or `fallback` for NaN / ±Infinity / null. */
 const toCount = (value: number | null | undefined, fallback = 0): number =>
@@ -106,34 +104,29 @@ export interface RunShareInput {
  * Time Attack names the medal earned in the title, in words ("Shape Stack ·
  * Time Attack · Gold medal"), and stays silent when there is none.
  */
-export const buildRunShareText = ({
-  mode,
-  score,
-  world,
-  level,
-  stackCount,
-  bestCombo,
-  breakdown,
-  practiceWorld,
-}: RunShareInput): string => {
-  const modeLabel = MODE_SHARE_LABELS[mode] ?? MODE_SHARE_LABELS.CLASSIC;
+export const buildRunShareText = (
+  i18n: Translator,
+  { mode, score, world, level, stackCount, bestCombo, breakdown, practiceWorld }: RunShareInput,
+): string => {
+  const { t } = i18n;
+  const knownMode: GameMode = GAME_MODE_KEYS.has(mode) ? mode : "CLASSIC";
+  const modeLabel = t(`mode.${knownMode}.name`);
   const practiceFrom = toCount(practiceWorld);
   const practice = practiceFrom > 1;
   const medal = hasMedals(mode, false, practice) ? getMedal(toCount(score)) : null;
   const title = practice
-    ? `Shape Stack · ${modeLabel} practice from W${practiceFrom}`
+    ? t("shareText.titlePractice", { mode: modeLabel, world: practiceFrom })
     : medal
-      ? `Shape Stack · ${modeLabel} · ${getMedalShareLabel(medal)}`
-      : `Shape Stack · ${modeLabel}`;
+      ? t("shareText.titleMedal", { mode: modeLabel, medal: getMedalShareLabel(i18n, medal) })
+      : t("shareText.title", { mode: modeLabel });
 
-  const stacks = toCount(stackCount);
   const stats = [
-    `${toCount(score)} pts`,
-    `${stacks} ${stacks === 1 ? "stack" : "stacks"}`,
-    `W${toOrdinal(world)} L${toOrdinal(level)}`,
+    t("shareText.score", { score: toCount(score) }),
+    t("shareText.stacks", { count: toCount(stackCount) }),
+    t("shareText.progress", { world: toOrdinal(world), level: toOrdinal(level) }),
   ];
   const combo = toCount(bestCombo);
-  if (mode !== "ZEN" && combo > 0) stats.push(`combo x${combo}`);
+  if (mode !== "ZEN" && combo > 0) stats.push(t("shareText.combo", { combo }));
 
   const lines = [title, stats.join(" · ")];
   const bar = buildQualityBar(breakdown);

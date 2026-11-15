@@ -1,6 +1,7 @@
 import type { EndReason, GameMode } from "../types";
 import type { HapticPattern } from "../utils/haptics";
-import { MEDAL_LABELS, type Medal } from "./medals";
+import type { Translator } from "../i18n";
+import { getMedalTitle, type Medal } from "./medals";
 
 /**
  * What the end of a run sounds, looks and feels like. Pure: GameCanvas asks
@@ -90,22 +91,28 @@ export interface TimeUpResult {
 }
 
 /** Screen-reader text for the TIME! moment ("Time! Score 1240. Bronze medal"). */
-export const getTimeUpAnnouncement = ({ score, medal }: TimeUpResult): string =>
+export const getTimeUpAnnouncement = (
+  i18n: Translator,
+  { score, medal }: TimeUpResult,
+): string =>
   medal === null
-    ? `Time! Score ${score}`
-    : `Time! Score ${score}. ${MEDAL_LABELS[medal]} medal`;
+    ? i18n.t("announce.timeUp", { score })
+    : i18n.t("announce.timeUpMedal", { score, medal: getMedalTitle(i18n, medal) });
 
 /**
  * Game over headline: a finished Zen session and a Time Attack run that used
  * its clock are complete runs, not losses, so neither says GAME OVER.
  */
-export const getGameOverHeadline = (reason: EndReason | null | undefined): string => {
+export const getGameOverHeadline = (
+  i18n: Translator,
+  reason: EndReason | null | undefined,
+): string => {
   switch (reason) {
     case "finished":
-      return "SESSION COMPLETE";
+      return i18n.t("gameOver.headlineFinished");
     case "timeout":
-      return "TIME!";
+      return i18n.t("gameOver.headlineTimeUp");
     default:
-      return "GAME OVER";
+      return i18n.t("gameOver.headline");
   }
 };

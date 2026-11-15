@@ -1,4 +1,5 @@
 import type { GameMode } from "../types";
+import { getLocalDateKey } from "../modes/daily";
 import {
   EMPTY_LIFETIME_STATS,
   MAX_TRACKED_DAILY_DATES,
@@ -9,6 +10,11 @@ import {
 
 export interface HighScore {
   score: number;
+  /**
+   * Local date key ("2026-11-15"), formatted in the player's language when
+   * shown (`formatScoreDate`). Entries saved before carry a locale display
+   * string ("11/15/2026"), shown as is.
+   */
   date: string;
 }
 
@@ -118,7 +124,7 @@ export const saveHighScore = (
 ): SaveHighScoreResult => {
   const all = getAllHighScores();
   const previousBest = all[mode][0]?.score ?? 0;
-  const entry: HighScore = { score, date: new Date().toLocaleDateString() };
+  const entry: HighScore = { score, date: getLocalDateKey() };
   const scores = [...all[mode], entry].sort(byScoreDesc).slice(0, MAX_HIGH_SCORES);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...all, [mode]: scores }));

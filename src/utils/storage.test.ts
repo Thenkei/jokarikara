@@ -9,6 +9,7 @@ import {
   saveDailyResult,
   MAX_DAILY_RECORDS,
 } from "./storage";
+import { getLocalDateKey } from "../modes/daily";
 
 const SCORES_KEY = "shape-stack-high-scores-v2";
 const SETTINGS_KEY = "shape-stack-settings";
@@ -59,12 +60,13 @@ describe("storage", () => {
       expect(scores[0].score).toBe(42);
     });
 
-    it("records today's date with the score", () => {
-      const today = new Date().toLocaleDateString();
+    it("records today's local date key with the score (formatted when shown)", () => {
+      const today = getLocalDateKey();
 
       saveHighScore(99);
 
       expect(getHighScores()[0].date).toBe(today);
+      expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
     it("keeps only the top 5 scores", () => {
