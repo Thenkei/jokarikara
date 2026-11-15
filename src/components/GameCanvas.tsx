@@ -727,6 +727,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       if (result.isPerfect && result.state.mode === "TIME_ATTACK") {
         audioService.playTimeBonus();
       }
+      if (result.lifeRegained) {
+        // Zen: a clean run earned a life back (App shows "+1 LIFE").
+        audioService.playTimeBonus();
+        haptic("life");
+        onZenLivesChange?.(result.state.zenLivesRemaining ?? null);
+      }
 
       // Check for level up
       if (result.leveledUp) {
@@ -755,6 +761,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onWorldUp,
       onStyleUpdate,
       onStack,
+      onZenLivesChange,
       miss,
       reducedFx,
       audioService,
@@ -803,6 +810,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           }
         }
 
+        if (result.lifeRegained) onZenLivesChange?.(result.state.zenLivesRemaining ?? null);
+
         // Mirror real play so the soundtrack can be exercised end to end.
         if (result.state.mode === "ZEN") zenCleanStacksRef.current += 1;
         syncMusic(result.state);
@@ -815,6 +824,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         onWorldUp,
         onStyleUpdate,
         onStack,
+        onZenLivesChange,
         reducedFx,
         syncMusic,
         teachWorldOnEntry,

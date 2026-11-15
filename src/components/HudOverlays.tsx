@@ -41,6 +41,8 @@ interface HudOverlaysProps {
   qualityPulseId: number;
   /** Bumped per Time Attack miss: replays the penalty pop (0 = none yet). */
   penaltyPulseId: number;
+  /** Bumped per Zen life regained: replays the "+1 LIFE" pop (0 = none yet). */
+  lifePulseId: number;
   missPop: MissPop | null;
   comboBanner: ComboBanner;
   /** Previous best the run just passed (record banner); null = no record yet. */
@@ -63,7 +65,7 @@ interface HudOverlaysProps {
 /**
  * Transient in-run overlays over the board, in stacking order: resume
  * countdown digit, first-run hint, stack quality, Time Attack bonus/penalty
- * pops, MISS pop, combo / record / medal banners, TIME!, level up and the
+ * pops, Zen "+1 LIFE" pop, MISS pop, combo / record / medal banners, TIME!, level up and the
  * world entry (or first-visit intro). Mostly decorative (`aria-hidden`): App
  * announces the same moments through its live region. Presentational: App
  * owns every value and when it shows.
@@ -78,6 +80,7 @@ export function HudOverlays({
   lastQuality,
   qualityPulseId,
   penaltyPulseId,
+  lifePulseId,
   missPop,
   comboBanner,
   passedBest,
@@ -148,6 +151,18 @@ export function HudOverlays({
           aria-hidden="true"
         >
           {t("hud.timePenalty", { seconds: TIME_ATTACK_MISS_PENALTY })}
+        </div>
+      )}
+
+      {mode === "ZEN" && lifePulseId > 0 && (
+        // Decorative: the live region announces the life regained.
+        <div
+          key={`life-${lifePulseId}`}
+          className="time-bonus-pop life-regain-pop"
+          data-testid="life-regain-pop"
+          aria-hidden="true"
+        >
+          {t("hud.lifeRegained")}
         </div>
       )}
 

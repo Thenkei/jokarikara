@@ -1495,6 +1495,12 @@ button:focus-visible {
   }
 }
 
+/* Zen life regained: the bonus pop's rise, in the lives chip's warm pink. */
+.life-regain-pop {
+  color: #ff9ccf;
+  text-shadow: 0 0 10px rgba(255, 120, 190, 0.45);
+}
+
 /* ---------- Achievements ---------- */
 .visually-hidden {
   position: absolute;

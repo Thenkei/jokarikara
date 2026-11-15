@@ -9,7 +9,8 @@ export type HapticPattern =
   | "fail"
   | "levelUp"
   | "record"
-  | "medal";
+  | "medal"
+  | "life";
 
 const PATTERNS: Record<HapticPattern, number | number[]> = {
   tap: 8,
@@ -21,6 +22,8 @@ const PATTERNS: Record<HapticPattern, number | number[]> = {
   record: [14, 40, 14, 40, 70],
   /** Time Attack medal reached: three even "ding" taps. */
   medal: [16, 32, 16, 32, 16],
+  /** Zen life regained: a quick double tap that swells. */
+  life: [10, 30, 22],
 };
 
 let enabled = true;

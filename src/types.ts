@@ -73,6 +73,8 @@ export interface GameState {
   mode: GameMode;
   timeRemaining?: number; // For Time Attack
   zenLivesRemaining?: number; // For Zen Mode - decremented on misses
+  /** Zen: clean stacks in a row toward the next life back (modes/zenLives). */
+  zenRegenProgress?: number;
   undoStack?: Shape[][]; // For Zen Mode - stores previous stacks of shapes
   isBossLevel?: boolean; // For Boss Mechanics
   runSeed: number;

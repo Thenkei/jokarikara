@@ -365,6 +365,7 @@ function App() {
   const comboMilestoneStackRef = useRef(false);
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
+  const [lifePulseId, setLifePulseId] = useState(0);
   /**
    * Time Attack clock ran out: the "TIME!" banner, shown from that moment
    * until the game over screen replaces the board. The ref mirrors it for
@@ -678,6 +679,7 @@ function App() {
     setLastQuality(null);
     setQualityPulseId(0);
     setPenaltyPulseId(0);
+    setLifePulseId(0);
     timeUpRef.current = false;
     runLostRef.current = false;
     setTimeUp(null);
@@ -969,12 +971,18 @@ function App() {
   const handleZenLivesChange = useCallback(
     (lives: number | null) => {
       setZenLives(lives);
-      if (lives !== previousZenLivesRef.current) {
+      const previous = previousZenLivesRef.current;
+      if (lives !== previous) {
         revealSecondaryHud();
+      }
+      // Zen: a clean run earned a life back (modes/zenLives).
+      if (lives !== null && previous !== null && lives > previous) {
+        setLifePulseId((current) => current + 1);
+        announce(i18n.t("announce.lifeRegained", { lives }));
       }
       previousZenLivesRef.current = lives;
     },
-    [revealSecondaryHud]
+    [revealSecondaryHud, announce, i18n]
   );
 
   /**
@@ -1446,6 +1454,7 @@ function App() {
               lastQuality={lastQuality}
               qualityPulseId={qualityPulseId}
               penaltyPulseId={penaltyPulseId}
+              lifePulseId={lifePulseId}
               missPop={missPop}
               comboBanner={comboBanner}
               passedBest={personalBestPassed ? personalBestTarget : null}
