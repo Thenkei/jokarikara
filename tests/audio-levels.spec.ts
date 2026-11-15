@@ -5,9 +5,12 @@ import { test, expect } from "./fixtures";
  * implementation and checks loudness relationships (see src/audio/mix.ts).
  * Levels are the loudest 300 ms RMS in dBFS; peaks are sample peaks; the
  * optional tail is the RMS of a window after every dry voice has ended, i.e.
- * pure reverb.
+ * pure reverb. Brightness is the RMS of the first difference over the RMS of
+ * the signal across the second half of the render (a cheap spectral tilt: it
+ * rises as energy moves up the spectrum), used to check that music tension
+ * really opens the bed rather than just making it louder.
  */
-type Level = { peakDb: number; rmsDb: number; tailDb: number };
+type Level = { peakDb: number; rmsDb: number; tailDb: number; brightDb: number };
 
 test("sound effects and music keep their mix relationships", async ({
   page,
@@ -34,6 +37,8 @@ test("sound effects and music keep their mix relationships", async ({
       playUi: (kind: "select" | "confirm" | "back") => void;
       playCue: (step: number, inWindow: boolean) => void;
       startMusic: (w: number) => void;
+      setMusicIntensity: (level: 0 | 1 | 2) => void;
+      setMusicTension: (tension: number) => void;
     };
     const SR = 44100;
     const modulePath = "/jokarikara/src/utils/audioManager.ts";
@@ -44,6 +49,14 @@ test("sound effects and music keep their mix relationships", async ({
       secs: number,
       play: (a: Audio) => void,
       tail?: [fromSecs: number, toSecs: number],
+      /**
+       * Let the soundtrack's lookahead scheduler run during the render: an
+       * offline render outruns its JS timer, so without this only the first
+       * 0.1 s of rhythmic notes would exist. The render pauses every
+       * `LIVE_STEP` s (under the 0.1 s lookahead) and resumes after the timer
+       * has fired, so the scheduler sees the clock advance as it would live.
+       */
+      live = false,
     ) => {
       let ctx: OfflineAudioContext | null = null;
       (window as unknown as { AudioContext: unknown }).AudioContext = function () {
@@ -55,6 +68,16 @@ test("sound effects and music keep their mix relationships", async ({
       const audio = mod.createAudioManager({ defer: (task) => task() });
       audio.init();
       play(audio);
+      if (live) {
+        const offline = ctx! as OfflineAudioContext;
+        const LIVE_STEP = 0.05;
+        for (let t = LIVE_STEP; t < secs; t += LIVE_STEP) {
+          offline
+            .suspend(t)
+            .then(() => new Promise((resolve) => setTimeout(resolve, 30)))
+            .then(() => offline.resume());
+        }
+      }
       const data = (await ctx!.startRendering()).getChannelData(0);
       let peak = 0;
       for (let i = 0; i < data.length; i += 1) peak = Math.max(peak, Math.abs(data[i]));
@@ -74,7 +97,18 @@ test("sound effects and music keep their mix relationships", async ({
         for (let i = from; i < to; i += 1) tailMeanSquare += data[i] * data[i];
         tailMeanSquare /= Math.max(1, to - from);
       }
-      return { peakDb: db(peak), rmsDb: db(Math.sqrt(best)), tailDb: db(Math.sqrt(tailMeanSquare)) };
+      let signal = 0;
+      let slope = 0;
+      for (let i = Math.floor(data.length / 2) + 1; i < data.length; i += 1) {
+        signal += data[i] * data[i];
+        slope += (data[i] - data[i - 1]) ** 2;
+      }
+      return {
+        peakDb: db(peak),
+        rmsDb: db(Math.sqrt(best)),
+        tailDb: db(Math.sqrt(tailMeanSquare)),
+        brightDb: signal > 0 ? db(Math.sqrt(slope / signal)) : -200,
+      };
     };
     // Per-world palettes (src/audio/palette.ts): the gameplay feedback of
     // every world, rendered the same way as world 1's reference above.
@@ -135,10 +169,57 @@ test("sound effects and music keep their mix relationships", async ({
         a.playTimeBonus();
       }),
       music: await measure(6, (a) => a.startMusic(1)),
+      // Time Attack's last seconds (src/audio/soundtrack.ts tension), with
+      // the scheduler live. Tension forces the bass pulse in, so its calm
+      // reference is the drone + pulse bed (streak 3+), not the drone alone.
+      musicPulse: await measure(
+        6,
+        (a) => {
+          a.startMusic(1);
+          a.setMusicIntensity(1);
+        },
+        undefined,
+        true,
+      ),
+      musicTense: await measure(
+        6,
+        (a) => {
+          a.startMusic(1);
+          a.setMusicTension(1);
+        },
+        undefined,
+        true,
+      ),
+      // Worst case: a long streak (arpeggio) on the very last second.
+      musicTenseFull: await measure(
+        6,
+        (a) => {
+          a.startMusic(1);
+          a.setMusicIntensity(2);
+          a.setMusicTension(1);
+        },
+        undefined,
+        true,
+      ),
     };
   });
 
   const { worlds, ...effects } = levels;
+  await test.info().attach("music-levels.json", {
+    body: JSON.stringify(
+      {
+        ok: levels.ok,
+        cue: levels.cue,
+        music: levels.music,
+        musicPulse: levels.musicPulse,
+        musicTense: levels.musicTense,
+        musicTenseFull: levels.musicTenseFull,
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
   await test.info().attach("per-world-levels.json", {
     body: JSON.stringify(worlds, null, 2),
     contentType: "application/json",
@@ -205,6 +286,19 @@ test("sound effects and music keep their mix relationships", async ({
 
   // The music bed never masks gameplay feedback.
   expect(levels.music.rmsDb).toBeLessThan(levels.ok.rmsDb - 8);
+
+  // Time Attack tension (last 10 s) changes the bed's colour, not the mix:
+  // at full tension (measured ≈ -34.7, vs drone ≈ -34.5 and the calm pulse
+  // bed ≈ -33.8) it stays ≥ 8 dB under a plain stack, even over a long
+  // streak's arpeggio, and the timing cue still sits ≥ 3 dB above it (≈ 3.6;
+  // the eighth-note tremolo only dips, which offsets the pedal and the lift).
+  expect(levels.musicTense.rmsDb).toBeLessThan(levels.ok.rmsDb - 8);
+  expect(levels.musicTenseFull.rmsDb).toBeLessThan(levels.ok.rmsDb - 8);
+  expect(levels.cue.rmsDb).toBeGreaterThan(levels.musicTense.rmsDb + 3);
+  // Tension never makes the bed it forces in louder...
+  expect(levels.musicTense.rmsDb).toBeLessThanOrEqual(levels.musicPulse.rmsDb + 0.5);
+  // ...it opens it: the filter, its resonance and the pedal move energy up.
+  expect(levels.musicTense.brightDb).toBeGreaterThan(levels.musicPulse.brightDb + 0.4);
 
   // Reverb is really there: a PERFECT stack rings on after its last voice
   // (a dry mix renders exact silence, -200), while a menu click stays
