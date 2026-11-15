@@ -48,6 +48,22 @@ describe("GameOverScreen", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("GAME OVER");
   });
 
+  it("heads a Time Attack run that used its clock TIME!, not GAME OVER", () => {
+    renderScreen({
+      mode: "TIME_ATTACK",
+      modeLabel: "TIME ATTACK",
+      run: {
+        ...RUN,
+        mode: "TIME_ATTACK",
+        stats: { ...RUN.stats, endReason: "timeout", endMargin: null },
+      },
+      endInsight: getEndInsight("timeout", 2),
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("TIME!");
+    // The rest of the card is unchanged.
+    expect(screen.getByText("Out of time.")).toBeTruthy();
+  });
+
   it("presents progression as a stat (levels reached across worlds)", () => {
     const { container } = renderScreen();
     expect(container.querySelector(".stat-levels")?.textContent).toBe("23");

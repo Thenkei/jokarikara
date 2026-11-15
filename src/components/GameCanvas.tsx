@@ -60,12 +60,27 @@ import {
   getShakeOffset,
   hasActiveEffects,
   spawnStackBurst,
+  TIME_UP_DELAY_MS,
   triggerFail,
   triggerLevelUp,
+  triggerTimeUp,
   triggerWorldUp,
   updateEffects,
   type EffectsState,
 } from "../rendering/effects";
+import { getMedal } from "../modes/medals";
+import {
+  selectEndFeedback,
+  type EndHold,
+  type TimeUpResult,
+} from "../modes/endFeedback";
+
+/** How long each kind of ending holds the board before `onGameOver`. */
+const END_HOLD_MS: Readonly<Record<EndHold, number>> = {
+  fail: GAME_OVER_DELAY_MS,
+  timeUp: TIME_UP_DELAY_MS,
+  none: 0,
+};
 
 /** Matches the PERFECT quality colour used by the HUD overlay. */
 const PERFECT_GUIDE_COLOR = "#fff3a8";
@@ -140,6 +155,17 @@ interface GameCanvasProps {
    * starts, then null when play resumes (tap, timeout, pause, Zen action).
    */
   onWorldIntro?: (world: number | null) => void;
+  /**
+   * The run has Time Attack medals (regular Time Attack, see `hasMedals`):
+   * the time-up cue and `onTimeUp` then carry the final medal. Default false.
+   */
+  medals?: boolean;
+  /**
+   * Time Attack clock reached 0 (timer or a miss penalty): the "TIME!"
+   * moment, reported at once with the final score and medal, before the
+   * (longer) hold that leads to `onGameOver`. Not called for other endings.
+   */
+  onTimeUp?: (result: TimeUpResult) => void;
   /** Optional audio service for dependency injection (testing) */
   audioService?: IAudioService;
 }
@@ -237,6 +263,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       onResumeCountdown,
       introTaughtThrough = Number.POSITIVE_INFINITY,
       onWorldIntro,
+      medals = false,
+      onTimeUp,
       audioService = defaultAudioManager,
     },
     ref,
@@ -275,6 +303,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     // First-visit intros: raised by every world taught this run, so a world
     // is taught once per run at most (a Zen undo can re-enter it).
     const taughtThroughRef = useRef(introTaughtThrough);
+    // Read only when the run ends: refs keep them out of the loop's deps.
+    const medalsRef = useRef(medals);
+    const onTimeUpRef = useRef(onTimeUp);
+
+    useEffect(() => {
+      medalsRef.current = medals;
+      onTimeUpRef.current = onTimeUp;
+    }, [medals, onTimeUp]);
 
     useEffect(() => {
       reducedFxRef.current = reducedFx;
@@ -338,20 +374,74 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       [audioService],
     );
 
-    /** Delay the callback so fail feedback is visible; state is already over. */
+    /**
+     * Report the end after `delayMs` so its feedback is seen first (the state
+     * is already over); 0 reports at once.
+     */
     const notifyGameOver = useCallback(
-      (score: number, world: number, level: number, stats?: RunStats) => {
-        if (GAME_OVER_DELAY_MS <= 0) {
-          onGameOver(score, world, level, stats);
+      (state: GameState, delayMs: number) => {
+        const report = () =>
+          onGameOver(state.score, state.world, state.level, toRunStats(state));
+        if (gameOverTimerRef.current) {
+          clearTimeout(gameOverTimerRef.current);
+          gameOverTimerRef.current = null;
+        }
+        if (delayMs <= 0) {
+          report();
           return;
         }
-        if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
         gameOverTimerRef.current = setTimeout(() => {
           gameOverTimerRef.current = null;
-          onGameOver(score, world, level, stats);
-        }, GAME_OVER_DELAY_MS);
+          report();
+        }, delayMs);
       },
       [onGameOver],
+    );
+
+    /**
+     * The run in `state` just ended: play the ending its reason calls for
+     * (fail, Time Attack time-up or Zen finish; see modes/endFeedback), then
+     * report it after that ending's hold. Once per run, never per frame.
+     */
+    const endRun = useCallback(
+      (state: GameState) => {
+        const medal = medalsRef.current ? getMedal(state.score) : null;
+        const feedback = selectEndFeedback(getEndReason(state), state.mode, medal);
+        audioService.stopMusic();
+        switch (feedback.cue.kind) {
+          case "fail":
+            audioService.playFailSound();
+            break;
+          case "timeUp":
+            audioService.playTimeUp(state.world, feedback.cue.medal);
+            break;
+          case "finish":
+            // The world's resolving chord: a session closing, not a loss.
+            audioService.playWorldUp(state.world);
+            break;
+        }
+        haptic(feedback.haptic);
+        if (feedback.effect === "fail") {
+          effectsRef.current = triggerFail(effectsRef.current, reducedFxRef.current);
+        } else if (feedback.effect === "timeUp") {
+          const top = state.shapes[state.shapes.length - 1];
+          const { width, height } = dimensionsRef.current;
+          effectsRef.current = triggerTimeUp(effectsRef.current, {
+            x: width / 2,
+            y: height / 2,
+            radius: top ? (top.size / 2) * state.zoom : Math.min(width, height) / 4,
+            // Raw world colour: the Mono look tints effects at draw time.
+            color: getWorldTheme(state.world, state.runSeed, reducedFxRef.current, false)
+              .hud.primary,
+            reducedFx: reducedFxRef.current,
+          });
+        }
+        if (feedback.timeUpBanner) {
+          onTimeUpRef.current?.({ score: state.score, medal });
+        }
+        notifyGameOver(state, END_HOLD_MS[feedback.hold]);
+      },
+      [audioService, notifyGameOver],
     );
 
     const setLoopPaused = useCallback(
@@ -462,16 +552,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
             gameOverTimerRef.current = null;
           }
           // Same game-over path as a lost run, minus the failure: the world's
-          // resolving chord and a light pulse instead of the buzz and shake.
-          audioService.stopMusic();
-          audioService.playWorldUp(finished.world);
-          haptic("levelUp");
-          onGameOver(
-            finished.score,
-            finished.world,
-            finished.level,
-            toRunStats(finished),
-          );
+          // resolving chord and a light pulse instead of the buzz and shake,
+          // reported at once (see modes/endFeedback).
+          endRun(finished);
           return true;
         },
       }),
@@ -480,8 +563,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         resumeCountdown,
         worldIntro,
         onResumeCountdown,
-        audioService,
-        onGameOver,
+        endRun,
       ],
     );
 
@@ -517,31 +599,30 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         );
       }
 
-      if (stateRef.current.isGameOver && !wasGameOver) {
-        audioService.stopMusic();
-        audioService.playFailSound();
-        haptic("fail");
-        effectsRef.current = triggerFail(effectsRef.current, reducedFxRef.current);
-        notifyGameOver(
-          stateRef.current.score,
-          stateRef.current.world,
-          stateRef.current.level,
-          toRunStats(stateRef.current),
-        );
-      } else {
-        // Zen: a life is lost but the run continues; momentum resets.
+      const ended = stateRef.current.isGameOver && !wasGameOver;
+      // A miss that ends the run is a fail, except when its Time Attack
+      // penalty drained the clock: the clock hit 0, so that run ends on
+      // time ("timeout", like the timer itself reaching 0), and the miss
+      // still plays its own feedback first (sound, small shake), exactly as
+      // any Time Attack miss, before the time-up ending.
+      const timedOut = ended && getEndReason(stateRef.current) === "timeout";
+      if (!ended || timedOut) {
+        // The miss's own feedback (Zen: a life lost, Time Attack: seconds
+        // lost); momentum resets.
         zenCleanStacksRef.current = 0;
-        syncMusic(stateRef.current);
+        if (!ended) syncMusic(stateRef.current);
         audioService.playMissSound();
-        haptic("miss");
+        // An ending's haptic replaces a running pattern: skip the miss's.
+        if (!ended) haptic("miss");
         effectsRef.current = triggerFail(
           effectsRef.current,
           reducedFxRef.current,
           true,
         );
       }
+      if (ended) endRun(stateRef.current);
     }, [
-      notifyGameOver,
+      endRun,
       onStyleUpdate,
       onZenLivesChange,
       onMiss,
@@ -825,19 +906,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
               }
             }
             if (state.isGameOver) {
+              // The clock ran out: Time Attack's normal ending, not a fail.
               stateRef.current = state;
-              audioService.stopMusic();
-              audioService.playFailSound();
-              effectsRef.current = triggerFail(
-                effectsRef.current,
-                reducedFx,
-              );
-              notifyGameOver(
-                state.score,
-                state.world,
-                state.level,
-                toRunStats(state),
-              );
+              endRun(state);
               return;
             }
           }
@@ -999,7 +1070,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       [
         audioService,
         miss,
-        notifyGameOver,
+        endRun,
         onLevelUp,
         onScore,
         onTimeUpdate,
@@ -1125,7 +1196,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     }, [
       audioService,
       miss,
-      notifyGameOver,
+      endRun,
       onTimeUpdate,
       onScore,
       onLevelUp,

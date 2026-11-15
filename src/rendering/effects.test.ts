@@ -9,8 +9,10 @@ import {
   MAX_RINGS,
   PERFECT_PARTICLES,
   spawnStackBurst,
+  TIME_UP_RING_LIFE,
   triggerFail,
   triggerLevelUp,
+  triggerTimeUp,
   triggerWorldUp,
   updateEffects,
   type StackBurst,
@@ -117,6 +119,54 @@ describe("effects", () => {
     expect(s.rings[0].alpha).toBeLessThan(0.5);
     expect(triggerLevelUp(createEffects(), true).punch.t).toBe(0);
     expect(triggerWorldUp(createEffects(), true).punch.t).toBe(0);
+  });
+
+  describe("time up (Time Attack clock ran out)", () => {
+    const mark = { x: 200, y: 300, radius: 80, color: "#4fd1ff", reducedFx: false };
+
+    it("marks the end with one ring and a flash in the world colour, nothing red", () => {
+      // Over a PERFECT burst from the last stack.
+      const before = spawnStackBurst(createEffects(), burst());
+      const fx = triggerTimeUp(before, mark);
+      expect(fx.rings).toHaveLength(1);
+      expect(fx.rings[0]).toMatchObject({
+        x: 200,
+        y: 300,
+        radius: 80,
+        color: "#4fd1ff",
+        maxLife: TIME_UP_RING_LIFE,
+      });
+      expect(fx.rings[0].growth).toBeGreaterThan(0);
+      expect(fx.flash).toMatchObject({ color: "#4fd1ff", danger: false });
+      expect(fx.flash.t).toBeGreaterThan(0);
+      // Calm: adds no shake or punch, and leaves the rest (particles) alone.
+      expect(fx.shake.t).toBe(0);
+      expect(fx.punch.t).toBe(0);
+      expect(fx.particles).toBe(before.particles);
+      expect(hasActiveEffects(fx)).toBe(true);
+    });
+
+    it("keeps the small shake of the miss that drained the clock", () => {
+      const missed = triggerFail(createEffects(), false, true);
+      const fx = triggerTimeUp(missed, mark);
+      expect(fx.shake).toEqual(missed.shake);
+      expect(fx.flash.danger).toBe(false);
+    });
+
+    it("reducedFx: a still, fainter ring and flash", () => {
+      const full = triggerTimeUp(createEffects(), mark);
+      const reduced = triggerTimeUp(createEffects(), { ...mark, reducedFx: true });
+      expect(reduced.rings[0].growth).toBe(0);
+      expect(reduced.rings[0].alpha).toBeLessThan(full.rings[0].alpha);
+      expect(reduced.flash.alpha).toBeLessThan(full.flash.alpha);
+      expect(reduced.flash.t).toBeGreaterThan(0);
+    });
+
+    it("fades out completely", () => {
+      let fx = triggerTimeUp(createEffects(), mark);
+      for (let t = 0; t < TIME_UP_RING_LIFE + 0.1; t += 0.05) fx = updateEffects(fx, 0.05);
+      expect(hasActiveEffects(fx)).toBe(false);
+    });
   });
 });
 

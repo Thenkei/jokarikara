@@ -40,6 +40,7 @@ import {
   stepFinishConfirm,
 } from "./modes/finishRun";
 import { getMissAnnouncement, getMissMarginLabel } from "./modes/missMargin";
+import { getTimeUpAnnouncement, type TimeUpResult } from "./modes/endFeedback";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
   LEVELS_PER_WORLD,
@@ -339,6 +340,14 @@ function App() {
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   /**
+   * Time Attack clock ran out: the "TIME!" banner, shown from that moment
+   * until the game over screen replaces the board. The ref mirrors it for
+   * `applyPaused` (stable callback): the run is over, so pausing is ignored
+   * (the pause menu's MAIN MENU would abandon a finished run and its score).
+   */
+  const [timeUp, setTimeUp] = useState<TimeUpResult | null>(null);
+  const timeUpRef = useRef(false);
+  /**
    * MISS pop for a miss that did not end the run (Zen, Time Attack), with how
    * far it was off ("+4 %", "BY A HAIR"). Set once per miss event, never per
    * frame; `id` replays the animation for identical consecutive labels.
@@ -433,6 +442,15 @@ function App() {
       }
     },
     [recordAchievementMiss, mode, announce],
+  );
+  /** Time Attack's clock hit 0: banner + the result, once per run. */
+  const handleTimeUp = useCallback(
+    (result: TimeUpResult) => {
+      timeUpRef.current = true;
+      setTimeUp(result);
+      announce(getTimeUpAnnouncement(result));
+    },
+    [announce],
   );
   const bestWorldReached = achievementRecord.lifetime.bestWorld;
   const revealedWorldCount = countRevealedWorlds(bestWorldReached);
@@ -694,6 +712,8 @@ function App() {
     setLastQuality(null);
     setQualityPulseId(0);
     setPenaltyPulseId(0);
+    timeUpRef.current = false;
+    setTimeUp(null);
     setMissPop(null);
     setComboBanner({ streak: 0, id: 0 });
     markProgress("reset", startWorld);
@@ -790,6 +810,9 @@ function App() {
       setShowSecondaryHud(false);
       setGameState("GAMEOVER");
       disarmFinish();
+      // A Time Attack run that used its clock was announced at the TIME!
+      // moment (score and medal); "Game over" would read it as a loss.
+      if (stats.endReason === "timeout") return;
       const insight = getEndInsight(
         stats.endReason,
         finalWorld,
@@ -960,6 +983,8 @@ function App() {
    */
   const applyPaused = useCallback(
     (next: boolean) => {
+      // Time is up: the board only holds for the TIME! banner, nothing to pause.
+      if (next && timeUpRef.current) return;
       setPaused(next);
       // A confirm never survives the menu closing (nor a fresh pause).
       disarmFinish();
@@ -1498,6 +1523,8 @@ function App() {
               onResumeCountdown={handleResumeCountdown}
               introTaughtThrough={introTaughtThrough}
               onWorldIntro={handleWorldIntro}
+              medals={runHasMedals}
+              onTimeUp={handleTimeUp}
             />
           </div>
 
@@ -1783,7 +1810,25 @@ function App() {
             </div>
           )}
 
-          {showLevelUp && !worldUpVisible && (
+          {timeUp && (
+            // Decorative: the live region announces the result (no double
+            // read-out). The level-up pop's styles, in the world colour.
+            <div
+              className={`level-up-overlay time-up-overlay${reducedFx ? " reduced-fx" : ""}`}
+              data-testid="time-up-banner"
+              aria-hidden="true"
+            >
+              <span className="level-up-text time-up-text">TIME!</span>
+              {timeUp.medal && (
+                <span className={`time-up-medal medal--${timeUp.medal.toLowerCase()}`}>
+                  <MedalGlyph medal={timeUp.medal} />
+                  {MEDAL_LABELS[timeUp.medal].toUpperCase()} MEDAL
+                </span>
+              )}
+            </div>
+          )}
+
+          {showLevelUp && !worldUpVisible && !timeUp && (
             <div className="level-up-overlay">
               <span className="level-up-text">LEVEL {level}</span>
             </div>

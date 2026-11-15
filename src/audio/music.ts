@@ -1,4 +1,5 @@
 import type { StackQuality } from "../types";
+import type { Medal } from "../modes/medals";
 
 /**
  * Pure music-theory helpers. Kept free of Web Audio so the musical design
@@ -62,6 +63,43 @@ export const QUALITY_HARMONY: Record<StackQuality, readonly number[]> = {
 export const LEVEL_UP_ARPEGGIO = [0, 4, 7, 12] as const;
 /** Sustained add9 chord (semitones) for a new world. */
 export const WORLD_UP_CHORD = [0, 4, 7, 14, 19] as const;
+
+/**
+ * Time Attack "time up" cadence, by result (see `playTimeUp`): after a bell
+ * strike (two octaves over the chord root), `pickup` notes lead into a held
+ * `chord`, all in semitones above the world root an octave up. Ordered by
+ * reward, with only a small rise in loudness (more, softer voices):
+ * - no medal: a suspended second settling on an open fifth + octave. No
+ *   third, so it resolves without saying "happy" or "sad": the run is over,
+ *   neither a loss nor a win.
+ * - Bronze: the dominant falls into a major triad (V → I).
+ * - Silver: third and fifth climb into the triad with the tenth on top.
+ * - Gold: a pentatonic run up into a wide major chord (tenth and twelfth),
+ *   plus a bell sparkle, held longer.
+ * No chord note doubles the bell or the hum under it (24, -12): a unison
+ * would phase in or out depending on the world's pitch, and the loudness
+ * with it.
+ */
+export interface TimeUpCadence {
+  readonly pickup: readonly number[];
+  readonly chord: readonly number[];
+  /** Hold of the chord, seconds. */
+  readonly hold: number;
+  /** A high bell partial over the chord (the record fanfare's sparkle). */
+  readonly sparkle: boolean;
+}
+
+export type TimeUpTier = "NONE" | Medal;
+
+export const TIME_UP_CADENCE: Readonly<Record<TimeUpTier, TimeUpCadence>> = {
+  NONE: { pickup: [2], chord: [0, 7, 12], hold: 0.9, sparkle: false },
+  BRONZE: { pickup: [7], chord: [0, 4, 7, 12], hold: 0.95, sparkle: false },
+  SILVER: { pickup: [4, 7], chord: [0, 4, 7, 12, 16], hold: 1, sparkle: false },
+  GOLD: { pickup: [4, 7, 9], chord: [0, 4, 7, 12, 16, 19], hold: 1.2, sparkle: true },
+};
+
+export const getTimeUpCadence = (medal: Medal | null): TimeUpCadence =>
+  TIME_UP_CADENCE[medal ?? "NONE"];
 
 /**
  * Timing cue pitches. Deliberately world-independent: the cue is a reference
