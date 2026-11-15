@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GameOverScreen, type GameOverRun } from "./GameOverScreen";
 import { ACHIEVEMENT_IDS } from "../progression/achievements";
 import { selectStreakLabel } from "../modes/dailyStreak";
+import { getMedalResult, MEDAL_THRESHOLDS } from "../modes/medals";
 
 const RUN: GameOverRun = {
   mode: "CLASSIC",
@@ -152,5 +153,74 @@ describe("GameOverScreen", () => {
     });
     expect(container.querySelector(".daily-next")).toBeNull();
     expect(container.querySelector(".streak-chip")).toBeNull();
+  });
+
+  describe("Time Attack medal", () => {
+    const TA_RUN: GameOverRun = { ...RUN, mode: "TIME_ATTACK", isNewBest: false };
+    const renderTa = (score: number) =>
+      renderScreen({
+        run: TA_RUN,
+        mode: "TIME_ATTACK",
+        modeLabel: "TIME",
+        score,
+        medal: getMedalResult(score),
+      });
+    const medalOf = (container: HTMLElement) =>
+      container.querySelector<HTMLElement>("[data-testid='gameover-medal']");
+
+    it("shows the earned medal and the next one with the points to go", () => {
+      const { container } = renderTa(MEDAL_THRESHOLDS.SILVER - 230);
+      const medal = medalOf(container)!;
+      expect(medal.classList).toContain("medal--bronze");
+      expect(medal.querySelector(".gameover-medal-title")?.textContent).toBe("BRONZE MEDAL");
+      // Visible text (aria-hidden separator), then the spoken version.
+      const next = medal.querySelector(".gameover-medal-next")!;
+      const visible = [...next.childNodes]
+        .filter((n) => !(n instanceof HTMLElement && n.classList.contains("visually-hidden")))
+        .map((n) => n.textContent)
+        .join("");
+      expect(visible).toBe(`Silver at ${MEDAL_THRESHOLDS.SILVER} · 230 to go`);
+      expect(next.textContent).toBe(`. Silver at ${MEDAL_THRESHOLDS.SILVER} · , 230 to go`);
+    });
+
+    it("draws an SVG glyph (decorative), not an emoji", () => {
+      const { container } = renderTa(MEDAL_THRESHOLDS.GOLD);
+      const svg = medalOf(container)!.querySelector("svg.medal-glyph--gold")!;
+      expect(svg.getAttribute("aria-hidden")).toBe("true");
+      expect(medalOf(container)!.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+    });
+
+    it("gold has no next goal", () => {
+      const { container } = renderTa(MEDAL_THRESHOLDS.GOLD + 140);
+      const medal = medalOf(container)!;
+      expect(medal.querySelector(".gameover-medal-title")?.textContent).toBe("GOLD MEDAL");
+      expect(medal.querySelector(".gameover-medal-next")).toBeNull();
+    });
+
+    it("below Bronze: no medal, with the Bronze target", () => {
+      const { container } = renderTa(880);
+      const medal = medalOf(container)!;
+      expect(medal.classList).toContain("medal--none");
+      expect(medal.querySelector(".gameover-medal-title")?.textContent).toBe("NO MEDAL");
+      expect(medal.querySelector(".gameover-medal-next")?.textContent).toContain(
+        `Bronze at ${MEDAL_THRESHOLDS.BRONZE}`,
+      );
+      expect(medal.querySelector(".gameover-medal-next")?.textContent).toContain("120 to go");
+      expect(medal.querySelector("svg.medal-glyph--none")).not.toBeNull();
+    });
+
+    it("sits in the hero, after the score (the score stays the hero)", () => {
+      const { container } = renderTa(MEDAL_THRESHOLDS.BRONZE);
+      const hero = container.querySelector(".gameover-hero")!;
+      const medal = medalOf(container)!;
+      expect(hero.contains(medal)).toBe(true);
+      const score = hero.querySelector(".score-display")!;
+      expect(score.compareDocumentPosition(medal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("is absent when the caller passes no medal (other modes)", () => {
+      const { container } = renderScreen();
+      expect(medalOf(container)).toBeNull();
+    });
   });
 });

@@ -57,6 +57,21 @@ import { useWallClock } from "./modes/useWallClock";
 import { StreakChip } from "./components/StreakChip";
 import { buildRunShareText } from "./modes/share";
 import {
+  MEDAL_CUE_TIER,
+  MEDAL_LABELS,
+  advanceMedalRun,
+  createMedalRun,
+  getMedal,
+  getMedalAnnouncement,
+  getMedalResult,
+  getMedalTarget,
+  hasMedals,
+  selectHudGoal,
+  type Medal,
+  type MedalRunState,
+} from "./modes/medals";
+import { MedalGlyph } from "./components/MedalGlyph";
+import {
   advancePersonalBest,
   createPersonalBestState,
   getPersonalBestAnnouncement,
@@ -277,6 +292,18 @@ function App() {
   /** Previous best this run races against (HUD target); null = no race. */
   const [personalBestTarget, setPersonalBestTarget] = useState<number | null>(null);
   const [personalBestPassed, setPersonalBestPassed] = useState(false);
+  /**
+   * Time Attack medals. Same split as the personal best: the ref follows
+   * every score, React state flips only on the stack that reaches a medal.
+   */
+  const medalRunRef = useRef<MedalRunState>(createMedalRun(false));
+  const [medalEarned, setMedalEarned] = useState<Medal | null>(null);
+  /**
+   * Whether the stack being reported lands on a combo milestone (set by
+   * handleStyleUpdate, which GameCanvas calls right after onScore). The medal
+   * cue yields to the combo fanfare GameCanvas plays for that same stack.
+   */
+  const comboMilestoneStackRef = useRef(false);
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
   /** Start screen sub-panel shown instead of the menu (null = the menu). */
@@ -534,6 +561,8 @@ function App() {
     personalBestRef.current = createPersonalBestState(previousBest);
     setPersonalBestTarget(previousBest);
     setPersonalBestPassed(false);
+    medalRunRef.current = createMedalRun(hasMedals(runMode, daily, practice));
+    setMedalEarned(null);
     setRunStartWorld(startWorld);
     setStartPanel(null);
     setMode(runMode);
@@ -670,16 +699,36 @@ function App() {
     revealSecondaryHud();
 
     const step = advancePersonalBest(personalBestRef.current, newScore);
-    if (!step.crossed || step.state.target === null) return;
-    personalBestRef.current = step.state;
-    // One-time record moment: banner + score pill accent (state), cue, haptic.
-    setPersonalBestPassed(true);
-    announce(getPersonalBestAnnouncement(step.state.target, dailyKey !== null));
-    audioManager.playRecord(worldRef.current);
-    // GameCanvas vibrates for the stack (and level up) right after reporting
-    // the score, and a new vibrate() call cancels the running pattern: queue
-    // ours behind that synchronous work so the bigger moment is the one felt.
-    queueMicrotask(() => haptic("record"));
+    const recordMoment = step.crossed && step.state.target !== null;
+    if (recordMoment && step.state.target !== null) {
+      personalBestRef.current = step.state;
+      // One-time record moment: banner + score pill accent (state), cue, haptic.
+      setPersonalBestPassed(true);
+      announce(getPersonalBestAnnouncement(step.state.target, dailyKey !== null));
+      audioManager.playRecord(worldRef.current);
+      // GameCanvas vibrates for the stack (and level up) right after reporting
+      // the score, and a new vibrate() call cancels the running pattern: queue
+      // ours behind that synchronous work so the bigger moment is the one felt.
+      queueMicrotask(() => haptic("record"));
+    }
+
+    const medalStep = advanceMedalRun(medalRunRef.current, newScore);
+    const medal = medalStep.crossed;
+    if (medal === null) return;
+    medalRunRef.current = medalStep.state;
+    // One-time per medal: HUD chip + lane pill (state), announcement, cue.
+    setMedalEarned(medal);
+    announce(getMedalAnnouncement(medal));
+    // A record on the same stack already has the bigger cue and haptic.
+    if (recordMoment) return;
+    queueMicrotask(() => {
+      // Runs after GameCanvas finished the stack (style update + its sounds):
+      // never stack two pentatonic runs when a combo milestone landed too.
+      if (!comboMilestoneStackRef.current) {
+        audioManager.playComboMilestone(MEDAL_CUE_TIER[medal], worldRef.current);
+      }
+      haptic("medal");
+    });
   }, [revealSecondaryHud, announce, dailyKey]);
 
   // Last progression announced; undo re-reports the current level/world and
@@ -734,6 +783,8 @@ function App() {
   }, []);
 
   const handleStyleUpdate = useCallback((style: StyleUpdate) => {
+    comboMilestoneStackRef.current =
+      style.lastStackQuality !== null && isComboMilestone(style.streak);
     setStyleScore(style.styleScore);
     setStreak(style.streak);
     setBestStreak(style.bestStreak);
@@ -1003,6 +1054,21 @@ function App() {
     return best === undefined ? "BEST --" : `BEST ${best}`;
   };
 
+  /** Best Time Attack medal, derived from the stored top score (no storage). */
+  const bestMedal = getMedal(allScores.TIME_ATTACK[0]?.score ?? 0);
+  /** The run in progress (or just ended) is a regular Time Attack run. */
+  const runHasMedals = hasMedals(mode, dailyKey !== null, runStartWorld > 1);
+  const medalTarget = runHasMedals ? getMedalTarget(medalEarned) : null;
+  /** One HUD goal at a time (see selectHudGoal): the nearer of best and medal. */
+  const hudGoal = selectHudGoal(
+    personalBestPassed ? null : personalBestTarget,
+    medalTarget,
+  );
+  const gameOverMedal =
+    lastRun && hasMedals(lastRun.mode, lastRun.daily !== null, lastRun.practiceWorld !== null)
+      ? getMedalResult(score)
+      : null;
+
   const endInsight = lastRun ? getEndInsight(lastRun.stats.endReason, world) : null;
   const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
   /** Stacks made this run (a practice run starts with earlier worlds "done"). */
@@ -1098,7 +1164,15 @@ function App() {
                   {MODE_LABELS[m].label}
                 </button>
                 <span className="mode-best" data-testid={`best-${m}`}>
+                  {bestMedal && m === "TIME_ATTACK" && (
+                    <MedalGlyph medal={bestMedal} />
+                  )}
                   {bestFor(m)}
+                  {bestMedal && m === "TIME_ATTACK" && (
+                    <span className="visually-hidden">
+                      , {MEDAL_LABELS[bestMedal]} medal
+                    </span>
+                  )}
                 </span>
               </div>
             ))}
@@ -1236,9 +1310,23 @@ function App() {
               }`}
             >
               <span className="score score-readout">{score}</span>
-              {personalBestTarget !== null && !personalBestPassed && (
+              {/* A single goal chip, no earned-medal glyph: the pill is already
+                  as wide as a 375 px phone allows (the lane pill and the game
+                  over carry the medal itself). */}
+              {hudGoal?.kind === "best" && (
                 <span className="pb-target" data-testid="pb-target">
-                  BEST {personalBestTarget}
+                  BEST {hudGoal.score}
+                </span>
+              )}
+              {hudGoal?.kind === "medal" && (
+                <span
+                  key={hudGoal.medal}
+                  className={`medal-target medal--${hudGoal.medal.toLowerCase()}${
+                    reducedFx ? " reduced-fx" : ""
+                  }`}
+                  data-testid="medal-target"
+                >
+                  {MEDAL_LABELS[hudGoal.medal].toUpperCase()} {hudGoal.threshold}
                 </span>
               )}
               <span className="world-badge">W {world}</span>
@@ -1407,6 +1495,30 @@ function App() {
             </div>
           )}
 
+          {runHasMedals && medalEarned && (
+            // Decorative: the live region announces it (no double read-out).
+            <div
+              key={`medal-${medalEarned}`}
+              className={`medal-milestone medal--${medalEarned.toLowerCase()}${
+                reducedFx ? " reduced-fx" : ""
+              }`}
+              data-testid="medal-banner"
+              aria-hidden="true"
+            >
+              <MedalGlyph medal={medalEarned} />
+              <span className="medal-milestone-text">
+                <span className="medal-milestone-title">
+                  {MEDAL_LABELS[medalEarned].toUpperCase()} MEDAL
+                </span>
+                {medalTarget && (
+                  <span className="medal-milestone-sub">
+                    NEXT {MEDAL_LABELS[medalTarget.medal].toUpperCase()} {medalTarget.threshold}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
           {showLevelUp && !showWorldUp && (
             <div className="level-up-overlay">
               <span className="level-up-text">LEVEL {level}</span>
@@ -1436,6 +1548,7 @@ function App() {
           world={world}
           level={level}
           topScores={allScores[mode]}
+          medal={gameOverMedal}
           stackCount={runStackCount}
           endInsight={endInsight}
           breakdown={breakdown}

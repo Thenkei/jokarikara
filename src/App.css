@@ -2594,3 +2594,209 @@ button:focus-visible {
   white-space: nowrap;
   border: 0;
 }
+
+/* ---------- Time Attack medals ---------- */
+/* Per-metal palette, read by the glyph (gradient stops) and the labels. */
+.medal-glyph--bronze,
+.medal--bronze {
+  --medal-hi: var(--medal-bronze-hi);
+  --medal-base: var(--medal-bronze);
+  --medal-lo: var(--medal-bronze-lo);
+  --medal-text: var(--medal-bronze-text);
+}
+
+.medal-glyph--silver,
+.medal--silver {
+  --medal-hi: var(--medal-silver-hi);
+  --medal-base: var(--medal-silver);
+  --medal-lo: var(--medal-silver-lo);
+  --medal-text: var(--medal-silver-text);
+}
+
+.medal-glyph--gold,
+.medal--gold {
+  --medal-hi: var(--medal-gold-hi);
+  --medal-base: var(--medal-gold);
+  --medal-lo: var(--medal-gold-lo);
+  --medal-text: var(--medal-gold-text);
+}
+
+.medal-glyph {
+  display: inline-block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+}
+
+.medal-glyph-ribbon {
+  fill: color-mix(in srgb, var(--medal-lo) 70%, #1a2a5a 30%);
+}
+
+.medal-glyph-ribbon--back {
+  fill: color-mix(in srgb, var(--medal-lo) 45%, #0d1430 55%);
+}
+
+.medal-glyph--none {
+  color: #7d8494;
+}
+
+/* HUD: next medal goal, as quiet as the BEST target it alternates with;
+ * re-keyed per medal so it pops once when the goal moves on. */
+.medal-target {
+  color: var(--medal-text);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0.9;
+  animation: medalChipPop 0.6s ease-out;
+}
+
+.medal-target.reduced-fx {
+  animation: none;
+}
+
+@keyframes medalChipPop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.25);
+  }
+}
+
+/* Crossing cue: a compact pill in the free lane under the stack, clear of
+ * the record (19%) and combo (30%) banners that can land on the same stack,
+ * and stacked above the achievement toast lane (Gold Rush lands with Gold). */
+.medal-milestone {
+  position: absolute;
+  left: 50%;
+  bottom: calc(
+    max(1.25rem, env(safe-area-inset-bottom)) + var(--achievement-toast-height) + 0.9rem
+  );
+  transform: translateX(-50%);
+  z-index: 91;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem 0.5rem 0.7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(9, 12, 20, 0.78);
+  border: 1px solid color-mix(in srgb, var(--medal-base) 60%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--medal-base) 30%, transparent);
+  backdrop-filter: blur(8px);
+  animation: medalLanePop 2.4s ease-out forwards;
+}
+
+.medal-milestone .medal-glyph {
+  font-size: 1.9rem;
+}
+
+.medal-milestone-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+}
+
+.medal-milestone-title {
+  font-size: 0.95rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  color: var(--medal-text);
+}
+
+.medal-milestone-sub {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #c7cedb;
+  font-variant-numeric: tabular-nums;
+}
+
+.medal-milestone.reduced-fx {
+  animation: timeBonusFade 2.4s linear forwards;
+}
+
+@keyframes medalLanePop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0.8rem) scale(0.9);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.05);
+  }
+  26% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+/* Game over: the medal sits right under the score, smaller than it. */
+.gameover-medal {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.55rem;
+  padding: 0.4rem 0.95rem 0.4rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--medal-base, #4a505c) 55%, transparent);
+  text-align: left;
+}
+
+.gameover-medal .medal-glyph {
+  font-size: 2.1rem;
+}
+
+.gameover-medal-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.gameover-medal-title {
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: var(--medal-text, #aeb4c0);
+}
+
+.gameover-medal-next {
+  font-size: 0.72rem;
+  color: #9aa0ad;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Start screen: best medal next to the Time Attack best. */
+.mode-best {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.mode-best .medal-glyph {
+  font-size: 0.95rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medal-milestone {
+    animation: timeBonusFade 2.4s linear forwards;
+  }
+
+  .medal-target {
+    animation: none;
+  }
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StackEvent, StackQuality } from "../types";
+import { MEDAL_THRESHOLDS } from "../modes/medals";
 import {
   ACHIEVEMENTS,
   ACHIEVEMENT_COUNT,
@@ -12,6 +13,7 @@ import {
   MAX_TRACKED_DAILY_DATES,
   PERFECT_ALIGNMENT_RUN,
   SPEED_DEMON_MAX_SECONDS,
+  GOLD_RUSH_SCORE,
   TIME_LORD_SCORE,
   UNBROKEN_COMBO,
   ZEN_MASTER_STACKS,
@@ -76,9 +78,9 @@ const unlockedBy = (r: RunProgress | null, l: LifetimeStats = lifetime()) =>
   evaluate({ run: r, lifetime: l }, NONE);
 
 describe("catalogue", () => {
-  it("has 12 visible + 1 hidden achievements with unique ids matching ACHIEVEMENT_IDS", () => {
+  it("has 13 visible + 1 hidden achievements with unique ids matching ACHIEVEMENT_IDS", () => {
     // The total includes the hidden one: the panel lists it (as "???").
-    expect(ACHIEVEMENT_COUNT).toBe(13);
+    expect(ACHIEVEMENT_COUNT).toBe(14);
     expect(ACHIEVEMENTS.filter((a) => a.hidden).map((a) => a.id)).toEqual([
       SECRET_ACHIEVEMENT_ID,
     ]);
@@ -262,6 +264,28 @@ describe("evaluate", () => {
     expect(
       unlockedBy(run({ mode: "CLASSIC", stackCount: ZEN_MASTER_STACKS })),
     ).not.toContain("zen-master");
+  });
+
+  it("Gold Rush is the Time Attack gold medal, Time Attack only", () => {
+    expect(GOLD_RUSH_SCORE).toBe(MEDAL_THRESHOLDS.GOLD);
+    expect(GOLD_RUSH_SCORE).toBeLessThan(TIME_LORD_SCORE);
+    expect(unlockedBy(run({ mode: "TIME_ATTACK", score: GOLD_RUSH_SCORE }))).toContain(
+      "gold-rush",
+    );
+    expect(
+      unlockedBy(run({ mode: "TIME_ATTACK", score: GOLD_RUSH_SCORE - 1 })),
+    ).not.toContain("gold-rush");
+    expect(unlockedBy(run({ mode: "CLASSIC", score: GOLD_RUSH_SCORE }))).not.toContain(
+      "gold-rush",
+    );
+    // A past best alone does not unlock it: the medal is earned in a run.
+    expect(
+      unlockedBy(run({ mode: "CLASSIC" }), lifetime({ bestTimeAttackScore: GOLD_RUSH_SCORE })),
+    ).not.toContain("gold-rush");
+    const progress = getAchievement("gold-rush").progress!;
+    expect(
+      progress({ run: run({ mode: "TIME_ATTACK", score: 900 }), lifetime: lifetime({ bestTimeAttackScore: 1700 }) }),
+    ).toEqual({ current: 1700, target: GOLD_RUSH_SCORE });
   });
 
   it("Time Lord needs the score in Time Attack only", () => {

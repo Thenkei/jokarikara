@@ -3,6 +3,20 @@
   --text-color: #f0f0f4;
   --accent-color: #3b82f6;
   --font-main: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Time Attack medal metals: highlight / base / shade, plus a text tone. */
+  --medal-bronze-hi: #f6c9a3;
+  --medal-bronze: #c97f45;
+  --medal-bronze-lo: #7c4520;
+  --medal-bronze-text: #e8a878;
+  --medal-silver-hi: #ffffff;
+  --medal-silver: #c3cad6;
+  --medal-silver-lo: #6c7584;
+  --medal-silver-text: #d9dee8;
+  --medal-gold-hi: #fff4b3;
+  --medal-gold: #f3c43a;
+  --medal-gold-lo: #9c6a00;
+  --medal-gold-text: #ffd84d;
   
   font-family: var(--font-main);
   background-color: var(--bg-color);

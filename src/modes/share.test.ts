@@ -7,6 +7,7 @@ import {
   type RunShareInput,
 } from "./share";
 import { QUALITY_EMOJI } from "./daily";
+import { MEDAL_THRESHOLDS } from "./medals";
 import type { QualityBreakdown } from "./runInsights";
 
 const breakdown = (
@@ -77,11 +78,37 @@ describe("buildRunShareText", () => {
     expectClean(text);
   });
 
-  it("formats a Time Attack run", () => {
-    const text = buildRunShareText({ ...base, mode: "TIME_ATTACK" });
+  it("formats a Time Attack run (below Bronze: no medal)", () => {
+    const text = buildRunShareText({ ...base, mode: "TIME_ATTACK", score: 640 });
     expect(text.split("\n")[0]).toBe("Shape Stack · Time Attack");
     expect(text).toContain("combo x4");
     expectClean(text);
+  });
+
+  it("names the Time Attack medal in words in the title", () => {
+    const gold = buildRunShareText({ ...base, mode: "TIME_ATTACK", score: MEDAL_THRESHOLDS.GOLD });
+    expect(gold.split("\n")[0]).toBe("Shape Stack · Time Attack · Gold medal");
+    const bronze = buildRunShareText({
+      ...base,
+      mode: "TIME_ATTACK",
+      score: MEDAL_THRESHOLDS.SILVER - 5,
+    });
+    expect(bronze.split("\n")[0]).toBe("Shape Stack · Time Attack · Bronze medal");
+    expect(bronze.split("\n")[1]).toMatch(/^1495 pts · /);
+    expectClean(gold);
+    expectClean(bronze);
+  });
+
+  it("says nothing about medals below Bronze or outside Time Attack", () => {
+    const none = buildRunShareText({
+      ...base,
+      mode: "TIME_ATTACK",
+      score: MEDAL_THRESHOLDS.BRONZE - 5,
+    });
+    expect(none).not.toMatch(/medal/i);
+    const classic = buildRunShareText({ ...base, score: MEDAL_THRESHOLDS.GOLD });
+    expect(classic.split("\n")[0]).toBe("Shape Stack · Classic");
+    expect(classic).not.toMatch(/medal/i);
   });
 
   it("omits the combo in Zen, which has none", () => {

@@ -25,7 +25,7 @@ test.describe("Lifetime stats", () => {
     await page.goto("/");
     await page.click(".achievements-btn");
     await expect(page.locator(".achievements-screen")).toBeVisible();
-    await expect(page.locator(".achievement-item")).toHaveCount(13);
+    await expect(page.locator(".achievement-item")).toHaveCount(14);
     await expect(page.locator(".lifetime-stats")).toHaveCount(0);
   });
 

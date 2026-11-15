@@ -1,5 +1,6 @@
 import type { GameMode, StackEvent } from "../types";
 import { LEVELS_PER_WORLD } from "../constants/game";
+import { MEDAL_THRESHOLDS } from "../modes/medals";
 
 /**
  * Achievements: a static catalogue plus pure evaluation.
@@ -21,6 +22,8 @@ export const SPEED_DEMON_LEVEL = 5;
 export const SPEED_DEMON_MAX_SECONDS = 30;
 export const ZEN_MASTER_STACKS = 30;
 export const TIME_LORD_SCORE = 3000;
+/** Same bar as the Time Attack gold medal (single source: medals.ts). */
+export const GOLD_RUSH_SCORE = MEDAL_THRESHOLDS.GOLD;
 export const DAILY_DEVOTEE_DAYS = 3;
 export const ARCHITECT_LIFETIME_STACKS = 1000;
 
@@ -41,6 +44,7 @@ export const ACHIEVEMENT_IDS = [
   "speed-demon",
   "giant-slayer",
   "zen-master",
+  "gold-rush",
   "time-lord",
   "daily-devotee",
   "architect",
@@ -266,6 +270,18 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = Object.freeze([
       capped(
         Math.max(ctx.lifetime.bestZenStacks, zenStacks(ctx)),
         ZEN_MASTER_STACKS,
+      ),
+  },
+  {
+    id: "gold-rush",
+    title: "Gold Rush",
+    description: `Earn a Time Attack gold medal (${GOLD_RUSH_SCORE} points).`,
+    // TA has no Daily or practice variant, so a TA score is a medal score.
+    isUnlocked: (ctx) => timeAttackScore(ctx) >= GOLD_RUSH_SCORE,
+    progress: (ctx) =>
+      capped(
+        Math.max(ctx.lifetime.bestTimeAttackScore, timeAttackScore(ctx)),
+        GOLD_RUSH_SCORE,
       ),
   },
   {
