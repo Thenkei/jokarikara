@@ -5,14 +5,12 @@ import {
   useRef,
   useEffect,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { GameCanvas, type GameCanvasHandle } from "./components/GameCanvas";
 import { audioManager } from "./utils/audioManager";
 import { installAudioTestBridge } from "./utils/testBridge";
 import {
-  GAME_MODES,
   getAllHighScores,
   getHighScores,
   saveHighScore,
@@ -27,25 +25,16 @@ import type { GameMode, MissMargin, RunStats, StyleUpdate, StackQuality } from "
 import { getWorldPalette, getWorldTheme } from "./visual/theme";
 import { haptic, isHapticsSupported, setHapticsEnabled } from "./utils/haptics";
 import { StartBackdrop } from "./components/StartBackdrop";
-import { getTimeBonus } from "./core/gameState";
-import { getComboTier, isComboMilestone } from "./gameplay/combo";
-import {
-  RESUME_COUNTDOWN_FROM,
-  RESUME_COUNTDOWN_STEP_MS,
-} from "./gameplay/resumeCountdown";
+import { isComboMilestone } from "./gameplay/combo";
+import { RESUME_COUNTDOWN_FROM } from "./gameplay/resumeCountdown";
 import { getEndInsight, getQualityBreakdown } from "./modes/runInsights";
-import {
-  FINISH_CONFIRM_WINDOW_MS,
-  canFinishRun,
-  stepFinishConfirm,
-} from "./modes/finishRun";
+import { canFinishRun } from "./modes/finishRun";
+import { useFinishConfirm } from "./modes/useFinishConfirm";
 import { getMissAnnouncement, getMissMarginLabel } from "./modes/missMargin";
 import { getTimeUpAnnouncement, type TimeUpResult } from "./modes/endFeedback";
 import {
   LEVELS_PER_WORLD,
   STACKS_PER_LEVEL,
-  PERFECT_STACK_TIME_BONUS,
-  GREAT_STACK_TIME_BONUS,
   TIME_ATTACK_MISS_PENALTY,
   ZEN_MAX_LIVES,
 } from "./constants/game";
@@ -65,24 +54,19 @@ import {
   type DailyStreakLabel,
 } from "./modes/dailyStreak";
 import { useWallClock } from "./modes/useWallClock";
-import { StreakChip } from "./components/StreakChip";
 import { buildRunShareText } from "./modes/share";
 import {
   MEDAL_CUE_TIER,
   advanceMedalRun,
   createMedalRun,
-  getMedal,
   getMedalAnnouncement,
-  getMedalName,
   getMedalResult,
   getMedalTarget,
-  getMedalTitle,
   hasMedals,
   selectHudGoal,
   type Medal,
   type MedalRunState,
 } from "./modes/medals";
-import { MedalGlyph } from "./components/MedalGlyph";
 import {
   advancePersonalBest,
   createPersonalBestState,
@@ -91,12 +75,11 @@ import {
   type PersonalBestState,
 } from "./modes/personalBest";
 import {
-  ACHIEVEMENT_COUNT,
   SECRET_ACHIEVEMENT_ID,
   countUnlocked,
   type AchievementId,
 } from "./progression/achievements";
-import { MONO_SEQUENCE, registerTap, stepSequence } from "./utils/secrets";
+import { useStartSecrets } from "./utils/useStartSecrets";
 import { useAchievements } from "./progression/useAchievements";
 import { isFirstEverProfile } from "./progression/stats";
 import {
@@ -105,14 +88,15 @@ import {
 } from "./components/AchievementToaster";
 import { AchievementsPanel } from "./components/AchievementsPanel";
 import { WorldAtlas } from "./components/WorldAtlas";
-import { ATLAS_WORLD_COUNT, countRevealedWorlds } from "./gameplay/atlas";
+import { StartScreen, type StartPanel } from "./components/StartScreen";
+import { countRevealedWorlds } from "./gameplay/atlas";
 import { getWorldHowTo, getWorldName, getWorldTagline } from "./gameplay/worldText";
 import { WORLD_INTRO_MS } from "./gameplay/worldIntro";
-import {
-  GearIcon,
-  SettingsSheet,
-  type SettingId,
-} from "./components/SettingsSheet";
+import { SettingsSheet, type SettingId } from "./components/SettingsSheet";
+import { PauseMenu } from "./components/PauseMenu";
+import { GameHud } from "./components/GameHud";
+import { useSecondaryHud } from "./components/useSecondaryHud";
+import { HudOverlays, type ComboBanner, type MissPop } from "./components/HudOverlays";
 import {
   GameOverScreen,
   type GameOverRun,
@@ -124,10 +108,8 @@ import {
   readBrowserLanguages,
   resolveLocale,
   type LanguageSetting,
-  type Translator,
 } from "./i18n";
 import { I18nContext } from "./i18n/context";
-import { Rich } from "./i18n/Rich";
 import "./App.css";
 
 const isE2eMode = (): boolean =>
@@ -145,33 +127,6 @@ const createRunSeed = (): number => {
   }
 
   return Math.floor(Math.random() * 0xffffffff);
-};
-
-/** Full-screen panels opened from the start screen menu. */
-type StartPanel = "achievements" | "worlds";
-
-const HUD_REVEAL_DURATION_MS = 2000;
-/** Start backdrop flourish length: the CSS burst plus its last layer's delay. */
-const FLOURISH_MS = 1900;
-/** Time Attack timer turns critical (red, pulsing) at or below this. */
-const TIMER_CRITICAL_SECONDS = 10;
-
-/** One line under the mode picker: the mode's rule, with the live numbers. */
-const describeMode = ({ t }: Translator, mode: GameMode): string => {
-  switch (mode) {
-    case "CLASSIC":
-      return t("mode.CLASSIC.description");
-    case "ZEN":
-      return t("mode.ZEN.description", { lives: ZEN_MAX_LIVES });
-    case "TIME_ATTACK":
-      return TIME_ATTACK_MISS_PENALTY !== undefined
-        ? t("mode.TIME_ATTACK.description", {
-            perfect: PERFECT_STACK_TIME_BONUS,
-            great: GREAT_STACK_TIME_BONUS,
-            penalty: TIME_ATTACK_MISS_PENALTY,
-          })
-        : t("mode.TIME_ATTACK.descriptionNoPenalty", { perfect: PERFECT_STACK_TIME_BONUS });
-  }
 };
 
 const EMPTY_STATS: RunStats = {
@@ -312,11 +267,15 @@ function App() {
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [zenLives, setZenLives] = useState<number | null>(null);
-  const [showSecondaryHud, setShowSecondaryHud] = useState(false);
+  const {
+    visible: showSecondaryHud,
+    reveal: revealSecondaryHud,
+    hide: hideSecondaryHud,
+  } = useSecondaryHud();
   const [lastQuality, setLastQuality] = useState<StackQuality | null>(null);
   const [qualityPulseId, setQualityPulseId] = useState(0);
   /** Last combo milestone reached (id replays the banner animation). */
-  const [comboBanner, setComboBanner] = useState({ streak: 0, id: 0 });
+  const [comboBanner, setComboBanner] = useState<ComboBanner>({ streak: 0, id: 0 });
   /**
    * Screen-reader announcements for events that are otherwise purely visual
    * (level/world/combo/pause/game over). Score itself is not announced: it
@@ -385,9 +344,7 @@ function App() {
    * far it was off ("+4 %", "BY A HAIR"). Set once per miss event, never per
    * frame; `id` replays the animation for identical consecutive labels.
    */
-  const [missPop, setMissPop] = useState<{ label: string | null; id: number } | null>(
-    null,
-  );
+  const [missPop, setMissPop] = useState<MissPop | null>(null);
   /** Start screen sub-panel shown instead of the menu (null = the menu). */
   const [startPanel, setStartPanel] = useState<StartPanel | null>(null);
   /**
@@ -399,46 +356,30 @@ function App() {
     achievements: null,
     worlds: null,
   });
-  const [showSettings, setShowSettings] = useState(false);
-  /**
-   * Zen FINISH RUN confirm: armed after a first press ("TAP AGAIN TO
-   * FINISH"), disarmed after FINISH_CONFIRM_WINDOW_MS or when the pause menu
-   * closes. The arming time (monotonic) lives in a ref for the press handler.
-   */
-  const [finishArmed, setFinishArmed] = useState(false);
-  const finishArmedAtRef = useRef<number | null>(null);
-  const finishDisarmTimeoutRef = useRef<number | null>(null);
-  /** Back to plain FINISH RUN (window expired, menu closed, run over). */
-  const disarmFinish = useCallback(() => {
-    finishArmedAtRef.current = null;
-    if (finishDisarmTimeoutRef.current !== null) {
-      window.clearTimeout(finishDisarmTimeoutRef.current);
-      finishDisarmTimeoutRef.current = null;
-    }
-    setFinishArmed(false);
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (finishDisarmTimeoutRef.current !== null) {
-        window.clearTimeout(finishDisarmTimeoutRef.current);
-      }
+  const registerPanelTrigger = useCallback(
+    (panel: StartPanel, node: HTMLButtonElement | null) => {
+      panelTriggerRefs.current[panel] = node;
     },
     [],
   );
-  /**
-   * Start screen secrets. Mono is session-only by design (never persisted):
-   * a reload brings the regular look back.
-   */
-  const [mono, setMono] = useState(false);
-  const [flourishing, setFlourishing] = useState(false);
-  const secretProgressRef = useRef(0);
-  const titleTapsRef = useRef<readonly number[]>([]);
-  const flourishTimeoutRef = useRef<number | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   /** The gear that opened the sheet (start screen or pause menu, never both). */
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<GameCanvasHandle>(null);
-  const secondaryHudTimeoutRef = useRef<number | null>(null);
+  /**
+   * Zen FINISH RUN confirm: armed after a first press ("TAP AGAIN TO
+   * FINISH"), disarmed after the confirm window or when the pause menu
+   * closes; the confirming press ends the run through onGameOver ->
+   * handleGameOver (score, stats, insight).
+   */
+  const {
+    armed: finishArmed,
+    disarm: disarmFinish,
+    press: handleFinishPress,
+  } = useFinishConfirm({
+    onArm: () => announce(t("announce.finishConfirm")),
+    onConfirm: () => canvasRef.current?.finishRun(),
+  });
   const previousZenLivesRef = useRef<number | null>(null);
   const toasterRef = useRef<AchievementToasterHandle>(null);
   const worldRef = useRef(world);
@@ -458,6 +399,20 @@ function App() {
     unlock: unlockAchievement,
   } = useAchievements({ onUnlock: handleAchievementUnlock });
   const unlockedAchievementCount = countUnlocked(achievementRecord.unlocked);
+  /**
+   * Start screen secrets (title taps, arrow sequence). Mono is session-only
+   * by design (never persisted): a reload brings the regular look back.
+   */
+  const {
+    mono,
+    flourishing,
+    handleTitleClick,
+    observeKey: observeSecretKey,
+  } = useStartSecrets({
+    resetKey: `${gameState}:${startPanel}`,
+    onMonoChange: (next) => announce(t(next ? "start.monoOn" : "start.monoOff")),
+    onFound: () => unlockAchievement(SECRET_ACHIEVEMENT_ID),
+  });
 
   const handleRunMiss = useCallback(
     (terminal: boolean, margin: MissMargin | null) => {
@@ -606,73 +561,8 @@ function App() {
 
   useEffect(() => clearWorldUpTimeout, [clearWorldUpTimeout]);
 
-  const clearSecondaryHudTimeout = useCallback(() => {
-    if (secondaryHudTimeoutRef.current !== null) {
-      window.clearTimeout(secondaryHudTimeoutRef.current);
-      secondaryHudTimeoutRef.current = null;
-    }
-  }, []);
-
-  const revealSecondaryHud = useCallback(() => {
-    setShowSecondaryHud(true);
-    clearSecondaryHudTimeout();
-    secondaryHudTimeoutRef.current = window.setTimeout(() => {
-      setShowSecondaryHud(false);
-      secondaryHudTimeoutRef.current = null;
-    }, HUD_REVEAL_DURATION_MS);
-  }, [clearSecondaryHudTimeout]);
-
-  useEffect(() => {
-    return () => {
-      clearSecondaryHudTimeout();
-    };
-  }, [clearSecondaryHudTimeout]);
-
   useEffect(() => installAudioTestBridge(audioManager), []);
 
-  // Secret inputs only count on the start screen itself: leaving it (or
-  // opening the achievements panel) forgets a half-entered sequence.
-  useEffect(() => {
-    secretProgressRef.current = 0;
-    titleTapsRef.current = [];
-  }, [gameState, startPanel]);
-
-  useEffect(
-    () => () => {
-      if (flourishTimeoutRef.current !== null) {
-        window.clearTimeout(flourishTimeoutRef.current);
-      }
-    },
-    []
-  );
-
-  /** Title tapped 7 times quickly: backdrop flourish + chime. */
-  const handleTitleClick = (event: ReactMouseEvent<HTMLHeadingElement>) => {
-    // A celebration already playing swallows extra taps (no restart mid-burst).
-    if (flourishing) return;
-    const step = registerTap(titleTapsRef.current, event.timeStamp);
-    titleTapsRef.current = step.taps;
-    if (!step.triggered) return;
-    // Click (not pointerdown) so the 7th tap is a user activation on touch
-    // devices too, and the audio context may start. Silent when muted.
-    audioManager.playChime();
-    audioManager.resume();
-    setFlourishing(true);
-    flourishTimeoutRef.current = window.setTimeout(() => {
-      flourishTimeoutRef.current = null;
-      setFlourishing(false);
-    }, FLOURISH_MS);
-    unlockAchievement(SECRET_ACHIEVEMENT_ID);
-  };
-
-  /** Arrow sequence entered: toggle the Mono look (keyboard-reachable egg). */
-  const toggleMono = () => {
-    const next = !mono;
-    setMono(next);
-    audioManager.playUi(next ? "confirm" : "back");
-    announce(t(next ? "start.monoOn" : "start.monoOff"));
-    unlockAchievement(SECRET_ACHIEVEMENT_ID);
-  };
   const gameplayThemeVars = useMemo(
     () =>
       ({
@@ -843,8 +733,7 @@ function App() {
       setScore(finalScore);
       setWorld(finalWorld);
       setLevel(finalLevel);
-      clearSecondaryHudTimeout();
-      setShowSecondaryHud(false);
+      hideSecondaryHud();
       setGameState("GAMEOVER");
       disarmFinish();
       // A Time Attack run that used its clock was announced at the TIME!
@@ -870,7 +759,7 @@ function App() {
     [
       announce,
       i18n,
-      clearSecondaryHudTimeout,
+      hideSecondaryHud,
       mode,
       dailyKey,
       runStartWorld,
@@ -1071,34 +960,6 @@ function App() {
     revealSecondaryHud();
   };
 
-  /**
-   * Zen FINISH RUN, two presses: the first arms the button for
-   * FINISH_CONFIRM_WINDOW_MS, a deliberate second one (not a double click, see
-   * stepFinishConfirm) ends the run through the regular game over path.
-   */
-  const handleFinishPress = () => {
-    const now = performance.now();
-    const step = stepFinishConfirm(finishArmedAtRef.current, now);
-    if (step === "wait") return;
-    if (step === "arm") {
-      finishArmedAtRef.current = now;
-      setFinishArmed(true);
-      if (finishDisarmTimeoutRef.current !== null) {
-        window.clearTimeout(finishDisarmTimeoutRef.current);
-      }
-      finishDisarmTimeoutRef.current = window.setTimeout(() => {
-        finishDisarmTimeoutRef.current = null;
-        finishArmedAtRef.current = null;
-        setFinishArmed(false);
-      }, FINISH_CONFIRM_WINDOW_MS);
-      announce(t("announce.finishConfirm"));
-      return;
-    }
-    disarmFinish();
-    // Reports through onGameOver -> handleGameOver (score, stats, insight).
-    canvasRef.current?.finishRun();
-  };
-
   const handleToggleReducedFx = () => {
     setReducedFx((current) => {
       const next = !current;
@@ -1200,8 +1061,7 @@ function App() {
     setShowSettings(false);
     setDailyKey(null);
     setKnownDailyRecord(readDailyRecordForToday());
-    clearSecondaryHudTimeout();
-    setShowSecondaryHud(false);
+    hideSecondaryHud();
     setZenLives(null);
     previousZenLivesRef.current = null;
     setShowLevelUp(false);
@@ -1256,9 +1116,7 @@ function App() {
     if (gameState === "START") {
       // Observes keys only (no preventDefault): arrows keep driving the mode
       // radio group, and the full sequence nets out to the same mode.
-      const step = stepSequence(MONO_SEQUENCE, secretProgressRef.current, event);
-      secretProgressRef.current = step.progress;
-      if (step.matched) toggleMono();
+      observeSecretKey(event);
     }
 
     if (event.key === "Enter" && !event.repeat && !isInteractiveTarget(event.target)) {
@@ -1298,39 +1156,6 @@ function App() {
     };
   }, [gameState, applyPaused]);
 
-  const modeButtonRefs = useRef<Partial<Record<GameMode, HTMLButtonElement | null>>>({});
-  /** WAI-ARIA radio group keys: arrows move and select, Home/End jump. */
-  const handleModeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const index = GAME_MODES.indexOf(mode);
-    const last = GAME_MODES.length - 1;
-    const target =
-      event.key === "ArrowRight" || event.key === "ArrowDown"
-        ? (index + 1) % GAME_MODES.length
-        : event.key === "ArrowLeft" || event.key === "ArrowUp"
-          ? (index - 1 + GAME_MODES.length) % GAME_MODES.length
-          : event.key === "Home"
-            ? 0
-            : event.key === "End"
-              ? last
-              : null;
-    if (target === null) return;
-    event.preventDefault();
-    audioManager.playUi("select");
-    const next = GAME_MODES[target];
-    setMode(next);
-    modeButtonRefs.current[next]?.focus();
-  };
-
-  const blurTarget = (event: { currentTarget: HTMLElement }) =>
-    event.currentTarget.blur();
-
-  const bestFor = (m: GameMode): string => {
-    const best = allScores[m][0]?.score;
-    return best === undefined ? t("start.bestNone") : t("start.best", { score: best });
-  };
-
-  /** Best Time Attack medal, derived from the stored top score (no storage). */
-  const bestMedal = getMedal(allScores.TIME_ATTACK[0]?.score ?? 0);
   /** The run in progress (or just ended) is a regular Time Attack run. */
   const runHasMedals = hasMedals(mode, dailyKey !== null, runStartWorld > 1);
   const medalTarget = runHasMedals ? getMedalTarget(medalEarned) : null;
@@ -1402,168 +1227,25 @@ function App() {
         )}
 
         {gameState === "START" && startPanel === null && (
-          <button
-            ref={settingsTriggerRef}
-            className="settings-gear-btn"
-            onClick={() => setShowSettings(true)}
-            aria-label={t("start.settings")}
-            aria-haspopup="dialog"
-            inert={settingsSheetVisible}
-          >
-            <GearIcon />
-          </button>
-        )}
-
-        {gameState === "START" && startPanel === null && (
-          <div className="screen start-screen" inert={settingsSheetVisible}>
-            {/* A plain heading for assistive tech: the tap secret is
-                pointer-only (React delegates the listener to the root, so the
-                heading is not exposed as clickable); keyboards get the arrow
-                sequence instead. */}
-            <h1 className="title" onClick={handleTitleClick}>
-              {t("app.title")}
-            </h1>
-            <p className="subtitle">{t("start.subtitle")}</p>
-
-            <div
-              className="mode-selection"
-              role="radiogroup"
-              aria-label={t("start.modeGroup")}
-              onKeyDown={handleModeKeyDown}
-            >
-              {GAME_MODES.map((m) => (
-                <div className="mode-option" key={m}>
-                  <button
-                    ref={(node) => {
-                      modeButtonRefs.current[m] = node;
-                    }}
-                    className={`mode-btn ${mode === m ? "active" : ""}`}
-                    onClick={() => setMode(m)}
-                    aria-label={t(`mode.${m}.aria`)}
-                    role="radio"
-                    aria-checked={mode === m}
-                    // Roving tabindex: one tab stop for the group, arrows inside.
-                    tabIndex={mode === m ? 0 : -1}
-                  >
-                    {t(`mode.${m}.label`)}
-                  </button>
-                  <span className="mode-best" data-testid={`best-${m}`}>
-                    {bestMedal && m === "TIME_ATTACK" && (
-                      <MedalGlyph medal={bestMedal} />
-                    )}
-                    {bestFor(m)}
-                    {bestMedal && m === "TIME_ATTACK" && (
-                      <span className="visually-hidden">
-                        {t("start.bestMedal", { medal: getMedalTitle(i18n, bestMedal) })}
-                      </span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="mode-description" aria-live="polite">
-              {describeMode(i18n, mode)}
-            </p>
-
-            {mode === "ZEN" && bestWorldReached > 1 && (
-              <div
-                className="practice-picker"
-                role="group"
-                aria-label={t("start.practiceGroup")}
-              >
-                <button
-                  className="practice-prev"
-                  onClick={() => setPracticeWorld(Math.max(1, pickedWorld - 1))}
-                  disabled={pickedWorld <= 1}
-                  aria-label={t("start.practicePrev")}
-                >
-                  ‹
-                </button>
-                <span className="practice-label" aria-live="polite">
-                  <span className="practice-world">
-                    {t("start.practiceWorld", { world: pickedWorld })}
-                  </span>
-                  <span className="practice-name">
-                    {pickedWorld === 1
-                      ? t("start.practiceFull")
-                      : t("start.practiceName", { name: getWorldName(i18n, pickedWorld) })}
-                  </span>
-                </span>
-                <button
-                  className="practice-next"
-                  onClick={() =>
-                    setPracticeWorld(Math.min(bestWorldReached, pickedWorld + 1))
-                  }
-                  disabled={pickedWorld >= bestWorldReached}
-                  aria-label={t("start.practiceNext")}
-                >
-                  ›
-                </button>
-              </div>
-            )}
-
-            <button
-              className="start-btn" data-ui-sound="confirm"
-              onClick={() => startRun({ mode, daily: false })}
-            >
-              {t("start.play")}
-            </button>
-
-            <button
-              className="daily-btn" data-ui-sound="confirm"
-              onClick={() => startRun({ mode: "CLASSIC", daily: true })}
-              aria-label={dailyButton.ariaLabel}
-            >
-              <span className="daily-btn-title">{t("daily.button")}</span>
-              <span className="daily-btn-meta">{dailyButton.meta}</span>
-              {(dailyButton.streak || dailyButton.next) && (
-                <span className="daily-btn-extra">
-                  {dailyButton.streak && <StreakChip label={dailyButton.streak} />}
-                  {dailyButton.next && (
-                    <span className="daily-next">
-                      <Rich
-                        template={i18n.template("daily.nextIn")}
-                        slots={{ time: <strong>{dailyButton.next.text}</strong> }}
-                      />
-                    </span>
-                  )}
-                </span>
-              )}
-            </button>
-
-            <div className="start-secondary">
-              <button
-                ref={(node) => {
-                  panelTriggerRefs.current.achievements = node;
-                }}
-                className="achievements-btn"
-                onClick={() => setStartPanel("achievements")}
-                aria-label={t("start.achievementsAria", {
-                  unlocked: unlockedAchievementCount,
-                  total: ACHIEVEMENT_COUNT,
-                })}
-              >
-                {t("start.achievements", {
-                  unlocked: unlockedAchievementCount,
-                  total: ACHIEVEMENT_COUNT,
-                })}
-              </button>
-              <button
-                ref={(node) => {
-                  panelTriggerRefs.current.worlds = node;
-                }}
-                className="worlds-btn"
-                onClick={() => setStartPanel("worlds")}
-                aria-label={t("start.worldsAria", {
-                  revealed: revealedWorldCount,
-                  total: ATLAS_WORLD_COUNT,
-                })}
-              >
-                {t("start.worlds", { revealed: revealedWorldCount, total: ATLAS_WORLD_COUNT })}
-              </button>
-            </div>
-
-          </div>
+          <StartScreen
+            mode={mode}
+            onModeChange={setMode}
+            allScores={allScores}
+            bestWorldReached={bestWorldReached}
+            pickedWorld={pickedWorld}
+            onPracticeWorldChange={setPracticeWorld}
+            dailyButton={dailyButton}
+            unlockedAchievementCount={unlockedAchievementCount}
+            revealedWorldCount={revealedWorldCount}
+            settingsOpen={settingsSheetVisible}
+            settingsTriggerRef={settingsTriggerRef}
+            registerPanelTrigger={registerPanelTrigger}
+            onTitleClick={handleTitleClick}
+            onStart={() => startRun({ mode, daily: false })}
+            onStartDaily={() => startRun({ mode: "CLASSIC", daily: true })}
+            onOpenPanel={setStartPanel}
+            onOpenSettings={() => setShowSettings(true)}
+          />
         )}
 
         {gameState === "PLAYING" && (
@@ -1599,351 +1281,60 @@ function App() {
               />
             </div>
 
-            <button
-              className="pause-btn"
-              onClick={(event) => {
-                blurTarget(event);
-                applyPaused(true);
-              }}
-              aria-label={t("hud.pauseAria")}
-            >
-              {t("hud.pause")}
-            </button>
-
-            <div className="hud">
-              {/* Row 1: the score and the one vital readout (Time Attack timer or
-                  Zen lives), in a band that reserves the PAUSE corner so they can
-                  never slide under it (see .hud-top). Everything else lives in
-                  the always-visible meta row below. */}
-              <div className="hud-top">
-                <div
-                  className={`hud-row hud-primary ${
-                    personalBestPassed ? `is-record${reducedFx ? " reduced-fx" : ""}` : ""
-                  }`}
-                >
-                  <span className="score score-readout">{score}</span>
-                  {mode === "TIME_ATTACK" && timeRemaining !== null && (
-                    <span
-                      className={`timer-badge ${
-                        timeRemaining <= TIMER_CRITICAL_SECONDS ? "critical" : ""
-                      }`}
-                      role="timer"
-                      aria-label={t("hud.timerAria", { count: Math.ceil(timeRemaining) })}
-                    >
-                      {t("hud.timer", { seconds: Math.ceil(timeRemaining) })}
-                    </span>
-                  )}
-                  {mode === "ZEN" && (
-                    <span
-                      className={`lives-badge ${(zenLives ?? 0) <= 3 ? "critical" : ""}`}
-                    >
-                      {t("hud.lives", { lives: zenLives ?? 0 })}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="hud-row hud-meta">
-                {/* A single goal chip, no earned-medal glyph (the lane pill and
-                    the game over carry the medal itself). */}
-                {hudGoal?.kind === "best" && (
-                  <span className="pb-target" data-testid="pb-target">
-                    {t("hud.best", { score: hudGoal.score })}
-                  </span>
-                )}
-                {hudGoal?.kind === "medal" && (
-                  <span
-                    key={hudGoal.medal}
-                    className={`medal-target medal--${hudGoal.medal.toLowerCase()}${
-                      reducedFx ? " reduced-fx" : ""
-                    }`}
-                    data-testid="medal-target"
-                  >
-                    {t("hud.medalGoal", {
-                      medal: i18n.upper(getMedalName(i18n, hudGoal.medal)),
-                      threshold: hudGoal.threshold,
-                    })}
-                  </span>
-                )}
-                <span className="world-badge">{t("hud.world", { world })}</span>
-                <span className="level-badge">{t("hud.level", { level })}</span>
-                {dailyKey && <span className="daily-badge">{t("hud.daily")}</span>}
-              </div>
-              <div
-                className={`hud-row hud-secondary ${showSecondaryHud ? "revealed" : "hidden"}`}
-                aria-hidden={!showSecondaryHud}
-              >
-                {mode !== "ZEN" && (
-                  <>
-                    <span className="style-badge">{t("hud.style", { score: styleScore })}</span>
-                    <span className={`streak-badge ${streak > 1 ? "active" : ""}`}>
-                      {t("hud.combo", { streak })}
-                    </span>
-                    <span className="best-streak-badge">
-                      {t("hud.bestCombo", { streak: bestStreak })}
-                    </span>
-                  </>
-                )}
-                {mode === "ZEN" && (
-                  <div className="zen-controls">
-                    <button
-                      className="restart-btn" data-ui-sound="none"
-                      onClick={(event) => {
-                        blurTarget(event);
-                        handleRestartShape();
-                      }}
-                      aria-label={t("hud.zenRestartAria")}
-                    >
-                      {t("hud.zenRestart")}
-                    </button>
-                    <button
-                      className="undo-btn" data-ui-sound="none"
-                      onClick={(event) => {
-                        blurTarget(event);
-                        handleUndo();
-                      }}
-                      aria-label={t("hud.zenUndoAria")}
-                    >
-                      {t("hud.zenUndo")}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+            <GameHud
+              mode={mode}
+              score={score}
+              world={world}
+              level={level}
+              timeRemaining={timeRemaining}
+              zenLives={zenLives}
+              recordPassed={personalBestPassed}
+              reducedFx={reducedFx}
+              goal={hudGoal}
+              daily={dailyKey !== null}
+              showSecondary={showSecondaryHud}
+              styleScore={styleScore}
+              streak={streak}
+              bestStreak={bestStreak}
+              onPause={() => applyPaused(true)}
+              onRestartShape={handleRestartShape}
+              onUndo={handleUndo}
+            />
 
             {paused && (
-              <div
-                className="pause-overlay"
-                role="dialog"
-                aria-modal="true"
-                aria-label={t("pause.dialog")}
-              >
-                <h2 className="pause-title">{t("pause.title")}</h2>
-                <button
-                  className="pause-resume-btn" data-ui-sound="confirm"
-                  onClick={() => applyPaused(false)}
-                  autoFocus
-                >
-                  {t("pause.resume")}
-                </button>
-                <button
-                  className="pause-restart-btn menu-btn" data-ui-sound="confirm"
-                  onClick={restartRun}
-                >
-                  {t("pause.restart")}
-                </button>
-                {canFinishRun(mode) && (
-                  <button
-                    className={`pause-finish-btn menu-btn${finishArmed ? " armed" : ""}`}
-                    // Armed: the finish cue replaces the generic click.
-                    data-ui-sound={finishArmed ? "none" : "select"}
-                    onClick={handleFinishPress}
-                    onKeyDown={(event) => {
-                      // A held Enter repeats clicks: it must not arm and confirm.
-                      if (event.repeat && event.key === "Enter") event.preventDefault();
-                    }}
-                  >
-                    {t(finishArmed ? "pause.finishArmed" : "pause.finish")}
-                  </button>
-                )}
-                <button
-                  ref={settingsTriggerRef}
-                  className="pause-settings-btn menu-btn"
-                  onClick={() => setShowSettings(true)}
-                  aria-haspopup="dialog"
-                >
-                  <GearIcon />
-                  {t("pause.settings")}
-                </button>
-                <button className="pause-menu-btn menu-btn" data-ui-sound="back" onClick={handleMainMenu}>
-                  {t("pause.mainMenu")}
-                </button>
-              </div>
+              <PauseMenu
+                canFinish={canFinishRun(mode)}
+                finishArmed={finishArmed}
+                onResume={() => applyPaused(false)}
+                onRestart={restartRun}
+                onFinishPress={handleFinishPress}
+                onOpenSettings={() => setShowSettings(true)}
+                onMainMenu={handleMainMenu}
+                settingsTriggerRef={settingsTriggerRef}
+              />
             )}
 
-            {resumeDigit !== null && (
-              // Decorative: the live region announces "Resuming in 3" once.
-              // pointer-events: none, so taps reach the (frozen) board and are
-              // ignored there like any tap while paused.
-              <div
-                className="resume-countdown"
-                data-testid="resume-countdown"
-                aria-hidden="true"
-                style={{ "--resume-step": `${RESUME_COUNTDOWN_STEP_MS}ms` } as CSSProperties}
-              >
-                <span
-                  key={resumeDigit}
-                  className={`resume-countdown-digit${reducedFx ? " reduced-fx" : ""}`}
-                >
-                  {resumeDigit}
-                </span>
-              </div>
-            )}
-
-            {showFirstRunHint && !paused && (
-              <div className="first-run-hint" role="status">
-                <p className="first-run-hint-title">{t("firstRun.title")}</p>
-                <p className="first-run-hint-body">
-                  <Rich
-                    template={i18n.template("firstRun.body")}
-                    slots={{
-                      perfect: (
-                        <span className="first-run-hint-perfect">{t("quality.PERFECT")}</span>
-                      ),
-                    }}
-                  />
-                </p>
-              </div>
-            )}
-
-            {lastQuality && (
-              <div
-                key={`quality-${qualityPulseId}`}
-                className={`quality-overlay quality-${lastQuality.toLowerCase()}`}
-              >
-                {t(`quality.${lastQuality}`)}
-              </div>
-            )}
-
-            {mode === "TIME_ATTACK" &&
-              lastQuality &&
-              getTimeBonus(lastQuality) > 0 && (
-                <div
-                  key={`bonus-${qualityPulseId}`}
-                  className="time-bonus-pop"
-                  aria-hidden="true"
-                >
-                  {t("hud.timeBonus", { seconds: getTimeBonus(lastQuality) })}
-                </div>
-              )}
-
-            {mode === "TIME_ATTACK" &&
-              penaltyPulseId > 0 &&
-              TIME_ATTACK_MISS_PENALTY !== undefined && (
-                <div
-                  key={`penalty-${penaltyPulseId}`}
-                  className="time-penalty-pop danger-signal"
-                  aria-hidden="true"
-                >
-                  {t("hud.timePenalty", { seconds: TIME_ATTACK_MISS_PENALTY })}
-                </div>
-              )}
-
-            {missPop && (
-              // Decorative: the live region announces the miss and its margin.
-              <div
-                key={`miss-${missPop.id}`}
-                className="miss-pop danger-signal"
-                data-testid="miss-pop"
-                aria-hidden="true"
-              >
-                <span className="miss-pop-title">{t("hud.miss")}</span>
-                {missPop.label && (
-                  <span className="miss-pop-margin">{missPop.label}</span>
-                )}
-              </div>
-            )}
-
-            {comboBanner.streak > 0 && mode !== "ZEN" && (
-              <div
-                key={`combo-${comboBanner.id}`}
-                className={`combo-milestone combo-tier-${getComboTier(comboBanner.streak)}`}
-                role="status"
-              >
-                {t("banner.combo", { streak: comboBanner.streak })}
-              </div>
-            )}
-
-            {personalBestPassed && personalBestTarget !== null && (
-              // Decorative: the live region announces it (no double read-out).
-              <div
-                className={`record-milestone ${reducedFx ? "reduced-fx" : ""}`}
-                data-testid="record-banner"
-                aria-hidden="true"
-              >
-                <span className="record-milestone-title">
-                  {t(dailyKey ? "banner.newDailyBest" : "banner.newBest")}
-                </span>
-                <span className="record-milestone-sub">
-                  {t("banner.pastBest", { score: personalBestTarget })}
-                </span>
-              </div>
-            )}
-
-            {runHasMedals && medalEarned && (
-              // Decorative: the live region announces it (no double read-out).
-              <div
-                key={`medal-${medalEarned}`}
-                className={`medal-milestone medal--${medalEarned.toLowerCase()}${
-                  reducedFx ? " reduced-fx" : ""
-                }`}
-                data-testid="medal-banner"
-                aria-hidden="true"
-              >
-                <MedalGlyph medal={medalEarned} />
-                <span className="medal-milestone-text">
-                  <span className="medal-milestone-title">
-                    {i18n.upper(getMedalTitle(i18n, medalEarned))}
-                  </span>
-                  {medalTarget && (
-                    <span className="medal-milestone-sub">
-                      {t("banner.nextMedal", {
-                        medal: i18n.upper(getMedalName(i18n, medalTarget.medal)),
-                        threshold: medalTarget.threshold,
-                      })}
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
-
-            {timeUp && (
-              // Decorative: the live region announces the result (no double
-              // read-out). The level-up pop's styles, in the world colour.
-              <div
-                className={`level-up-overlay time-up-overlay${reducedFx ? " reduced-fx" : ""}`}
-                data-testid="time-up-banner"
-                aria-hidden="true"
-              >
-                <span className="level-up-text time-up-text">{t("banner.timeUp")}</span>
-                {timeUp.medal && (
-                  <span className={`time-up-medal medal--${timeUp.medal.toLowerCase()}`}>
-                    <MedalGlyph medal={timeUp.medal} />
-                    {i18n.upper(getMedalTitle(i18n, timeUp.medal))}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {showLevelUp && !worldUpVisible && !timeUp && (
-              <div className="level-up-overlay">
-                <span className="level-up-text">{t("banner.level", { level })}</span>
-              </div>
-            )}
-            {worldUpVisible && (
-              // Decorative: the live region announces the world (and, on a
-              // first visit, its how-to line). pointer-events: none, so a tap
-              // anywhere reaches the board, which dismisses a first-visit hold.
-              <div
-                className={`world-up-overlay${introHowTo ? " world-up-overlay--teach" : ""}${
-                  reducedFx ? " reduced-fx" : ""
-                }`}
-                data-testid="world-up"
-                aria-hidden="true"
-              >
-                <span className="world-up-title">{t("banner.newWorld")}</span>
-                <span className="world-up-text">{t("banner.world", { world })}</span>
-                <span className="world-up-name">{getWorldName(i18n, world)}</span>
-                <span className="world-up-tagline">{getWorldTagline(i18n, world)}</span>
-                {introHowTo && (
-                  <>
-                    <span className="world-up-howto" data-testid="world-up-howto">
-                      {introHowTo}
-                    </span>
-                    <span className="world-up-continue">{t("banner.tapToPlay")}</span>
-                  </>
-                )}
-              </div>
-            )}
+            <HudOverlays
+              mode={mode}
+              world={world}
+              level={level}
+              reducedFx={reducedFx}
+              resumeDigit={resumeDigit}
+              showFirstRunHint={showFirstRunHint && !paused}
+              lastQuality={lastQuality}
+              qualityPulseId={qualityPulseId}
+              penaltyPulseId={penaltyPulseId}
+              missPop={missPop}
+              comboBanner={comboBanner}
+              passedBest={personalBestPassed ? personalBestTarget : null}
+              daily={dailyKey !== null}
+              medalEarned={runHasMedals ? medalEarned : null}
+              medalTarget={medalTarget}
+              timeUp={timeUp}
+              showLevelUp={showLevelUp}
+              worldUpVisible={worldUpVisible}
+              introHowTo={introHowTo}
+            />
           </div>
         )}
 

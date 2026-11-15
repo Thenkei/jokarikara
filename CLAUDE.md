@@ -82,6 +82,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/components/StartBackdrop.tsx` - Animated start screen backdrop; layer data lives in `startBackdropLayers.ts` (non-component exports stay out of component modules for Fast Refresh); `flourish` plays a CSS-only burst on per-layer wrappers
 - `src/utils/secrets.ts` - Start screen easter eggs (keep out of user-facing docs): pure matchers for 7 quick title taps (backdrop flourish + `playChime`) and the ↑↑↓↓←→←→ key sequence (toggles the session-only Mono look: `getWorldTheme(..., mono)` + `toMonoColor` in the renderer, a CSS filter on DOM layers only, never on the canvas; danger signals stay red-orange: `theme.danger` on the canvas, and DOM `.danger-signal` / `.critical` elements are kept out of the filter). Both unlock the hidden `curious-mind` achievement (`hidden: true`, shown as "???", counted in the total, granted via `useAchievements().unlock`)
 - `src/components/GameOverScreen.tsx` - Presentational game over: score hero, run cards in a scrolling body, and an action bar (RETRY / share / menu) that never scrolls away; achievement toasts drop into a lane reserved above the hero (never over the title or the action bar)
+- App screens (presentational, like GameOverScreen: App keeps state, records, navigation, timers and announcements; components get props/callbacks, read strings via `useI18n()`, own only local UI state): `StartScreen.tsx` (gear, title, mode radiogroup + bests/medal, practice picker, START, Daily button, ACHIEVEMENTS / WORLDS; the backdrop and panels stay in App, they are shared with the panels), `PauseMenu.tsx` (pause dialog; Escape/P stay in App's window listener), `GameHud.tsx` (PAUSE + the three HUD rows), `HudOverlays.tsx` (transient overlays: resume digit, first-run hint, quality/bonus/penalty/MISS pops, combo/record/medal banners, TIME!, level up, world entry/intro). State clusters moved out of App as hooks: `modes/useFinishConfirm.ts` (Zen FINISH RUN two-press confirm), `components/useSecondaryHud.ts` (row 3 auto-reveal), `utils/useStartSecrets.ts` (title taps flourish + Mono sequence)
 
 ### localStorage keys
 Bump the version suffix on any incompatible schema change and migrate from the previous key (see `LEGACY_STORAGE_KEY`):
@@ -108,7 +109,7 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 - **TIME_ATTACK**: 60-second timer; PERFECT +5s, GREAT +2s, miss −5s
 - **Daily Challenge**: not a `GameMode` but a run variant (CLASSIC rules, date-derived `runSeed`), handled in `App.tsx`
 
-### HUD layout (App.tsx + App.css)
+### HUD layout (components/GameHud.tsx + App.css)
 - Row 1 `.hud-top`: the score pill holds only the score and the vital readout (Time Attack timer / Zen lives); its `::before`/`::after` spacers reserve PAUSE's fixed-width corner (`--pause-width`, `--pause-reserve`), so the pill is centred while it fits and slides left, never under PAUSE.
 - Row 2 `.hud-meta` (always visible, below PAUSE, wraps): goal chip, W, L, DAILY. Row 3 `.hud-secondary`: auto-revealed STYLE/COMBO (Zen controls). New HUD chips go in row 2 or 3, not row 1. `tests/hud-layout.spec.ts` guards 320/375 px.
 
