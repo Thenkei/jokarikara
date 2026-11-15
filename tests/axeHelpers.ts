@@ -77,6 +77,16 @@ const PUMP_STEP_MS = 16;
  */
 const DECOR_HIDDEN_CSS = ".start-backdrop, canvas { visibility: hidden !important; }";
 
+/**
+ * No CSS transitions while scanning: a UI timer firing mid-scan (e.g. the
+ * STYLE/COMBO row auto-hiding a few seconds after a stack) would otherwise be
+ * measured half-faded, at a contrast no player ever reads (seen on CI as
+ * 1.4:1 on Mobile Chrome). State changes then apply instantly; keyframe
+ * animations are left to `settle`.
+ */
+const NO_TRANSITIONS_CSS =
+  "*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; }";
+
 const analyze = async (page: Page, builder: AxeBuilder, pumpPausedClock: boolean) => {
   let done = false;
   const scan = builder.analyze().finally(() => {
@@ -106,6 +116,7 @@ export const expectNoViolations = async (page: Page, { pumpPausedClock = false }
   // CSS only drops motion (colours are shared), so the scans see what every
   // player sees once things stop moving.
   await page.emulateMedia({ reducedMotion: "reduce" });
+  const frozen = await page.addStyleTag({ content: NO_TRANSITIONS_CSS });
   try {
     // Playwright's paused clock also freezes requestAnimationFrame.
     await settle(page, !pumpPausedClock);
@@ -128,6 +139,7 @@ export const expectNoViolations = async (page: Page, { pumpPausedClock = false }
       await style.evaluate((node) => node.remove());
     }
   } finally {
+    await frozen.evaluate((node) => node.remove());
     await page.emulateMedia({ reducedMotion: null });
   }
 };

@@ -83,6 +83,10 @@ const enterMono = async (page: Page) => {
 };
 
 test.describe("axe audit (WCAG 2.1 A/AA)", () => {
+  // 15 screens × two axe passes: heavy on loaded CI runners (Mobile Chrome
+  // went past 30 s), so give each scenario the slow-test budget.
+  test.slow();
+
   test("start screen", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator(".start-btn")).toBeVisible();
