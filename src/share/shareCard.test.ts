@@ -7,6 +7,7 @@ import {
   drawShareCard,
   parseShareText,
   renderShareCardFile,
+  statsWithoutScore,
 } from "./shareCard";
 import { buildRunShareText } from "../modes/share";
 import { buildDailyShareText } from "../modes/daily";
@@ -111,7 +112,8 @@ describe("drawShareCard", () => {
     expect(texts).toEqual([
       "SHAPE STACK · ZEN",
       "640",
-      "640 pts · 9 stacks · W2 L3",
+      // The headline already says 640: no "640 pts" under it.
+      "9 stacks · W2 L3",
       "thenkei.github.io/jokarikara",
     ]);
     // Background, board frame, then 9 cells.
@@ -125,6 +127,25 @@ describe("drawShareCard", () => {
     const calls = drawCalls(ctx);
     expect(calls.some((c) => c.type === "drawImage")).toBe(false);
     expect(calls.find((c) => c.type === "fillText" && c.props.text === "0")).toBeTruthy();
+  });
+});
+
+describe("statsWithoutScore", () => {
+  it("drops the score segment, in any language", () => {
+    expect(statsWithoutScore("1240 pts · 42 stacks · W3 L2 · combo x12", 1240)).toBe(
+      "42 stacks · W3 L2 · combo x12",
+    );
+    expect(statsWithoutScore("900 pts · 17 empilements · M2 N1", 900)).toBe(
+      "17 empilements · M2 N1",
+    );
+  });
+
+  it("drops only the score when another stat starts with the same number", () => {
+    expect(statsWithoutScore("0 pts · 0 stacks · W1 L1", 0)).toBe("0 stacks · W1 L1");
+  });
+
+  it("leaves a line without the score untouched", () => {
+    expect(statsWithoutScore("42 stacks · W3 L2", 1240)).toBe("42 stacks · W3 L2");
   });
 });
 
