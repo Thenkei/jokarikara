@@ -103,6 +103,10 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 - **TIME_ATTACK**: 60-second timer; PERFECT +5s, GREAT +2s, miss −5s
 - **Daily Challenge**: not a `GameMode` but a run variant (CLASSIC rules, date-derived `runSeed`), handled in `App.tsx`
 
+### HUD layout (App.tsx + App.css)
+- Row 1 `.hud-top`: the score pill holds only the score and the vital readout (Time Attack timer / Zen lives); its `::before`/`::after` spacers reserve PAUSE's fixed-width corner (`--pause-width`, `--pause-reserve`), so the pill is centred while it fits and slides left, never under PAUSE.
+- Row 2 `.hud-meta` (always visible, below PAUSE, wraps): goal chip, W, L, DAILY. Row 3 `.hud-secondary`: auto-revealed STYLE/COMBO (Zen controls). New HUD chips go in row 2 or 3, not row 1. `tests/hud-layout.spec.ts` guards 320/375 px.
+
 ### Loop invariants
 - Simulation is time-based: every per-frame change must scale with `dt` (clamped to `MAX_FRAME_DT`).
 - Keep React state updates out of the per-frame path (e.g. the Time Attack timer only reports when the displayed second changes).
