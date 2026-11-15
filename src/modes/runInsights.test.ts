@@ -73,6 +73,13 @@ describe("end insight", () => {
     ).toBeUndefined();
   });
 
+  it("reads a Time Attack timeout calmly and every lost run as danger", () => {
+    expect(getEndInsight("timeout", 1)?.tone).toBe("calm");
+    for (const reason of ["overflow", "badTap", "fracture", "lives"] as const) {
+      expect(getEndInsight(reason, 1)?.tone).toBeUndefined();
+    }
+  });
+
   it("adapts the advice to Reverse Stack", () => {
     expect(getEndInsight("badTap", 9)?.tip).toContain("Reverse Stack");
     expect(getEndInsight("overflow", 9)?.title).toContain("ring");

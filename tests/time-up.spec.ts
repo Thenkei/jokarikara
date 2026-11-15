@@ -68,6 +68,9 @@ test.describe("Time Attack time-up ending", () => {
     expect(await vibrations(page)).toEqual([LEVEL_UP_PATTERN]);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("TIME!");
     await expect(page.locator(".end-insight-title")).toHaveText("Out of time.");
+    // The clock is Time Attack's normal ending: calm card, not danger.
+    await expect(page.locator(".end-insight")).toHaveClass(/end-insight--calm/);
+    await expect(page.locator(".end-insight")).not.toHaveClass(/danger-signal/);
     await expect(liveRegion(page)).toHaveText("Time! Score 0");
   });
 

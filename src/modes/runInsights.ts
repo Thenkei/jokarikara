@@ -20,8 +20,9 @@ export interface EndInsight {
   title: string;
   tip: string;
   /**
-   * "calm" for an end that is not a failure (Zen FINISH RUN): the card drops
-   * the danger styling. Absent means the run was lost (danger).
+   * "calm" for an end that is not a failure (Zen FINISH RUN, Time Attack's
+   * clock running out — its normal ending): the card drops the danger
+   * styling. Absent means the run was lost (danger).
    */
   tone?: "calm";
 }
@@ -99,6 +100,8 @@ const getReasonInsight = (
       return {
         title: "Out of time.",
         tip: `Precision buys time: PERFECT +${PERFECT_STACK_TIME_BONUS} s, GREAT +${GREAT_STACK_TIME_BONUS} s.`,
+        // The clock is how every Time Attack run ends, not a mistake.
+        tone: "calm",
       };
     case "lives":
       return {
