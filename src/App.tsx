@@ -113,6 +113,7 @@ import { I18nContext } from "./i18n/context";
 import "./App.css";
 import { isE2eMode } from "./utils/e2e";
 import { GAME_OVER_INPUT_GUARD_MS } from "./modes/gameOverGuard";
+import { renderShareCardFile } from "./share/shareCard";
 
 
 const createRunSeed = (): number => {
@@ -136,9 +137,20 @@ const EMPTY_STATS: RunStats = {
   scoreHistory: [],
 };
 
-/** Web Share on mobile, clipboard elsewhere. Never throws. */
-const shareText = async (text: string): Promise<ShareStatus> => {
+/** Whether this browser may share files (decides if the card is rendered). */
+const canShareFiles = (): boolean =>
+  typeof navigator.canShare === "function" && typeof navigator.share === "function";
+
+/**
+ * Web Share on mobile (with the result card when the browser takes files),
+ * clipboard elsewhere. Never throws.
+ */
+const shareResult = async (text: string, image: File | null): Promise<ShareStatus> => {
   try {
+    if (image && canShareFiles() && navigator.canShare({ files: [image] })) {
+      await navigator.share({ files: [image], text });
+      return "shared";
+    }
     if (typeof navigator.share === "function") {
       await navigator.share({ text });
       return "shared";
@@ -243,6 +255,7 @@ function App() {
    */
   const [knownDailyRecord, setKnownDailyRecord] = useState(readDailyRecordForToday);
   const [shareStatus, setShareStatus] = useState<ShareStatus>("idle");
+  const boardSnapshotRef = useRef<HTMLCanvasElement | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [runSeed, setRunSeed] = useState(0);
   const [reducedFx, setReducedFx] = useState(() => getSettings().reducedFx);
@@ -692,6 +705,8 @@ function App() {
       finalLevel: number,
       stats: RunStats = EMPTY_STATS
     ) => {
+      // Still mounted here: the board as the run ended, for the share card.
+      boardSnapshotRef.current = canvasRef.current?.getEndSnapshot() ?? null;
       const achievements = finishAchievementRun({
         score: finalScore,
         world: finalWorld,
@@ -1040,30 +1055,6 @@ function App() {
     }
   };
 
-  const handleShare = async () => {
-    if (!lastRun) return;
-    const text = lastRun.daily
-      ? buildDailyShareText(i18n, {
-          dateKey: lastRun.daily.dateKey,
-          score,
-          world,
-          level,
-          stackCount: lastRun.stats.stackCount,
-          qualities: qualitiesFromScoreHistory(lastRun.stats.scoreHistory),
-        })
-      : buildRunShareText(i18n, {
-          mode: lastRun.mode,
-          score,
-          world,
-          level,
-          stackCount: runStackCount,
-          bestCombo: lastRun.stats.bestStreak,
-          breakdown,
-          practiceWorld: lastRun.practiceWorld,
-        });
-    setShareStatus(await shareText(text));
-  };
-
   const handleMainMenu = () => {
     // No-op after a game over (already committed); counts an abandoned run
     // with the canvas's authoritative stats (a Zen undo lowers them).
@@ -1197,6 +1188,53 @@ function App() {
     0,
     (lastRun?.stats.stackCount ?? 0) - stacksBeforeWorld(lastRun?.practiceWorld ?? 1),
   );
+
+  // What SHARE RESULT sends, computed from what the game over screen shows.
+  const shareMessage = !lastRun
+    ? null
+    : lastRun.daily
+      ? buildDailyShareText(i18n, {
+          dateKey: lastRun.daily.dateKey,
+          score,
+          world,
+          level,
+          stackCount: lastRun.stats.stackCount,
+          qualities: qualitiesFromScoreHistory(lastRun.stats.scoreHistory),
+        })
+      : buildRunShareText(i18n, {
+          mode: lastRun.mode,
+          score,
+          world,
+          level,
+          stackCount: runStackCount,
+          bestCombo: lastRun.stats.bestStreak,
+          breakdown,
+          practiceWorld: lastRun.practiceWorld,
+        });
+
+  // The card is rendered as soon as the game over screen shows: Safari only
+  // opens the share sheet inside the tap's own activation, so nothing slow
+  // may run between the tap and `navigator.share`. A tap before it is ready
+  // shares the text alone.
+  const shareImageRef = useRef<File | null>(null);
+  useEffect(() => {
+    shareImageRef.current = null;
+    if (gameState !== "GAMEOVER" || !shareMessage || !canShareFiles()) return;
+    let cancelled = false;
+    void renderShareCardFile(shareMessage, score, boardSnapshotRef.current, {
+      fontFamily: getComputedStyle(document.body).fontFamily,
+    }).then((file) => {
+      if (!cancelled) shareImageRef.current = file;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameState, shareMessage, score]);
+
+  const handleShare = async () => {
+    if (!shareMessage) return;
+    setShareStatus(await shareResult(shareMessage, shareImageRef.current));
+  };
 
   /**
    * Menu sounds via one delegated listener: every button plays "select"

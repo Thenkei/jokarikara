@@ -24,6 +24,7 @@ import {
 import { getWorldMechanics, ZEN_MIN_CLICK_RATIO } from "../constants/game";
 import type { GameMode } from "../types";
 import { forwardRef, useImperativeHandle } from "react";
+import { captureBoardSnapshot } from "../share/shareCard";
 import { useI18n } from "../i18n/context";
 import {
   drawShape,
@@ -206,6 +207,11 @@ export interface GameCanvasHandle {
    * a run mid-way (MAIN MENU) must read these rather than replay events.
    */
   getRunStats: () => RunStats | null;
+  /**
+   * Square snapshot of the board as the run ended (the last frame the player
+   * saw, before the end effects), for the share image. Null mid-run.
+   */
+  getEndSnapshot: () => HTMLCanvasElement | null;
 }
 
 const toRunStats = (state: GameState): RunStats => {
@@ -273,6 +279,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
   ) => {
     const i18n = useI18n();
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const endSnapshotRef = useRef<HTMLCanvasElement | null>(null);
     const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
     const stateRef = useRef<GameState | null>(null);
     const lastTimeRef = useRef(0);
@@ -408,6 +415,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
      */
     const endRun = useCallback(
       (state: GameState) => {
+        // Before any end effect is drawn: the canvas still holds the stack
+        // as the player last saw it.
+        endSnapshotRef.current = captureBoardSnapshot(canvasRef.current);
         const medal = medalsRef.current ? getMedal(state.score) : null;
         const feedback = selectEndFeedback(getEndReason(state), state.mode, medal);
         audioService.stopMusic();
@@ -542,6 +552,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         },
         tap: () => handleTapRef.current(),
         getRunStats: () => (stateRef.current ? toRunStats(stateRef.current) : null),
+        getEndSnapshot: () => endSnapshotRef.current,
         finishRun: () => {
           const state = stateRef.current;
           if (!state) return false;
