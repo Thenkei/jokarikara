@@ -28,11 +28,8 @@ import { StartBackdrop } from "./components/StartBackdrop";
 import { isComboMilestone } from "./gameplay/combo";
 import { RESUME_COUNTDOWN_FROM } from "./gameplay/resumeCountdown";
 import { getEndInsight, getQualityBreakdown } from "./modes/runInsights";
-import {
-  FINISH_CONFIRM_WINDOW_MS,
-  canFinishRun,
-  stepFinishConfirm,
-} from "./modes/finishRun";
+import { canFinishRun } from "./modes/finishRun";
+import { useFinishConfirm } from "./modes/useFinishConfirm";
 import { getMissAnnouncement, getMissMarginLabel } from "./modes/missMargin";
 import { getTimeUpAnnouncement, type TimeUpResult } from "./modes/endFeedback";
 import {
@@ -82,7 +79,7 @@ import {
   countUnlocked,
   type AchievementId,
 } from "./progression/achievements";
-import { MONO_SEQUENCE, registerTap, stepSequence } from "./utils/secrets";
+import { useStartSecrets } from "./utils/useStartSecrets";
 import { useAchievements } from "./progression/useAchievements";
 import { isFirstEverProfile } from "./progression/stats";
 import {
@@ -98,6 +95,7 @@ import { WORLD_INTRO_MS } from "./gameplay/worldIntro";
 import { SettingsSheet, type SettingId } from "./components/SettingsSheet";
 import { PauseMenu } from "./components/PauseMenu";
 import { GameHud } from "./components/GameHud";
+import { useSecondaryHud } from "./components/useSecondaryHud";
 import { HudOverlays, type ComboBanner, type MissPop } from "./components/HudOverlays";
 import {
   GameOverScreen,
@@ -130,10 +128,6 @@ const createRunSeed = (): number => {
 
   return Math.floor(Math.random() * 0xffffffff);
 };
-
-const HUD_REVEAL_DURATION_MS = 2000;
-/** Start backdrop flourish length: the CSS burst plus its last layer's delay. */
-const FLOURISH_MS = 1900;
 
 const EMPTY_STATS: RunStats = {
   stackCount: 0,
@@ -273,7 +267,11 @@ function App() {
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [zenLives, setZenLives] = useState<number | null>(null);
-  const [showSecondaryHud, setShowSecondaryHud] = useState(false);
+  const {
+    visible: showSecondaryHud,
+    reveal: revealSecondaryHud,
+    hide: hideSecondaryHud,
+  } = useSecondaryHud();
   const [lastQuality, setLastQuality] = useState<StackQuality | null>(null);
   const [qualityPulseId, setQualityPulseId] = useState(0);
   /** Last combo milestone reached (id replays the banner animation). */
@@ -365,45 +363,23 @@ function App() {
     [],
   );
   const [showSettings, setShowSettings] = useState(false);
-  /**
-   * Zen FINISH RUN confirm: armed after a first press ("TAP AGAIN TO
-   * FINISH"), disarmed after FINISH_CONFIRM_WINDOW_MS or when the pause menu
-   * closes. The arming time (monotonic) lives in a ref for the press handler.
-   */
-  const [finishArmed, setFinishArmed] = useState(false);
-  const finishArmedAtRef = useRef<number | null>(null);
-  const finishDisarmTimeoutRef = useRef<number | null>(null);
-  /** Back to plain FINISH RUN (window expired, menu closed, run over). */
-  const disarmFinish = useCallback(() => {
-    finishArmedAtRef.current = null;
-    if (finishDisarmTimeoutRef.current !== null) {
-      window.clearTimeout(finishDisarmTimeoutRef.current);
-      finishDisarmTimeoutRef.current = null;
-    }
-    setFinishArmed(false);
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (finishDisarmTimeoutRef.current !== null) {
-        window.clearTimeout(finishDisarmTimeoutRef.current);
-      }
-    },
-    [],
-  );
-  /**
-   * Start screen secrets. Mono is session-only by design (never persisted):
-   * a reload brings the regular look back.
-   */
-  const [mono, setMono] = useState(false);
-  const [flourishing, setFlourishing] = useState(false);
-  const secretProgressRef = useRef(0);
-  const titleTapsRef = useRef<readonly number[]>([]);
-  const flourishTimeoutRef = useRef<number | null>(null);
   /** The gear that opened the sheet (start screen or pause menu, never both). */
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<GameCanvasHandle>(null);
-  const secondaryHudTimeoutRef = useRef<number | null>(null);
+  /**
+   * Zen FINISH RUN confirm: armed after a first press ("TAP AGAIN TO
+   * FINISH"), disarmed after the confirm window or when the pause menu
+   * closes; the confirming press ends the run through onGameOver ->
+   * handleGameOver (score, stats, insight).
+   */
+  const {
+    armed: finishArmed,
+    disarm: disarmFinish,
+    press: handleFinishPress,
+  } = useFinishConfirm({
+    onArm: () => announce(t("announce.finishConfirm")),
+    onConfirm: () => canvasRef.current?.finishRun(),
+  });
   const previousZenLivesRef = useRef<number | null>(null);
   const toasterRef = useRef<AchievementToasterHandle>(null);
   const worldRef = useRef(world);
@@ -423,6 +399,20 @@ function App() {
     unlock: unlockAchievement,
   } = useAchievements({ onUnlock: handleAchievementUnlock });
   const unlockedAchievementCount = countUnlocked(achievementRecord.unlocked);
+  /**
+   * Start screen secrets (title taps, arrow sequence). Mono is session-only
+   * by design (never persisted): a reload brings the regular look back.
+   */
+  const {
+    mono,
+    flourishing,
+    handleTitleClick,
+    observeKey: observeSecretKey,
+  } = useStartSecrets({
+    resetKey: `${gameState}:${startPanel}`,
+    onMonoChange: (next) => announce(t(next ? "start.monoOn" : "start.monoOff")),
+    onFound: () => unlockAchievement(SECRET_ACHIEVEMENT_ID),
+  });
 
   const handleRunMiss = useCallback(
     (terminal: boolean, margin: MissMargin | null) => {
@@ -571,73 +561,8 @@ function App() {
 
   useEffect(() => clearWorldUpTimeout, [clearWorldUpTimeout]);
 
-  const clearSecondaryHudTimeout = useCallback(() => {
-    if (secondaryHudTimeoutRef.current !== null) {
-      window.clearTimeout(secondaryHudTimeoutRef.current);
-      secondaryHudTimeoutRef.current = null;
-    }
-  }, []);
-
-  const revealSecondaryHud = useCallback(() => {
-    setShowSecondaryHud(true);
-    clearSecondaryHudTimeout();
-    secondaryHudTimeoutRef.current = window.setTimeout(() => {
-      setShowSecondaryHud(false);
-      secondaryHudTimeoutRef.current = null;
-    }, HUD_REVEAL_DURATION_MS);
-  }, [clearSecondaryHudTimeout]);
-
-  useEffect(() => {
-    return () => {
-      clearSecondaryHudTimeout();
-    };
-  }, [clearSecondaryHudTimeout]);
-
   useEffect(() => installAudioTestBridge(audioManager), []);
 
-  // Secret inputs only count on the start screen itself: leaving it (or
-  // opening the achievements panel) forgets a half-entered sequence.
-  useEffect(() => {
-    secretProgressRef.current = 0;
-    titleTapsRef.current = [];
-  }, [gameState, startPanel]);
-
-  useEffect(
-    () => () => {
-      if (flourishTimeoutRef.current !== null) {
-        window.clearTimeout(flourishTimeoutRef.current);
-      }
-    },
-    []
-  );
-
-  /** Title tapped 7 times quickly: backdrop flourish + chime. */
-  const handleTitleClick = (event: ReactMouseEvent<HTMLHeadingElement>) => {
-    // A celebration already playing swallows extra taps (no restart mid-burst).
-    if (flourishing) return;
-    const step = registerTap(titleTapsRef.current, event.timeStamp);
-    titleTapsRef.current = step.taps;
-    if (!step.triggered) return;
-    // Click (not pointerdown) so the 7th tap is a user activation on touch
-    // devices too, and the audio context may start. Silent when muted.
-    audioManager.playChime();
-    audioManager.resume();
-    setFlourishing(true);
-    flourishTimeoutRef.current = window.setTimeout(() => {
-      flourishTimeoutRef.current = null;
-      setFlourishing(false);
-    }, FLOURISH_MS);
-    unlockAchievement(SECRET_ACHIEVEMENT_ID);
-  };
-
-  /** Arrow sequence entered: toggle the Mono look (keyboard-reachable egg). */
-  const toggleMono = () => {
-    const next = !mono;
-    setMono(next);
-    audioManager.playUi(next ? "confirm" : "back");
-    announce(t(next ? "start.monoOn" : "start.monoOff"));
-    unlockAchievement(SECRET_ACHIEVEMENT_ID);
-  };
   const gameplayThemeVars = useMemo(
     () =>
       ({
@@ -808,8 +733,7 @@ function App() {
       setScore(finalScore);
       setWorld(finalWorld);
       setLevel(finalLevel);
-      clearSecondaryHudTimeout();
-      setShowSecondaryHud(false);
+      hideSecondaryHud();
       setGameState("GAMEOVER");
       disarmFinish();
       // A Time Attack run that used its clock was announced at the TIME!
@@ -835,7 +759,7 @@ function App() {
     [
       announce,
       i18n,
-      clearSecondaryHudTimeout,
+      hideSecondaryHud,
       mode,
       dailyKey,
       runStartWorld,
@@ -1036,34 +960,6 @@ function App() {
     revealSecondaryHud();
   };
 
-  /**
-   * Zen FINISH RUN, two presses: the first arms the button for
-   * FINISH_CONFIRM_WINDOW_MS, a deliberate second one (not a double click, see
-   * stepFinishConfirm) ends the run through the regular game over path.
-   */
-  const handleFinishPress = () => {
-    const now = performance.now();
-    const step = stepFinishConfirm(finishArmedAtRef.current, now);
-    if (step === "wait") return;
-    if (step === "arm") {
-      finishArmedAtRef.current = now;
-      setFinishArmed(true);
-      if (finishDisarmTimeoutRef.current !== null) {
-        window.clearTimeout(finishDisarmTimeoutRef.current);
-      }
-      finishDisarmTimeoutRef.current = window.setTimeout(() => {
-        finishDisarmTimeoutRef.current = null;
-        finishArmedAtRef.current = null;
-        setFinishArmed(false);
-      }, FINISH_CONFIRM_WINDOW_MS);
-      announce(t("announce.finishConfirm"));
-      return;
-    }
-    disarmFinish();
-    // Reports through onGameOver -> handleGameOver (score, stats, insight).
-    canvasRef.current?.finishRun();
-  };
-
   const handleToggleReducedFx = () => {
     setReducedFx((current) => {
       const next = !current;
@@ -1165,8 +1061,7 @@ function App() {
     setShowSettings(false);
     setDailyKey(null);
     setKnownDailyRecord(readDailyRecordForToday());
-    clearSecondaryHudTimeout();
-    setShowSecondaryHud(false);
+    hideSecondaryHud();
     setZenLives(null);
     previousZenLivesRef.current = null;
     setShowLevelUp(false);
@@ -1221,9 +1116,7 @@ function App() {
     if (gameState === "START") {
       // Observes keys only (no preventDefault): arrows keep driving the mode
       // radio group, and the full sequence nets out to the same mode.
-      const step = stepSequence(MONO_SEQUENCE, secretProgressRef.current, event);
-      secretProgressRef.current = step.progress;
-      if (step.matched) toggleMono();
+      observeSecretKey(event);
     }
 
     if (event.key === "Enter" && !event.repeat && !isInteractiveTarget(event.target)) {
