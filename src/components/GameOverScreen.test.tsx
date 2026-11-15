@@ -120,6 +120,8 @@ describe("GameOverScreen", () => {
     expect(container.querySelector(".danger-signal")).toBeNull();
     expect(card?.querySelector(".end-insight-margin")).toBeNull();
     expect(card?.querySelector(".end-insight-title")?.textContent).toBe("Session complete.");
+    // A chosen ending, not a failure: the headline says so too.
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("SESSION COMPLETE");
     expect(card?.querySelector(".end-insight-tip")?.textContent).toContain("67% PERFECT");
     // Still the full game over: stats, leaderboard and share.
     expect(container.querySelector(".stat-stacks")?.textContent).toBe("60");

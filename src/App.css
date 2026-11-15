@@ -765,7 +765,9 @@ button:active {
 
 .pause-overlay .menu-btn {
   margin-top: 0;
-  min-width: 12rem;
+  /* One width for the whole column, wide enough for the armed
+     "TAP AGAIN TO FINISH" label so it never sticks out. */
+  width: min(17.5rem, calc(100vw - 2rem));
   /* #666 on the dimmed game read at ~3:1; keep secondary but AA. */
   color: #b9c2d6;
   border-color: rgba(255, 255, 255, 0.2);
@@ -785,7 +787,7 @@ button:active {
 }
 
 .pause-resume-btn {
-  min-width: 12rem;
+  width: min(17.5rem, calc(100vw - 2rem));
   padding: 0.9rem 2rem;
   font-weight: 800;
   letter-spacing: 0.1em;

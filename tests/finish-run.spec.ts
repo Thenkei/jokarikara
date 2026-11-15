@@ -51,6 +51,7 @@ test.describe("Zen FINISH RUN", () => {
 
     await finishFromPauseMenu(page);
 
+    await expect(page.locator(".gameover-title")).toHaveText("SESSION COMPLETE");
     await expect(page.locator(".score-display")).toHaveText(`Score: ${score}`);
     await expect(page.locator(".stat-stacks")).toHaveText("3");
     const insight = page.locator(".end-insight");
