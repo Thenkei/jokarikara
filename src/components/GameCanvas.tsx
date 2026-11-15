@@ -155,6 +155,12 @@ export interface GameCanvasHandle {
    * nothing, when the run cannot be finished (not Zen, already over).
    */
   finishRun: () => boolean;
+  /**
+   * Authoritative stats of the run in progress (null before the first frame).
+   * Zen UNDO lowers them after the last stack event, so anything committing
+   * a run mid-way (MAIN MENU) must read these rather than replay events.
+   */
+  getRunStats: () => RunStats | null;
 }
 
 const toRunStats = (state: GameState): RunStats => {
@@ -386,6 +392,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           resumeCountdown.start();
         },
         tap: () => handleTapRef.current(),
+        getRunStats: () => (stateRef.current ? toRunStats(stateRef.current) : null),
         finishRun: () => {
           const state = stateRef.current;
           if (!state) return false;

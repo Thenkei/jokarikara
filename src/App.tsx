@@ -1045,8 +1045,9 @@ function App() {
   };
 
   const handleMainMenu = () => {
-    // No-op after a game over (already committed); counts an abandoned run.
-    abandonAchievementRun();
+    // No-op after a game over (already committed); counts an abandoned run
+    // with the canvas's authoritative stats (a Zen undo lowers them).
+    abandonAchievementRun(canvasRef.current?.getRunStats() ?? null);
     disarmFinish();
     setPaused(false);
     setResumeDigit(null);
