@@ -29,6 +29,11 @@ import {
 
 /** Seconds the record fanfare waits so the stack note under it reads first. */
 const RECORD_DELAY = 0.08;
+/**
+ * The unlock toast drops in with its cue; a beat of delay lets the stack (or
+ * level up) that earned it land first instead of masking the strike.
+ */
+const ACHIEVEMENT_DELAY = 0.12;
 
 /**
  * Time-up: the chord lands once the bell strike has read (seconds), after
@@ -795,6 +800,39 @@ class AudioManager implements IAudioService {
       { freq: at(24), type: "sine", delay: chord + 0.04, duration: 0.5, peak: 0.04, detune: 6 },
       { freq: at(24) * 2.76, type: "sine", delay: chord, duration: 0.1, peak: 0.025, attack: 0.001 },
     ]);
+  }
+
+  playAchievement(world: number): void {
+    // Unlock "ding-ding": two bell strikes rising a fourth, then a soft
+    // shimmer. Its own voice (it used to borrow the level up arpeggio, so an
+    // unlock on a level up just sounded like one level up). In the world's
+    // key, unshaped by the palette like the other rewards, an octave above
+    // the record so the two never read as the same moment.
+    const root = getWorldRoot(world) * 4;
+    const at = (semitones: number) => root * semitonesToRatio(semitones);
+    const voices: Voice[] = [];
+    [
+      { semitones: 7, delay: ACHIEVEMENT_DELAY, duration: 0.4, peak: 0.2 },
+      { semitones: 12, delay: ACHIEVEMENT_DELAY + 0.11, duration: 0.85, peak: 0.24 },
+    ].forEach(({ semitones, delay, duration, peak }) => {
+      const freq = at(semitones);
+      voices.push(
+        { freq, type: "sine", delay, duration, peak, attack: 0.002 },
+        // Bar overtone: rings like a bell, not a beep; dies fast.
+        { freq: freq * 2.76, type: "sine", delay, duration: 0.12, peak: peak * 0.18, attack: 0.001 },
+        // Body an octave down for small phone speakers.
+        { freq: freq / 2, type: "triangle", delay, duration: duration * 0.6, peak: peak * 0.35 },
+      );
+    });
+    voices.push({
+      freq: at(16),
+      type: "sine",
+      delay: ACHIEVEMENT_DELAY + 0.2,
+      duration: 0.6,
+      peak: 0.05,
+      detune: 7,
+    });
+    this.play("achievement", voices);
   }
 
   playTimeUp(world: number, medal: Medal | null): void {

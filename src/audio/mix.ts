@@ -17,6 +17,9 @@ import type { StackQuality } from "../types";
  *   pulse) without raising it; the cue keeps its ≥ 3 dB, measured ≈ 3.6)
  *   secret chime (start screen) ≈ -21: above menu clicks, under a level up
  *   personal best ("record") ≈ -16: above a PERFECT stack, ≈ combo, ≤ world up
+ *   achievement unlock ≈ -17.6: ≈ level up (±2 dB), ≤ record; every world's
+ *   key within ±0.9 dB of world 1's; on a PERFECT + level up + record pile-up
+ *   it peaks ≈ -3.3 dBFS
  *   Time Attack time up, around world up (±2 dB; world up ≈ -16.1 measured):
  *   no medal ≈ -17.3, Bronze ≈ -16.6, Silver ≈ -16.1, Gold ≈ -15.1 (a climb,
  *   not a jump); every world's key within ±1.2 dB of world 1's; its worst
@@ -49,6 +52,7 @@ export type SfxId =
   | "combo"
   | "chime"
   | "record"
+  | "achievement"
   | "menu"
   | "ui"
   | "cue"
@@ -71,6 +75,7 @@ export const SFX_TRIM_DB: Readonly<Record<SfxId, number>> = {
   combo: 0,
   chime: -8,
   record: -1.5,
+  achievement: -4,
   menu: 0,
   ui: 2.5,
   cue: 10,
@@ -102,6 +107,8 @@ export const SFX_REVERB_SEND_DB: Readonly<Record<SfxId, number>> = {
   chime: -10,
   // Once-per-run moment: the held chord may bloom like a level up.
   record: -12,
+  // Unlock bell: a reward, it may ring a little into the room.
+  achievement: -12,
   menu: -42,
   ui: -26,
   // Timing cue is a rhythm aid: a tail would smear where the beat lands.

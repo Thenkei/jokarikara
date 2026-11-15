@@ -120,6 +120,31 @@ describe("audioManager", () => {
     });
   });
 
+  it("plays the achievement bell after the stack that earned it, in the world's key", () => {
+    const audio = createAudioManager();
+    audio.setMuted(true);
+    audio.playAchievement(1);
+    expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
+
+    audio.setMuted(false);
+    audio.playAchievement(1);
+    // Two strikes (fundamental, bar overtone, body) plus the shimmer.
+    expect(mock.oscillators).toHaveLength(7);
+    mock.oscillators.forEach((osc) => {
+      const [when] = osc.start.mock.calls[0] as [number];
+      expect(when).toBeGreaterThan(0);
+    });
+    const pitch = (i: number) =>
+      mock.oscillators[i].frequency.setValueAtTime.mock.calls[0][0] as number;
+    const firstStrike = pitch(0);
+    expect(firstStrike).toBeGreaterThan(0);
+
+    audio.playAchievement(4);
+    // Another world, another key: same shape, transposed.
+    expect(mock.oscillators).toHaveLength(14);
+    expect(pitch(7)).not.toBeCloseTo(firstStrike, 3);
+  });
+
   describe("time up (Time Attack clock ran out)", () => {
     const TIERS = [null, "BRONZE", "SILVER", "GOLD"] as const;
     const freqOf = (osc: (typeof mock.oscillators)[number]) =>

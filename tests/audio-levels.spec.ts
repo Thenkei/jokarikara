@@ -121,6 +121,7 @@ test("sound effects and music keep their mix relationships", async ({
       worldUp: Level;
       timeUp: Level;
       timeUpGold: Level;
+      achievement: Level;
     }[] = [];
     for (let world = 1; world <= 10; world += 1) {
       worlds.push({
@@ -132,6 +133,7 @@ test("sound effects and music keep their mix relationships", async ({
         // Unshaped by the palette, but in each world's key.
         timeUp: await measure(2.5, (a) => a.playTimeUp(world, null)),
         timeUpGold: await measure(2.5, (a) => a.playTimeUp(world, "GOLD")),
+        achievement: await measure(1.5, (a) => a.playAchievement(world)),
       });
     }
     return {
@@ -156,6 +158,15 @@ test("sound effects and music keep their mix relationships", async ({
       combo: await measure(1.2, (a) => a.playComboMilestone(5, 1)),
       chime: await measure(1.6, (a) => a.playChime()),
       record: await measure(1.5, (a) => a.playRecord(1)),
+      achievement: await measure(1.5, (a) => a.playAchievement(1)),
+      // An unlock lands on the stack that earned it, often a level up too
+      // (and the record on the same stack): the pile-up must not clip.
+      achievementBurst: await measure(1.5, (a) => {
+        a.playStack("PERFECT", 10, 1);
+        a.playLevelUp(1);
+        a.playRecord(1);
+        a.playAchievement(1);
+      }),
       // The record lands on a stack, and often on a combo milestone and a
       // level up too: the pile-up must not clip.
       recordBurst: await measure(1.5, (a) => {
@@ -241,6 +252,23 @@ test("sound effects and music keep their mix relationships", async ({
     ),
     contentType: "application/json",
   });
+  await test.info().attach("reward-levels.json", {
+    body: JSON.stringify(
+      {
+        ok: levels.ok.rmsDb,
+        perfect: levels.perfect.rmsDb,
+        levelUp: levels.levelUp.rmsDb,
+        record: levels.record.rmsDb,
+        achievement: levels.achievement,
+        achievementBurst: levels.achievementBurst,
+        uiConfirm: levels.uiConfirm.rmsDb,
+        perWorld: worlds.map((w) => [w.world, w.achievement.rmsDb]),
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
   await test.info().attach("per-world-levels.json", {
     body: JSON.stringify(worlds, null, 2),
     contentType: "application/json",
@@ -268,7 +296,15 @@ test("sound effects and music keep their mix relationships", async ({
   });
   const all = [
     ...(Object.values(effects) as Level[]),
-    ...worlds.flatMap((w) => [w.ok, w.perfect, w.levelUp, w.worldUp, w.timeUp, w.timeUpGold]),
+    ...worlds.flatMap((w) => [
+      w.ok,
+      w.perfect,
+      w.levelUp,
+      w.worldUp,
+      w.timeUp,
+      w.timeUpGold,
+      w.achievement,
+    ]),
   ];
   // No clipping anywhere, including the worst simultaneous burst.
   for (const level of all) expect(level.peakDb).toBeLessThanOrEqual(-1);
@@ -309,6 +345,14 @@ test("sound effects and music keep their mix relationships", async ({
   expect(levels.record.rmsDb).toBeGreaterThan(levels.perfect.rmsDb);
   expect(levels.record.rmsDb).toBeGreaterThan(levels.levelUp.rmsDb - 2);
   expect(levels.record.rmsDb).toBeLessThanOrEqual(levels.worldUp.rmsDb + 1);
+
+  // An achievement unlock is a reward: above a plain stack and the menu
+  // clicks, around a level up (±2 dB, the cue it replaced), and no louder
+  // than the record, the run's bigger moment.
+  expect(levels.achievement.rmsDb).toBeGreaterThan(levels.ok.rmsDb + 2);
+  expect(levels.achievement.rmsDb).toBeGreaterThan(levels.uiConfirm.rmsDb + 2);
+  expect(Math.abs(levels.achievement.rmsDb - levels.levelUp.rmsDb)).toBeLessThanOrEqual(2);
+  expect(levels.achievement.rmsDb).toBeLessThanOrEqual(levels.record.rmsDb);
 
   // Time Attack's clock running out is the mode's normal ending: it sits
   // with the new-world chord (±2 dB), never under a routine stack, and the
@@ -389,6 +433,11 @@ test("sound effects and music keep their mix relationships", async ({
       expect(Math.abs(w[key].rmsDb - origin[key].rmsDb), `${where} ${key}`).toBeLessThanOrEqual(2);
     }
     expect(w.timeUpGold.rmsDb, where).toBeGreaterThan(w.timeUp.rmsDb);
+    // The unlock bell follows the key too.
+    expect(
+      Math.abs(w.achievement.rmsDb - origin.achievement.rmsDb),
+      `${where} achievement`,
+    ).toBeLessThanOrEqual(2);
   }
   expect(origin.timeUp.rmsDb).toBeCloseTo(levels.timeUp.rmsDb, 5);
 });

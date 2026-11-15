@@ -20,6 +20,7 @@ const mockAudioService: IAudioService = {
   playStack: vi.fn(),
   playLevelUp: vi.fn(),
   playWorldUp: vi.fn(),
+  playAchievement: vi.fn(),
   playFailSound: vi.fn(),
   playMissSound: vi.fn(),
   playEarlyClickSound: vi.fn(),

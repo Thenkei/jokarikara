@@ -77,6 +77,9 @@ export interface IAudioService {
   /** Sustained chord on entering a new world. */
   playWorldUp(world: number): void;
 
+  /** Achievement unlocked (toast): a rising two-strike bell in the world's key. */
+  playAchievement(world: number): void;
+
   /** Run-ending failure sound. */
   playFailSound(): void;
 
