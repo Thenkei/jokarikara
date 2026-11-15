@@ -386,6 +386,7 @@ describe("audioManager", () => {
         playing: true,
         intensity: 0,
         world: 2,
+        tension: 0,
       });
       expect(mock.oscillators.length).toBeGreaterThan(0);
     });
@@ -470,6 +471,80 @@ describe("audioManager", () => {
       expect(audio.getMusicState().world).toBe(2);
     });
 
+    describe("Time Attack tension", () => {
+      /** The tension voice's eighth-note LFO is the only oscillator at this rate. */
+      const tensionLfos = () =>
+        mock.oscillators.filter((o) => o.frequency.value > 1 && o.frequency.value < 5);
+
+      it("forwards tension to the running bed and reports it", () => {
+        const audio = createMusicOnly();
+        audio.startMusic(1);
+        audio.setMusicTension(0.3);
+        expect(audio.getMusicState()).toMatchObject({ tension: 0.3, intensity: 0 });
+        expect(tensionLfos()).toHaveLength(1);
+        // The forced bass pulse arms the scheduler at streak 0.
+        expect(vi.getTimerCount()).toBe(1);
+
+        audio.setMusicTension(0); // a time bonus lifted the clock
+        expect(audio.getMusicState().tension).toBe(0);
+      });
+
+      it("drops repeats and sanitises values", () => {
+        const audio = createMusicOnly();
+        audio.startMusic(1);
+        audio.setMusicTension(0.5);
+        const created = mock.ctx.createOscillator.mock.calls.length;
+        audio.setMusicTension(0.5);
+        expect(mock.ctx.createOscillator.mock.calls.length).toBe(created);
+        audio.setMusicTension(Number.NaN);
+        expect(audio.getMusicState().tension).toBe(0);
+        audio.setMusicTension(4);
+        expect(audio.getMusicState().tension).toBe(1);
+      });
+
+      it("survives pause and mute rebuilds, and allocates nothing while silent", () => {
+        const audio = createMusicOnly();
+        audio.startMusic(1);
+        audio.pauseMusic();
+        const created = mock.ctx.createOscillator.mock.calls.length;
+        audio.setMusicTension(0.8);
+        expect(mock.ctx.createOscillator.mock.calls.length).toBe(created);
+        expect(vi.getTimerCount()).toBe(0);
+        expect(audio.getMusicState()).toMatchObject({ playing: false, tension: 0.8 });
+
+        audio.resumeMusic();
+        expect(audio.getMusicState()).toMatchObject({ playing: true, tension: 0.8 });
+        expect(tensionLfos()).toHaveLength(1);
+
+        audio.setMuted(true);
+        audio.setMusicTension(1);
+        expect(tensionLfos()).toHaveLength(1);
+        audio.setMuted(false);
+        expect(tensionLfos()).toHaveLength(2); // rebuilt tense
+      });
+
+      it("never builds a tension voice with the music off", () => {
+        const audio = createMusicOnly();
+        audio.setMusicEnabled(false);
+        audio.startMusic(1);
+        audio.setMusicTension(1);
+        expect(mock.ctx.createOscillator).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it("resets with the run: a new run and a stopped one are calm", () => {
+        const audio = createMusicOnly();
+        audio.startMusic(1);
+        audio.setMusicTension(0.9);
+        audio.stopMusic();
+        expect(audio.getMusicState()).toMatchObject({ active: false, tension: 0 });
+        audio.startMusic(1);
+        audio.setMusicTension(0.9);
+        audio.startMusic(2);
+        expect(audio.getMusicState().tension).toBe(0);
+      });
+    });
+
     it("does not leak nodes or timers across many runs", () => {
       const audio = createMusicOnly();
       audio.init();
@@ -480,6 +555,7 @@ describe("audioManager", () => {
         audio.setMusicIntensity(2);
         mock.ctx.currentTime += 0.5;
         vi.advanceTimersByTime(500);
+        audio.setMusicTension(run % 2 === 0 ? 1 : 0.2);
         audio.setMusicWorld(4);
         audio.pauseMusic();
         audio.resumeMusic();
@@ -798,6 +874,22 @@ describe("audioManager", () => {
       expect(mock.ctx.resume).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(0);
       expect(audio.getContextState()).toBe("running"); // calls applied in order
+    });
+
+    it("lets a paused or music-off run sleep however tense its clock", async () => {
+      const audio = createAudioManager();
+      audio.startMusic(1);
+      audio.setMusicTension(1);
+      audio.pauseMusic();
+      audio.setMusicTension(0.9); // the paused clock still reports
+      await advance(idleAfter(0.25) + 0.2);
+      expect(mock.ctx.suspend).toHaveBeenCalledTimes(1);
+      expect(mock.ctx.resume).not.toHaveBeenCalled();
+      // Tension alone never wakes it: only resuming the run does.
+      audio.setMusicTension(1);
+      expect(mock.ctx.resume).not.toHaveBeenCalled();
+      audio.resumeMusic();
+      expect(mock.ctx.resume).toHaveBeenCalledTimes(1);
     });
 
     it("resumes for the soundtrack too", async () => {
