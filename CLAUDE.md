@@ -130,6 +130,7 @@ Measured with `npm run perf` and Chromium DevTools at 4× CPU throttle:
   - Drive the game through `window.__GAME_TEST__` (`src/utils/testBridge.ts`: pause, step, forceStack(ratio), setActiveSize, setTimeRemaining, tap, getState), only installed when `VITE_E2E=true`. Helpers in `tests/bridgeHelpers.ts`.
   - Import `test` from `tests/fixtures.ts`: it clears localStorage on each navigation, so seed state with an `addInitScript` registered after the fixture.
   - Prefer deterministic bridge control (pause + step) over wall-clock waits; the dev machine is often loaded and timings are noisy.
+- **Accessibility**: `tests/axe.spec.ts` scans every screen with axe-core (WCAG 2.1 A/AA, any impact fails) plus a color-contrast pass with the decorative backdrop/canvas hidden (axe can't see through image nodes); add a scan when you add a screen. Seed-dependent HUD chip tints are swept in `src/visual/hudChipContrast.test.ts` (parses App.css).
 - **Tiers**: by default Chromium runs every spec, other browsers/devices run only specs tagged `@cross-browser`. `E2E_FULL=1` runs the full matrix.
 - **Snapshots**: darwin baselines only; snapshot assertions are ignored on Linux CI. Update locally with `--update-snapshots` and review the diff images.
 

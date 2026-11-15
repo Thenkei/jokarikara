@@ -25,6 +25,10 @@
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   overflow: hidden;
+  /* body is position: fixed, so without this <html> is 0 px tall: with
+     overflow: hidden it reads as clipping all content, and assistive tooling
+     (axe) then treats every element as off screen. */
+  height: 100%;
 }
 
 * {

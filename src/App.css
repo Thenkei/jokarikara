@@ -10,6 +10,9 @@
   justify-content: center;
   position: relative;
   background-color: var(--bg-color);
+  /* Pinch zoom stays available (the viewport no longer forbids it), but
+     rapid taps outside the board never double-tap-zoom mid-run. */
+  touch-action: manipulation;
 }
 
 .game-screen {
@@ -181,20 +184,26 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
+/*
+ * World-tinted chips under light text. The tint share is capped so that any
+ * seeded palette colour (Mono included) keeps the 0.68rem label at WCAG AA
+ * (4.5:1); src/visual/hudChipContrast.test.ts sweeps worlds and seeds against
+ * these exact percentages, so change them together.
+ */
 .world-badge {
-  background: color-mix(in srgb, var(--world-hud-primary) 58%, rgba(11, 16, 24, 0.86));
+  background: color-mix(in srgb, var(--world-hud-primary) 40%, rgba(11, 16, 24, 0.86));
 }
 
 .level-badge {
-  background: color-mix(in srgb, var(--world-hud-secondary) 58%, rgba(11, 16, 24, 0.86));
+  background: color-mix(in srgb, var(--world-hud-secondary) 40%, rgba(11, 16, 24, 0.86));
 }
 
 .style-badge {
-  background: color-mix(in srgb, var(--world-hud-accent) 52%, rgba(11, 16, 24, 0.86));
+  background: color-mix(in srgb, var(--world-hud-accent) 40%, rgba(11, 16, 24, 0.86));
 }
 
 .timer-badge {
-  background: color-mix(in srgb, var(--world-hud-secondary) 42%, #261008 58%);
+  background: color-mix(in srgb, var(--world-hud-secondary) 38%, #261008 62%);
 }
 
 .lives-badge {
@@ -336,7 +345,7 @@
 .leaderboard h3 {
   font-size: 0.9rem;
   font-weight: 800;
-  color: #666;
+  color: #8c8c8c;
   letter-spacing: 0.2em;
   margin-bottom: 1rem;
 }
@@ -358,8 +367,9 @@
   font-weight: 600;
 }
 
+/* Rank and date stay secondary but AA (>= 4.5:1) on the card. */
 .leaderboard li span:nth-child(1) {
-  color: #555;
+  color: #8c8c8c;
   width: 2rem;
 }
 
@@ -370,7 +380,7 @@
 }
 
 .leaderboard li span:nth-child(3) {
-  color: #444;
+  color: #858585;
   font-size: 0.8rem;
 }
 
@@ -836,6 +846,12 @@ button:active {
   display: none;
 }
 
+/* Keyboard stop for scrolling the cards: inset, so the edges never clip it. */
+.gameover-body:focus-visible {
+  outline: 2px solid #8cc2ff;
+  outline-offset: -2px;
+}
+
 /* Centre when the content fits; start at the top (no clipping) when it scrolls. */
 .gameover-body > :first-child {
   margin-top: auto;
@@ -933,7 +949,8 @@ button:active {
 .gameover-card h3 {
   font-size: 0.68rem;
   font-weight: 800;
-  color: #777;
+  /* #777 read 4.0:1 on the card; AA needs 4.5:1 at this size. */
+  color: #8c8c8c;
   letter-spacing: 0.2em;
   margin-bottom: 0.6rem;
 }
@@ -950,7 +967,7 @@ button:active {
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.15em;
-  color: #777;
+  color: #8c8c8c;
   white-space: nowrap;
 }
 
@@ -1480,9 +1497,10 @@ button:focus-visible {
   color: #a3abbb;
 }
 
+/* Locked reads dimmer than unlocked but stays AA (#5f6470 was 3:1). */
 .achievement-item.locked .achievement-title,
 .achievement-item.locked .achievement-desc {
-  color: #5f6470;
+  color: #7f8696;
 }
 
 .achievement-progress {
@@ -1616,7 +1634,7 @@ button:focus-visible {
 .world-card.locked .world-card-badge {
   background: transparent;
   border: 2px dashed #3d4352;
-  color: #5f6470;
+  color: #7f8696;
 }
 
 .world-card-body {
@@ -1664,7 +1682,7 @@ button:focus-visible {
 .world-card.locked .world-card-number,
 .world-card.locked .world-card-name,
 .world-card-hint {
-  color: #5f6470;
+  color: #7f8696;
 }
 
 .world-card-hint {
