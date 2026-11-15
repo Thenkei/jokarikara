@@ -107,7 +107,7 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 
 ### Game Modes
 - **CLASSIC**: Standard fail-on-miss gameplay
-- **ZEN**: No fail state, restart/undo buttons available; pause menu FINISH RUN (`src/modes/finishRun.ts`, `finishRun` in gameState) ends the run as a game over with `EndReason` "finished" (scores saved; MAIN MENU still abandons); can start from any world already reached (practice)
+- **ZEN**: 10 lives, one back after every 10 clean stacks in a row (`src/modes/zenLives.ts`, `zenRegenProgress` in GameState: a miss resets it, UNDO steps it back, nothing banked at full lives; "+1 LIFE" pop + `playTimeBonus` + `life` haptic + announcement), restart/undo buttons available; pause menu FINISH RUN (`src/modes/finishRun.ts`, `finishRun` in gameState) ends the run as a game over with `EndReason` "finished" (scores saved; MAIN MENU still abandons); can start from any world already reached (practice)
 - **TIME_ATTACK**: 60-second timer; PERFECT +5s, GREAT +2s, miss −5s
 - **Daily Challenge**: not a `GameMode` but a run variant (CLASSIC rules, date-derived `runSeed`), handled in `App.tsx`
 

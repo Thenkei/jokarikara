@@ -50,6 +50,7 @@ import {
 import { getBeatPhase, getHeartbeatMultiplier } from "../gameplay/heartbeat";
 import { getPerfectBandEntrySize } from "../gameplay/guide";
 import { isTapBlockedByFracture } from "../gameplay/fracture";
+import { advanceZenRegen, rewindZenRegen } from "../modes/zenLives";
 
 /** Regular worlds: a new shape starts at this fraction of its container. */
 const NORMAL_SPAWN_RATIO = 0.05;
@@ -141,6 +142,7 @@ export const createInitialState = (
     mode,
     timeRemaining: mode === "TIME_ATTACK" ? TIME_ATTACK_START_TIME : undefined,
     zenLivesRemaining: mode === "ZEN" ? ZEN_MAX_LIVES : undefined,
+    zenRegenProgress: mode === "ZEN" ? 0 : undefined,
     isBossLevel: false,
     runSeed,
     rngState: seedRng(runSeed),
@@ -435,6 +437,8 @@ export const stackActiveShape = (
   worldUp: boolean;
   isPerfect: boolean;
   quality: StackQuality;
+  /** Zen: this stack earned a life back (modes/zenLives). */
+  lifeRegained: boolean;
 } => {
   if (!state.activeShape) {
     return {
@@ -444,6 +448,7 @@ export const stackActiveShape = (
       worldUp: false,
       isPerfect: false,
       quality: "OK",
+      lifeRegained: false,
     };
   }
 
@@ -495,9 +500,19 @@ export const stackActiveShape = (
     : 0;
   const bestStreak = styleEnabled ? Math.max(state.bestStreak, streak) : 0;
 
+  const regen =
+    state.mode === "ZEN"
+      ? advanceZenRegen(
+          state.zenLivesRemaining ?? ZEN_MAX_LIVES,
+          state.zenRegenProgress ?? 0,
+          ZEN_MAX_LIVES,
+        )
+      : null;
+
   return {
     state: {
       ...state,
+      ...(regen && { zenLivesRemaining: regen.lives, zenRegenProgress: regen.progress }),
       shapes: finalShapes,
       activeShape: null,
       activeOffset: { x: 0, y: 0 },
@@ -520,6 +535,7 @@ export const stackActiveShape = (
     worldUp,
     isPerfect,
     quality,
+    lifeRegained: regen?.regained ?? false,
   };
 };
 
@@ -698,6 +714,8 @@ const handleMissInner = (state: GameState): GameState => {
     const nextState: GameState = {
       ...state,
       zenLivesRemaining: nextLives,
+      // The next life back takes a fresh clean run.
+      zenRegenProgress: 0,
       activeShape: resetActiveAfterMiss(state),
       perfectBandEnteredAt: null,
       activeOffset: { x: 0, y: 0 },
@@ -814,6 +832,7 @@ export const undoLastStack = (state: GameState): GameState => {
     targetZoom: newTargetZoom,
     activeShape: null, // Force spawn of new shape
     perfectBandEnteredAt: null,
+    zenRegenProgress: rewindZenRegen(state.zenRegenProgress ?? 0),
   };
 };
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { ZEN_LIFE_REGEN_STACKS } from "../modes/zenLives";
 import {
   createInitialState,
   generateRandomSpeed,
@@ -249,6 +250,50 @@ describe("gameState", () => {
       const newState = handleMiss(state);
       expect(newState.zenLivesRemaining).toBe(0);
       expect(newState.isGameOver).toBe(true);
+    });
+  });
+
+  describe("Zen life regeneration", () => {
+    const stackOnce = (state: ReturnType<typeof createInitialState>) =>
+      stackActiveShape(spawnActiveShape(state));
+    const missOnce = (state: ReturnType<typeof createInitialState>) => {
+      const spawned = spawnActiveShape(state);
+      spawned.activeShape!.size = spawned.shapes[0].size * 2;
+      return handleMiss(spawned);
+    };
+
+    it("earns a life back after ZEN_LIFE_REGEN_STACKS clean stacks", () => {
+      let state = missOnce(createInitialState(1000, "ZEN"));
+      expect(state.zenLivesRemaining).toBe(9);
+      for (let i = 1; i < ZEN_LIFE_REGEN_STACKS; i += 1) {
+        const result = stackOnce(state);
+        expect(result.lifeRegained).toBe(false);
+        state = result.state;
+      }
+      expect(state.zenLivesRemaining).toBe(9);
+      const result = stackOnce(state);
+      expect(result.lifeRegained).toBe(true);
+      expect(result.state.zenLivesRemaining).toBe(10);
+      expect(result.state.zenRegenProgress).toBe(0);
+    });
+
+    it("a miss starts the clean run over", () => {
+      let state = missOnce(createInitialState(1000, "ZEN"));
+      for (let i = 0; i < ZEN_LIFE_REGEN_STACKS - 1; i += 1) state = stackOnce(state).state;
+      state = missOnce(state);
+      expect(state.zenLivesRemaining).toBe(8);
+      expect(state.zenRegenProgress).toBe(0);
+    });
+
+    it("UNDO steps the progress back; other modes never track it", () => {
+      let state = missOnce(createInitialState(1000, "ZEN"));
+      for (let i = 0; i < 3; i += 1) state = stackOnce(state).state;
+      expect(state.zenRegenProgress).toBe(3);
+      expect(undoLastStack(state).zenRegenProgress).toBe(2);
+
+      const classic = stackOnce(createInitialState(1000, "CLASSIC"));
+      expect(classic.lifeRegained).toBe(false);
+      expect(classic.state.zenRegenProgress).toBeUndefined();
     });
   });
 

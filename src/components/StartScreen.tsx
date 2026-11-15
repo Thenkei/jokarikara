@@ -24,6 +24,7 @@ import { getWorldName } from "../gameplay/worldText";
 import { GearIcon } from "./SettingsSheet";
 import { MedalGlyph } from "./MedalGlyph";
 import { StreakChip } from "./StreakChip";
+import { ZEN_LIFE_REGEN_STACKS } from "../modes/zenLives";
 
 /** Full-screen panels opened from the start screen menu. */
 export type StartPanel = "achievements" | "worlds";
@@ -34,7 +35,7 @@ const describeMode = ({ t }: Translator, mode: GameMode): string => {
     case "CLASSIC":
       return t("mode.CLASSIC.description");
     case "ZEN":
-      return t("mode.ZEN.description", { lives: ZEN_MAX_LIVES });
+      return t("mode.ZEN.description", { lives: ZEN_MAX_LIVES, regen: ZEN_LIFE_REGEN_STACKS });
     case "TIME_ATTACK":
       return TIME_ATTACK_MISS_PENALTY !== undefined
         ? t("mode.TIME_ATTACK.description", {
