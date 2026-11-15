@@ -175,8 +175,8 @@ export const en = {
   "margin.hintEdge": "PERFECT opened {seconds} before the edge.",
   "margin.hintRing": "PERFECT opened {seconds} before the ring.",
   // No-break space: "0.4 s" and "4 %" never wrap between number and unit.
-  "unit.seconds": "{value} s",
-  "unit.percent": "{value} %",
+  "unit.seconds": "{value}\u00a0s",
+  "unit.percent": "{value}\u00a0%",
 
   // ---------------------------------------------------------------- game over
   "gameOver.summary": "Run summary",

@@ -21,7 +21,7 @@ export const fr: Catalog = {
   // ---------------------------------------------------------------- app
   "app.title": "SHAPE STACK",
   "app.gameBoard":
-    "Plateau de jeu : touche, clique ou appuie sur Espace pour empiler la forme qui grandit",
+    "Plateau de jeu\u00a0: touche, clique ou appuie sur Espace pour empiler la forme qui grandit",
 
   // ---------------------------------------------------------------- start screen
   "start.subtitle": "Touche pour empiler. Sans déborder.",
@@ -39,9 +39,9 @@ export const fr: Catalog = {
   "start.practiceFull": "Partie complète",
   "start.practiceName": "Entraînement · {name}",
   "start.achievements": "SUCCÈS {unlocked}/{total}",
-  "start.achievementsAria": "Succès : {unlocked} sur {total} débloqués",
+  "start.achievementsAria": "Succès\u00a0: {unlocked} sur {total} débloqués",
   "start.worlds": "MONDES {revealed}/{total}",
-  "start.worldsAria": "Mondes : {revealed} sur {total} découverts",
+  "start.worldsAria": "Mondes\u00a0: {revealed} sur {total} découverts",
   "start.monoOn": "Style mono activé",
   "start.monoOff": "Style mono désactivé",
 
@@ -58,8 +58,8 @@ export const fr: Catalog = {
   "mode.TIME_ATTACK.aria": "Mode chrono",
   "mode.TIME_ATTACK.name": "Chrono",
   "mode.TIME_ATTACK.description":
-    "60 s. PERFECT +{perfect} s, GREAT +{great} s, raté −{penalty} s.",
-  "mode.TIME_ATTACK.descriptionNoPenalty": "60 s, chaque PERFECT ajoute +{perfect} s.",
+    "60\u202fs. PERFECT +{perfect}\u202fs, GREAT +{great}\u202fs, raté −{penalty}\u202fs.",
+  "mode.TIME_ATTACK.descriptionNoPenalty": "60\u202fs, chaque PERFECT ajoute +{perfect}\u202fs.",
 
   // ---------------------------------------------------------------- daily challenge
   "daily.button": "DÉFI DU JOUR",
@@ -78,9 +78,9 @@ export const fr: Catalog = {
   "daily.streak.keptSpoken": "Série de {days} jours.",
   "daily.streak.atRisk": "GARDE TA SÉRIE DE {days} JOURS",
   "daily.streak.atRiskSpoken": "Série de {days} jours, joue aujourd'hui pour la garder.",
-  "countdown.hoursMinutes": "{hours} h {minutes} min",
-  "countdown.minutes": "{minutes} min",
-  "countdown.lessThanMinute": "<1 min",
+  "countdown.hoursMinutes": "{hours}\u202fh {minutes}\u202fmin",
+  "countdown.minutes": "{minutes}\u202fmin",
+  "countdown.lessThanMinute": "<1\u202fmin",
   "countdown.spoken.hours": { one: "{count} heure", other: "{count} heures" },
   "countdown.spoken.minutes": { one: "{count} minute", other: "{count} minutes" },
   "countdown.spoken.hoursMinutes": "{hours} et {minutes}",
@@ -89,7 +89,7 @@ export const fr: Catalog = {
   // ---------------------------------------------------------------- HUD
   "hud.pause": "PAUSE",
   "hud.pauseAria": "Mettre le jeu en pause",
-  "hud.timer": "{seconds} s",
+  "hud.timer": "{seconds}\u202fs",
   "hud.timerAria": { one: "{count} seconde restante", other: "{count} secondes restantes" },
   "hud.lives": "VIES {lives}",
   "hud.best": "RECORD {score}",
@@ -104,8 +104,8 @@ export const fr: Catalog = {
   "hud.zenRestartAria": "Relancer la forme en cours",
   "hud.zenUndo": "ANNULER",
   "hud.zenUndoAria": "Annuler la dernière forme",
-  "hud.timeBonus": "+{seconds} s",
-  "hud.timePenalty": "−{seconds} s",
+  "hud.timeBonus": "+{seconds}\u202fs",
+  "hud.timePenalty": "−{seconds}\u202fs",
   "hud.miss": "RATÉ",
 
   // ---------------------------------------------------------------- pause menu
@@ -125,20 +125,20 @@ export const fr: Catalog = {
   "banner.newDailyBest": "RECORD DU JOUR",
   "banner.pastBest": "AU-DELÀ DE {score}",
   "banner.nextMedal": "PUIS {medal} {threshold}",
-  "banner.timeUp": "TEMPS ÉCOULÉ !",
+  "banner.timeUp": "TEMPS ÉCOULÉ\u202f!",
   "banner.level": "NIVEAU {level}",
   "banner.newWorld": "NOUVEAU MONDE",
   "banner.world": "MONDE {world}",
   "banner.tapToPlay": "TOUCHE POUR JOUER",
   "firstRun.title": "TOUCHE QUAND ÇA RENTRE",
   "firstRun.body":
-    "Laisse la forme grandir, puis touche l'écran (ou appuie sur Espace) juste avant qu'elle atteigne le bord. Plus tu t'en approches, mieux c'est : {perfect}.",
+    "Laisse la forme grandir, puis touche l'écran (ou appuie sur Espace) juste avant qu'elle atteigne le bord. Plus tu t'en approches, mieux c'est\u00a0: {perfect}.",
 
   // ---------------------------------------------------------------- screen reader announcements
   "announce.paused": "En pause",
   "announce.resuming": "Reprise dans {seconds}",
   "announce.finishConfirm":
-    "Finir la partie ? Appuie encore pour la terminer et garder ton score",
+    "Finir la partie\u202f? Appuie encore pour la terminer et garder ton score",
   "announce.level": "Niveau {level}",
   "announce.world": "Monde {world}",
   "announce.worldIntro": "{howTo} Touche l'écran ou appuie sur Espace pour jouer.",
@@ -150,9 +150,9 @@ export const fr: Catalog = {
   "announce.newBest": "Nouveau record personnel. Ancien record de {score} battu",
   "announce.newDailyBest": "Nouveau record du jour. Ancien record de {score} battu",
   "announce.medalTop": "{medal}. Médaille la plus haute obtenue",
-  "announce.medalNext": "{medal}. Prochaine : {next} à {threshold}",
-  "announce.timeUp": "Temps écoulé ! Score {score}",
-  "announce.timeUpMedal": "Temps écoulé ! Score {score}. {medal}",
+  "announce.medalNext": "{medal}. Prochaine\u00a0: {next} à {threshold}",
+  "announce.timeUp": "Temps écoulé\u202f! Score {score}",
+  "announce.timeUpMedal": "Temps écoulé\u202f! Score {score}. {medal}",
 
   // ---------------------------------------------------------------- stack qualities (game terms)
   "quality.PERFECT": "PERFECT",
@@ -183,17 +183,17 @@ export const fr: Catalog = {
   "margin.hairLabel": "D'UN CHEVEU",
   "margin.hintEdge": "Le PERFECT s'est ouvert {seconds} avant le bord.",
   "margin.hintRing": "Le PERFECT s'est ouvert {seconds} avant l'anneau.",
-  "unit.seconds": "{value} s",
-  "unit.percent": "{value} %",
+  "unit.seconds": "{value}\u202fs",
+  "unit.percent": "{value}\u00a0%",
 
   // ---------------------------------------------------------------- game over
   "gameOver.summary": "Résumé de la partie",
   "gameOver.headline": "FIN DE PARTIE",
   "gameOver.headlineFinished": "SESSION TERMINÉE",
-  "gameOver.headlineTimeUp": "TEMPS ÉCOULÉ !",
+  "gameOver.headlineTimeUp": "TEMPS ÉCOULÉ\u202f!",
   "gameOver.practiceFrom": "ENTRAÎNEMENT · DÈS LE MONDE {world}",
   "gameOver.daily": "DÉFI · {date}",
-  "gameOver.scoreLabel": "Score : ",
+  "gameOver.scoreLabel": "Score\u00a0: ",
   "gameOver.world": "MONDE {world}",
   "gameOver.level": "NIVEAU {level}",
   "gameOver.newBest": "NOUVEAU RECORD",
@@ -212,35 +212,35 @@ export const fr: Catalog = {
   "gameOver.today": "AUJOURD'HUI",
   "gameOver.dailyLine": "RECORD {best} · {tries}",
   "gameOver.topScores": "MEILLEURS SCORES - {mode}",
-  "gameOver.noScores": "Pas encore de meilleur score !",
+  "gameOver.noScores": "Pas encore de meilleur score\u202f!",
   "gameOver.retry": "REJOUER",
   "gameOver.share": "PARTAGER",
   "gameOver.mainMenu": "MENU PRINCIPAL",
   "share.copied": "Copié dans le presse-papiers",
-  "share.shared": "Partagé !",
+  "share.shared": "Partagé\u202f!",
   "share.failed": "Partage indisponible",
 
   // ---------------------------------------------------------------- run insights
-  "insight.overflow.title": "Trop tard : la forme a dépassé le bord.",
+  "insight.overflow.title": "Trop tard\u00a0: la forme a dépassé le bord.",
   "insight.overflow.titleWithMargin": "La forme a dépassé le bord.",
   "insight.overflow.tip":
-    "Touche un poil plus tôt. Un GREAT (92 %+) garde la partie en vie et le combo en cours.",
+    "Touche un poil plus tôt. Un GREAT (92\u00a0%+) garde la partie en vie et le combo en cours.",
   "insight.overflowReverse.title": "Ta forme a franchi l'anneau.",
   "insight.overflowReverse.tip":
-    "Touche dès qu'elle entoure complètement la précédente : au plus serré, c'est PERFECT.",
+    "Touche dès qu'elle entoure complètement la précédente\u00a0: au plus serré, c'est PERFECT.",
   "insight.badTap.title": "Cette forme ne rentrait pas.",
   "insight.badTap.tip":
     "Au moment de toucher, chaque coin de ta forme doit être dans celle du dessous.",
-  "insight.badTapReverse.title": "Trop tôt : elle n'entourait pas la forme précédente.",
+  "insight.badTapReverse.title": "Trop tôt\u00a0: elle n'entourait pas la forme précédente.",
   "insight.badTapReverse.titleWithMargin": "Elle n'entourait pas la forme précédente.",
   "insight.badTapReverse.tip":
     "Dans la Pile inversée, attends que ta forme entoure complètement la précédente.",
-  "insight.fracture.title": "Fracture ! Un secteur rouge a croisé ta forme.",
+  "insight.fracture.title": "Fracture\u202f! Un secteur rouge a croisé ta forme.",
   "insight.fracture.tip":
     "Près du bord, touche quand les arcs rouges sont loin des coins de ta forme.",
   "insight.timeout.title": "Temps écoulé.",
   "insight.timeout.tip":
-    "La précision rapporte du temps : PERFECT +{perfect} s, GREAT +{great} s.",
+    "La précision rapporte du temps\u00a0: PERFECT +{perfect}\u202fs, GREAT +{great}\u202fs.",
   "insight.lives.title": "Plus de vies.",
   "insight.lives.tip":
     "En Zen, toucher trop tôt ne coûte rien, et ANNULER / RELANCER ne coûtent jamais de vie.",
@@ -250,11 +250,11 @@ export const fr: Catalog = {
   "insight.finished.onlyPerfect": "Ta seule forme était PERFECT. Timing impeccable.",
   "insight.finished.allPerfect": "Tes {stacks} étaient toutes PERFECT. Timing impeccable.",
   "insight.finished.dialledIn":
-    "{rate} % de PERFECT sur {stacks} : ton timing est au point. Le mode Classique le met à l'épreuve.",
+    "{rate}\u00a0% de PERFECT sur {stacks}\u00a0: ton timing est au point. Le mode Classique le met à l'épreuve.",
   "insight.finished.somePerfect":
-    "{perfects} PERFECT sur {stacks} ({rate} %). À la prochaine session, vise-en un de plus.",
+    "{perfects} PERFECT sur {stacks} ({rate}\u00a0%). À la prochaine session, vise-en un de plus.",
   "insight.finished.great":
-    "{great} sur {stacks} en GREAT. Le PERFECT, c'est 97 % : attends un poil plus avant de toucher.",
+    "{great} sur {stacks} en GREAT. Le PERFECT, c'est 97\u00a0%\u00a0: attends un poil plus avant de toucher.",
   "insight.finished.safe":
     "Toutes tes formes ont tenu. Laisse-les grandir plus près du bord avant de toucher pour marquer plus.",
   "insight.stacks": { one: "{count} forme", other: "{count} formes" },
@@ -357,23 +357,23 @@ export const fr: Catalog = {
   "world.1.name": "Les bases",
   "world.1.tagline": "Touche quand la forme remplit l'espace.",
   "world.1.howTo":
-    "Ta forme grandit dans la précédente : touche juste avant qu'elle atteigne le bord, et plus elle est ajustée, plus elle rapporte.",
+    "Ta forme grandit dans la précédente\u00a0: touche juste avant qu'elle atteigne le bord, et plus elle est ajustée, plus elle rapporte.",
   "world.2.name": "Respiration",
   "world.2.tagline": "La pile respire. Fie-toi au contour.",
   "world.2.howTo":
-    "Les formes empilées gonflent et dégonflent doucement, mais seulement à l'écran : cale ta touche sur leur taille au repos.",
+    "Les formes empilées gonflent et dégonflent doucement, mais seulement à l'écran\u00a0: cale ta touche sur leur taille au repos.",
   "world.3.name": "Croissance accélérée",
   "world.3.tagline": "Ça grandit plus vite. Les secteurs rouges du bord bloquent.",
   "world.3.howTo":
-    "Les formes grandissent plus vite à chaque niveau et, hors Zen, deux secteurs rouges balaient le bord : toucher quand un coin y est, c'est raté.",
+    "Les formes grandissent plus vite à chaque niveau et, hors Zen, deux secteurs rouges balaient le bord\u00a0: toucher quand un coin y est, c'est raté.",
   "world.4.name": "Houle",
   "world.4.tagline": "La pile tangue, ta forme reste en place.",
   "world.4.howTo":
-    "La pile oscille de gauche à droite mais ta forme reste centrée ; l'oscillation est visuelle, garde l'œil sur la taille.",
+    "La pile oscille de gauche à droite mais ta forme reste centrée\u00a0; l'oscillation est visuelle, garde l'œil sur la taille.",
   "world.5.name": "Dérive chromatique",
   "world.5.tagline": "Les couleurs dérivent. Pas les formes.",
   "world.5.howTo":
-    "Les formes empilées changent sans cesse de couleur, sans rien changer d'autre : lis le contour, pas la couleur.",
+    "Les formes empilées changent sans cesse de couleur, sans rien changer d'autre\u00a0: lis le contour, pas la couleur.",
   "world.6.name": "L'Éclipse",
   "world.6.tagline": "Obscurité. Suis le contour qui pulse.",
   "world.6.howTo":
@@ -381,17 +381,17 @@ export const fr: Catalog = {
   "world.7.name": "Gravité",
   "world.7.tagline": "Ta forme descend en grandissant.",
   "world.7.howTo":
-    "Ta forme descend en grandissant et touche donc plus tôt le bas de la précédente : touche un peu plus tôt.",
+    "Ta forme descend en grandissant et touche donc plus tôt le bas de la précédente\u00a0: touche un peu plus tôt.",
   "world.8.name": "Rotation inversée",
   "world.8.tagline": "La rotation s'inverse un niveau sur deux.",
   "world.8.howTo":
-    "La pile change de sens de rotation un niveau sur deux et sur les formes boss : les coins s'alignent à de nouveaux moments.",
+    "La pile change de sens de rotation un niveau sur deux et sur les formes boss\u00a0: les coins s'alignent à de nouveaux moments.",
   "world.9.name": "Pile inversée",
-  "world.9.tagline": "Grandis vers l'extérieur : entoure la dernière forme, reste dans l'anneau.",
+  "world.9.tagline": "Grandis vers l'extérieur\u00a0: entoure la dernière forme, reste dans l'anneau.",
   "world.9.howTo":
-    "Les formes grandissent vers l'extérieur : touche dès que la tienne entoure la précédente, avant qu'elle atteigne l'anneau de l'arène.",
+    "Les formes grandissent vers l'extérieur\u00a0: touche dès que la tienne entoure la précédente, avant qu'elle atteigne l'anneau de l'arène.",
   "world.10.name": "Pulsation",
   "world.10.tagline": "La croissance bondit sur le temps. Touche en rythme.",
   "world.10.howTo":
-    "La croissance s'emballe à chaque temps (90 BPM) et ralentit entre deux : vise le calme avant le temps suivant.",
+    "La croissance s'emballe à chaque temps (90\u202fBPM) et ralentit entre deux\u00a0: vise le calme avant le temps suivant.",
 };
