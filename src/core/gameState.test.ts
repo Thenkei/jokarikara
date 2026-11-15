@@ -7,6 +7,8 @@ import {
   checkContainment,
   stackActiveShape,
   setGameOver,
+  finishRun,
+  getEndReason,
   updateZoom,
   updateShapeOpacities,
   updateShapeRotations,
@@ -550,6 +552,50 @@ describe("gameState", () => {
       const state = createInitialState(1000);
       const gameOverState = setGameOver(state);
       expect(gameOverState.isGameOver).toBe(true);
+    });
+  });
+
+  describe("finishRun", () => {
+    const zenWithStacks = (count: number) => {
+      let state = spawnActiveShape(createInitialState(1000, "ZEN", 7));
+      for (let i = 0; i < count; i += 1) {
+        state = spawnActiveShape(stackActiveShape(state).state);
+      }
+      return state;
+    };
+
+    it("ends a Zen run as a game over with reason 'finished', keeping the run intact", () => {
+      const state = handleMiss(zenWithStacks(2), "badTap");
+      expect(state.lastMissReason).toBe("badTap");
+      const finished = finishRun(state);
+
+      expect(finished.isGameOver).toBe(true);
+      expect(finished.finishedByPlayer).toBe(true);
+      expect(getEndReason(finished)).toBe("finished");
+      // Nothing about the run itself changes: same score pipeline as lives-out.
+      expect(finished.score).toBe(state.score);
+      expect(finished.stackCount).toBe(2);
+      expect(finished.scoreHistory).toEqual(state.scoreHistory);
+      expect(finished.perfectCount).toBe(state.perfectCount);
+      expect(finished.zenLivesRemaining).toBe(state.zenLivesRemaining);
+      // Pure: the input is untouched.
+      expect(state.isGameOver).toBe(false);
+      expect(getEndReason(state)).toBeNull();
+    });
+
+    it.each(["CLASSIC", "TIME_ATTACK"] as const)(
+      "returns a %s run unchanged (no voluntary finish)",
+      (mode) => {
+        const state = spawnActiveShape(createInitialState(1000, mode, 7));
+        expect(finishRun(state)).toBe(state);
+      },
+    );
+
+    it("returns a run that is already over unchanged (lives out stays 'lives')", () => {
+      const out = handleMiss({ ...zenWithStacks(1), zenLivesRemaining: 1 }, "overflow");
+      expect(out.isGameOver).toBe(true);
+      expect(finishRun(out)).toBe(out);
+      expect(getEndReason(out)).toBe("lives");
     });
   });
 

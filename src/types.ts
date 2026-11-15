@@ -40,8 +40,11 @@ export type MissMargin =
   | { kind: "early"; fraction: number }
   | { kind: "fracture"; clearInSec: number };
 
-/** Why a run ended (shown on the game over screen). */
-export type EndReason = MissReason | "timeout" | "lives";
+/**
+ * Why a run ended (shown on the game over screen). `finished`: the player
+ * ended a Zen run from the pause menu (FINISH RUN), not a failure.
+ */
+export type EndReason = MissReason | "timeout" | "lives" | "finished";
 
 export interface StyleUpdate {
   styleScore: number;
@@ -81,6 +84,11 @@ export interface GameState {
    * gameplay.
    */
   elapsedTime: number;
+  /**
+   * The player ended the run on purpose (Zen FINISH RUN, see `finishRun`).
+   * Takes precedence over every other end reason.
+   */
+  finishedByPlayer?: boolean;
   /** Cause of the most recent miss (null until the first one). */
   lastMissReason: MissReason | null;
   /** How far that miss was off (null when not computable). */

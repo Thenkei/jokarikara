@@ -1,12 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { getEndInsight, getQualityBreakdown } from "./runInsights";
+import { getEndInsight, getFinishedInsight, getQualityBreakdown } from "./runInsights";
 import { STYLE_QUALITY_POINTS } from "../constants/game";
 import { createInitialState, getEndReason, handleMiss, spawnActiveShape, updateTimer } from "../core/gameState";
 import type { EndReason } from "../types";
 
 describe("end insight", () => {
   it("explains every end reason with a title and a tip", () => {
-    const reasons: EndReason[] = ["overflow", "badTap", "fracture", "timeout", "lives"];
+    const reasons: EndReason[] = [
+      "overflow",
+      "badTap",
+      "fracture",
+      "timeout",
+      "lives",
+      "finished",
+    ];
     for (const reason of reasons) {
       const insight = getEndInsight(reason, 1);
       expect(insight?.title.length).toBeGreaterThan(5);
@@ -70,6 +77,39 @@ describe("end insight", () => {
     expect(getEndInsight("badTap", 9)?.tip).toContain("Reverse Stack");
     expect(getEndInsight("overflow", 9)?.title).toContain("ring");
     expect(getEndInsight("overflow", 1)?.title).toContain("edge");
+  });
+});
+
+describe("finished insight (Zen FINISH RUN)", () => {
+  const { perfect, great, good, ok } = STYLE_QUALITY_POINTS;
+
+  it("is a calm 'Session complete.' with no margin, whatever the last miss was", () => {
+    const insight = getEndInsight("finished", 9, { kind: "late", fraction: 0.04 }, [perfect]);
+    expect(insight?.tone).toBe("calm");
+    expect(insight?.title).toBe("Session complete.");
+    expect(insight?.margin).toBeUndefined();
+    expect(insight?.marginHint).toBeUndefined();
+    // Failure reasons keep the danger tone.
+    expect(getEndInsight("lives", 1)?.tone).toBeUndefined();
+  });
+
+  it("derives its tip from the stacks landed this run", () => {
+    expect(getFinishedInsight([]).tip).toContain("Nothing stacked");
+    expect(getFinishedInsight([perfect]).tip).toBe(
+      "Your only stack was PERFECT. Flawless timing.",
+    );
+    expect(getFinishedInsight([perfect, perfect, perfect]).tip).toBe(
+      "All 3 stacks were PERFECT. Flawless timing.",
+    );
+    // 3 of 5 PERFECT: dialled in.
+    expect(getFinishedInsight([perfect, great, perfect, ok, perfect]).tip).toBe(
+      "60% PERFECT over 5 stacks: your timing is dialled in. Classic puts it on the line.",
+    );
+    expect(getFinishedInsight([perfect, great, good, ok]).tip).toBe(
+      "1 PERFECT of 4 stacks (25%). Next session, aim for one more.",
+    );
+    expect(getFinishedInsight([great, good]).tip).toContain("1 of 2 stacks landed GREAT");
+    expect(getFinishedInsight([ok, good]).tip).toContain("closer to the edge");
   });
 });
 

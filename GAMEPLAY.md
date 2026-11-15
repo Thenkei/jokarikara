@@ -23,7 +23,7 @@ The game pauses automatically when you switch tabs or the window loses focus, an
 | Mode | Rules |
 | --- | --- |
 | **Classic** | One miss ends the run. |
-| **Zen** | 10 lives; each miss costs one life and resets the growing shape. `UNDO` and `RESTART` are available. Taps before the shape reaches 30% of the container are ignored, with a soft cue. **Practice**: once you have reached a world in any run, Zen can start directly at that world (‹ › picker on the start screen). Practice runs skip leaderboards and achievements. |
+| **Zen** | 10 lives; each miss costs one life and resets the growing shape. `UNDO` and `RESTART` are available. Taps before the shape reaches 30% of the container are ignored, with a soft cue. **Finish run**: the pause menu's `FINISH RUN` (press it twice: it turns into `TAP AGAIN TO FINISH` for 3 s) ends the session as a regular game over, so the score goes into the Zen top 5 with the usual summary, and the card reads "Session complete." with a tip from your run instead of a failure reason. `MAIN MENU` still leaves without saving. **Practice**: once you have reached a world in any run, Zen can start directly at that world (‹ › picker on the start screen). Practice runs skip leaderboards and achievements. |
 | **Time Attack** | 60 seconds on the clock. **PERFECT +5 s**, **GREAT +2 s**. A miss costs **−5 s** and resets the growing shape instead of ending the run, so the run ends only when the clock hits zero. The timer turns red at 10 s, and the last 5 seconds tick audibly. |
 | **Daily Challenge** | Classic rules on a **seed derived from today's date**, so everyone gets the same sequence of shapes, colours and speeds. Your best score and number of tries are kept per day, and **SHARE RESULT** copies a spoiler-free summary (score plus quality trail). Daily scores stay out of the Classic leaderboard. |
 
@@ -106,7 +106,7 @@ Effects are **cumulative**, and visual distortions only apply to stacked shapes,
 ## 🎵 Audio & Feel
 
 - **Stacks** play notes of a major pentatonic scale in the current world's key. The melody climbs with your combo, and better quality adds richer harmony (PERFECT adds a bell sparkle).
-- **Level up** plays an arpeggio, a **new world** plays a sustained chord, a **Zen miss** plays a soft drop and **game over** plays a low buzz.
+- **Level up** plays an arpeggio, a **new world** plays a sustained chord, a **Zen miss** plays a soft drop and **game over** plays a low buzz (a Zen session you finish yourself ends on the new-world chord instead).
 - **Visual feedback**: rings and particles on PERFECT/GREAT stacks, screen shake and a red flash on failure, a zoom punch on level up and a flash on a new world.
 - **Haptics** on supported phones.
 - **Settings** (saved):

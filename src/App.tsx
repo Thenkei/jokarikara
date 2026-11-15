@@ -33,6 +33,11 @@ import {
   RESUME_COUNTDOWN_STEP_MS,
 } from "./gameplay/resumeCountdown";
 import { getEndInsight, getQualityBreakdown } from "./modes/runInsights";
+import {
+  FINISH_CONFIRM_WINDOW_MS,
+  canFinishRun,
+  stepFinishConfirm,
+} from "./modes/finishRun";
 import { getMissAnnouncement, getMissMarginLabel } from "./modes/missMargin";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
@@ -338,6 +343,32 @@ function App() {
   });
   const [showSettings, setShowSettings] = useState(false);
   /**
+   * Zen FINISH RUN confirm: armed after a first press ("TAP AGAIN TO
+   * FINISH"), disarmed after FINISH_CONFIRM_WINDOW_MS or when the pause menu
+   * closes. The arming time (monotonic) lives in a ref for the press handler.
+   */
+  const [finishArmed, setFinishArmed] = useState(false);
+  const finishArmedAtRef = useRef<number | null>(null);
+  const finishDisarmTimeoutRef = useRef<number | null>(null);
+  /** Back to plain FINISH RUN (window expired, menu closed, run over). */
+  const disarmFinish = useCallback(() => {
+    finishArmedAtRef.current = null;
+    if (finishDisarmTimeoutRef.current !== null) {
+      window.clearTimeout(finishDisarmTimeoutRef.current);
+      finishDisarmTimeoutRef.current = null;
+    }
+    setFinishArmed(false);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (finishDisarmTimeoutRef.current !== null) {
+        window.clearTimeout(finishDisarmTimeoutRef.current);
+      }
+    },
+    [],
+  );
+  /**
    * Start screen secrets. Mono is session-only by design (never persisted):
    * a reload brings the regular look back.
    */
@@ -595,6 +626,7 @@ function App() {
     setDailyKey(todayKey);
     setShareStatus("idle");
     setPaused(false);
+    disarmFinish();
     setResumeDigit(null);
     setLastRun(null);
     setRunId((current) => current + 1);
@@ -706,10 +738,20 @@ function App() {
       clearSecondaryHudTimeout();
       setShowSecondaryHud(false);
       setGameState("GAMEOVER");
-      const insight = getEndInsight(stats.endReason, finalWorld, stats.endMargin);
+      disarmFinish();
+      const insight = getEndInsight(
+        stats.endReason,
+        finalWorld,
+        stats.endMargin,
+        stats.scoreHistory,
+      );
+      // A finished session is not a loss: no "Game over" lead-in.
+      const lead = stats.endReason === "finished" ? null : "Game over";
       announce(
-        ["Game over", insight?.margin, insight?.title, `Score ${finalScore}`]
-          .filter(Boolean)
+        [lead, insight?.margin, insight?.title, `Score ${finalScore}`]
+          .filter((part): part is string => Boolean(part))
+          // Titles are sentences: never read "edge.. Score".
+          .map((part) => part.replace(/\.$/, ""))
           .join(". "),
       );
     },
@@ -721,6 +763,7 @@ function App() {
       runStartWorld,
       allScores,
       finishAchievementRun,
+      disarmFinish,
     ]
   );
 
@@ -848,6 +891,8 @@ function App() {
   const applyPaused = useCallback(
     (next: boolean) => {
       setPaused(next);
+      // A confirm never survives the menu closing (nor a fresh pause).
+      disarmFinish();
       if (next) {
         setResumeDigit(null);
         announce("Paused");
@@ -861,7 +906,7 @@ function App() {
       if (canvasRef.current) canvasRef.current.resumeWithCountdown();
       else setAchievementsPaused(false);
     },
-    [setAchievementsPaused, announce]
+    [setAchievementsPaused, announce, disarmFinish]
   );
 
   const handleResumeCountdown = useCallback(
@@ -884,6 +929,34 @@ function App() {
     canvasRef.current?.undo();
     recordAchievementUndo();
     revealSecondaryHud();
+  };
+
+  /**
+   * Zen FINISH RUN, two presses: the first arms the button for
+   * FINISH_CONFIRM_WINDOW_MS, a deliberate second one (not a double click, see
+   * stepFinishConfirm) ends the run through the regular game over path.
+   */
+  const handleFinishPress = () => {
+    const now = performance.now();
+    const step = stepFinishConfirm(finishArmedAtRef.current, now);
+    if (step === "wait") return;
+    if (step === "arm") {
+      finishArmedAtRef.current = now;
+      setFinishArmed(true);
+      if (finishDisarmTimeoutRef.current !== null) {
+        window.clearTimeout(finishDisarmTimeoutRef.current);
+      }
+      finishDisarmTimeoutRef.current = window.setTimeout(() => {
+        finishDisarmTimeoutRef.current = null;
+        finishArmedAtRef.current = null;
+        setFinishArmed(false);
+      }, FINISH_CONFIRM_WINDOW_MS);
+      announce("Finish this run? Press again to end it and keep your score");
+      return;
+    }
+    disarmFinish();
+    // Reports through onGameOver -> handleGameOver (score, stats, insight).
+    canvasRef.current?.finishRun();
   };
 
   const handleToggleReducedFx = () => {
@@ -974,6 +1047,7 @@ function App() {
   const handleMainMenu = () => {
     // No-op after a game over (already committed); counts an abandoned run.
     abandonAchievementRun();
+    disarmFinish();
     setPaused(false);
     setResumeDigit(null);
     setShowSettings(false);
@@ -1124,7 +1198,12 @@ function App() {
       : null;
 
   const endInsight = lastRun
-    ? getEndInsight(lastRun.stats.endReason, world, lastRun.stats.endMargin)
+    ? getEndInsight(
+        lastRun.stats.endReason,
+        world,
+        lastRun.stats.endMargin,
+        lastRun.stats.scoreHistory,
+      )
     : null;
   const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
   /** Stacks made this run (a practice run starts with earlier worlds "done"). */
@@ -1476,6 +1555,20 @@ function App() {
               >
                 RESTART
               </button>
+              {canFinishRun(mode) && (
+                <button
+                  className={`pause-finish-btn menu-btn${finishArmed ? " armed" : ""}`}
+                  // Armed: the finish cue replaces the generic click.
+                  data-ui-sound={finishArmed ? "none" : "select"}
+                  onClick={handleFinishPress}
+                  onKeyDown={(event) => {
+                    // A held Enter repeats clicks: it must not arm and confirm.
+                    if (event.repeat && event.key === "Enter") event.preventDefault();
+                  }}
+                >
+                  {finishArmed ? "TAP AGAIN TO FINISH" : "FINISH RUN"}
+                </button>
+              )}
               <button
                 ref={settingsTriggerRef}
                 className="pause-settings-btn menu-btn"

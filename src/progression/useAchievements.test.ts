@@ -89,6 +89,73 @@ describe("useAchievements", () => {
     expect(lifetime.dailyDates).toEqual(["2026-11-14"]);
   });
 
+  describe("Zen FINISH RUN commits like a game over, not like an abandon", () => {
+    // Two stacks, then an undo: the last stack event still says 2.
+    const playThenUndo = (hook: ReturnType<typeof setup>["hook"]) => {
+      act(() => hook.result.current.beginRun("ZEN", null));
+      act(() => hook.result.current.recordStack(stack(1, { streak: 0 })));
+      act(() => hook.result.current.recordStack(stack(2, { streak: 0 })));
+      act(() => hook.result.current.recordUndo());
+    };
+    const finishedStats = {
+      stackCount: 1,
+      perfectCount: 1,
+      bestStreak: 0,
+      scoreHistory: [140],
+      endReason: "finished" as const,
+    };
+
+    it("finished: one run played, totals from the authoritative RunStats", () => {
+      const { hook } = setup();
+      playThenUndo(hook);
+      act(() => {
+        hook.result.current.finishRun({ score: 140, world: 1, level: 1, stats: finishedStats });
+      });
+      // Main menu from the game over screen: already committed, no double count.
+      act(() => hook.result.current.abandonRun());
+      act(() => hook.result.current.beginRun("ZEN", null));
+
+      const { lifetime } = getAchievementRecord();
+      expect(lifetime.runsPlayed).toBe(1);
+      expect(lifetime.totalStacks).toBe(1);
+      expect(lifetime.totalPerfects).toBe(1);
+      expect(lifetime.bestZenStacks).toBe(1);
+    });
+
+    it("abandoned (MAIN MENU): also one run played, but from the last stack event", () => {
+      const { hook } = setup();
+      playThenUndo(hook);
+      act(() => hook.result.current.abandonRun());
+
+      const { lifetime } = getAchievementRecord();
+      expect(lifetime.runsPlayed).toBe(1);
+      expect(lifetime.totalStacks).toBe(2);
+    });
+
+    it("a finished practice run only extends the reached world", () => {
+      const { hook, onUnlock } = setup();
+      act(() => hook.result.current.beginRun("ZEN", null, { practice: true }));
+      act(() =>
+        hook.result.current.recordStack(stack(31, { streak: 0, world: 3, level: 1 })),
+      );
+      let unlocked: readonly string[] = ["sentinel"];
+      act(() => {
+        unlocked = hook.result.current.finishRun({
+          score: 140,
+          world: 3,
+          level: 1,
+          stats: { ...finishedStats, stackCount: 31, perfectCount: 1 },
+        });
+      });
+      expect(unlocked).toEqual([]);
+      expect(onUnlock).not.toHaveBeenCalled();
+      const { lifetime } = getAchievementRecord();
+      expect(lifetime.runsPlayed).toBe(0);
+      expect(lifetime.totalStacks).toBe(0);
+      expect(lifetime.bestWorld).toBe(3);
+    });
+  });
+
   it("excludes paused time from Speed Demon", () => {
     const { hook, onUnlock, advance } = setup();
     act(() => hook.result.current.beginRun("CLASSIC", null));
