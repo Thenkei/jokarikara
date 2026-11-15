@@ -85,4 +85,34 @@ test.describe("Pause and keyboard", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator(".score")).toBeVisible();
   });
+
+  test("shows where the run stands: score, world, level and the mode's vital", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("radio", { name: "Time Attack mode" }).press("Enter");
+    await page.locator(".start-btn").press("Enter");
+    await waitForBridge(page);
+    const bridge = makeBridge(page);
+    await bridge.pause();
+    await bridge.forceStack(0.98);
+    await bridge.setTimeRemaining(42.3);
+    await bridge.step(0.001);
+    const score = (await bridge.getState())?.score ?? 0;
+    expect(score).toBeGreaterThan(0);
+
+    await page.keyboard.press("Escape");
+    const status = page.getByTestId("pause-status");
+    await expect(status.locator("span")).toHaveText([`SCORE ${score}`, "W 1", "L 1", "43s"]);
+    await expect(status).toHaveCSS("color", "rgb(199, 206, 219)");
+
+    // Zen shows its lives instead of a timer.
+    await page.locator(".pause-menu-btn").press("Enter");
+    await page.getByRole("radio", { name: "Zen mode" }).press("Enter");
+    await page.locator(".start-btn").press("Enter");
+    await waitForBridge(page);
+    await makeBridge(page).pause();
+    await page.keyboard.press("Escape");
+    await expect(status.locator("span")).toHaveText(["SCORE 0", "W 1", "L 1", /^LIVES \d+$/]);
+  });
 });

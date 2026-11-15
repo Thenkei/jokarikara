@@ -1371,6 +1371,13 @@ function App() {
 
             {paused && (
               <PauseMenu
+                status={{
+                  score,
+                  world,
+                  level,
+                  timeRemaining: mode === "TIME_ATTACK" ? timeRemaining : null,
+                  zenLives: mode === "ZEN" ? zenLives : null,
+                }}
                 canFinish={canFinishRun(mode)}
                 finishArmed={finishArmed}
                 onResume={() => applyPaused(false)}

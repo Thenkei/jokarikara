@@ -836,7 +836,27 @@ button:active {
   font-size: clamp(2rem, 10vw, 3.2rem);
   font-weight: 900;
   letter-spacing: 0.12em;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0;
+}
+
+/* Run status under the title: one quiet line of HUD-style readouts. */
+.pause-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 0.9rem;
+  max-width: min(17.5rem, calc(100vw - 2rem));
+  /* Reads as the title's subtitle: tighter above than the column gap. */
+  margin: -0.45rem 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #c7cedb;
+  font-variant-numeric: tabular-nums;
+}
+
+.pause-status-score {
+  color: #f5f8ff;
 }
 
 .pause-overlay .menu-btn {
