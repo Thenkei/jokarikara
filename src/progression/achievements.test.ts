@@ -6,8 +6,8 @@ import {
   ACHIEVEMENT_COUNT,
   ACHIEVEMENT_IDS,
   ARCHITECT_LIFETIME_STACKS,
-  HIDDEN_ACHIEVEMENT_TEXT,
   SECRET_ACHIEVEMENT_ID,
+  getAchievementText,
   DAILY_DEVOTEE_DAYS,
   EMPTY_LIFETIME_STATS,
   MAX_TRACKED_DAILY_DATES,
@@ -39,6 +39,9 @@ import {
   startStopwatch,
 } from "./stopwatch";
 
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 const NONE: ReadonlySet<AchievementId> = new Set();
 
 const lifetime = (overrides: Partial<LifetimeStats> = {}): LifetimeStats => ({
@@ -88,12 +91,24 @@ describe("catalogue", () => {
     expect(new Set(ACHIEVEMENT_IDS).size).toBe(ACHIEVEMENT_IDS.length);
   });
 
-  it("every entry has a title and description", () => {
+  it("every entry has a title and a fully filled description", () => {
     for (const a of ACHIEVEMENTS) {
-      expect(a.title.trim()).not.toBe("");
-      expect(a.description.trim()).not.toBe("");
+      const { title, description } = getAchievementText(EN, a);
+      expect(title.trim()).not.toBe("");
+      expect(description.trim()).not.toBe("");
+      // Every placeholder has its value in `descriptionParams`.
+      expect(description, a.id).not.toMatch(/[{}]/);
       expect(getAchievement(a.id)).toBe(a);
     }
+  });
+
+  it("quotes its thresholds in the description, grouped per language", () => {
+    expect(getAchievementText(EN, getAchievement("architect")).description).toBe(
+      `Stack ${EN.number(ARCHITECT_LIFETIME_STACKS)} shapes in total.`,
+    );
+    expect(getAchievementText(EN, getAchievement("world-3")).description).toBe(
+      "Reach World 3.",
+    );
   });
 
   it("isAchievementId guards unknown values", () => {
@@ -119,10 +134,13 @@ describe("hidden achievement (Curious Mind)", () => {
 
   it("is hidden, with a placeholder that gives no hint", () => {
     expect(secret.hidden).toBe(true);
-    expect(HIDDEN_ACHIEVEMENT_TEXT.title).toBe("???");
+    const placeholder = getAchievementText(EN, secret, false);
+    expect(placeholder.title).toBe("???");
     for (const word of ["title", "tap", "arrow", "key", "mono", "start"]) {
-      expect(HIDDEN_ACHIEVEMENT_TEXT.description.toLowerCase()).not.toContain(word);
+      expect(placeholder.description.toLowerCase()).not.toContain(word);
     }
+    // Revealed once unlocked.
+    expect(getAchievementText(EN, secret, true).title).toBe("Curious Mind");
   });
 
   it("is never unlocked by run evaluation, however big the run", () => {

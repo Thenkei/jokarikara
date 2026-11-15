@@ -7,6 +7,9 @@ import {
   selectPreviousBest,
   type PersonalBestSource,
 } from "./personalBest";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const source = (overrides: Partial<PersonalBestSource> = {}): PersonalBestSource => ({
   mode: "CLASSIC",
@@ -114,10 +117,10 @@ describe("advancePersonalBest", () => {
 
 describe("getPersonalBestAnnouncement", () => {
   it("names the kind of best and the score beaten", () => {
-    expect(getPersonalBestAnnouncement(3300, false)).toBe(
+    expect(getPersonalBestAnnouncement(EN, 3300, false)).toBe(
       "New personal best. Previous best 3300 beaten",
     );
-    expect(getPersonalBestAnnouncement(900, true)).toBe(
+    expect(getPersonalBestAnnouncement(EN, 900, true)).toBe(
       "New daily best. Previous best 900 beaten",
     );
   });

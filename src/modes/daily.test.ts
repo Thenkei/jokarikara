@@ -8,6 +8,9 @@ import {
   SHARE_TRAIL_LENGTH,
 } from "./daily";
 import { STYLE_QUALITY_POINTS } from "../constants/game";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 describe("daily challenge", () => {
   it("builds a zero-padded local date key", () => {
@@ -33,8 +36,8 @@ describe("daily challenge", () => {
   });
 
   it("formats a readable label and falls back on malformed keys", () => {
-    expect(formatDailyLabel("2026-11-14", "en-US")).toBe("Nov 14");
-    expect(formatDailyLabel("garbage")).toBe("garbage");
+    expect(formatDailyLabel(EN, "2026-11-14")).toBe("Nov 14");
+    expect(formatDailyLabel(EN, "garbage")).toBe("garbage");
   });
 
   it("maps awarded points back to qualities, ignoring unknown values", () => {
@@ -48,7 +51,7 @@ describe("daily challenge", () => {
   });
 
   it("builds a spoiler-free share text with a capped quality trail", () => {
-    const text = buildDailyShareText({
+    const text = buildDailyShareText(EN, {
       dateKey: "2026-11-14",
       score: 1240,
       world: 2,
@@ -66,7 +69,7 @@ describe("daily challenge", () => {
   });
 
   it("omits the trail line when no stack was made", () => {
-    const text = buildDailyShareText({
+    const text = buildDailyShareText(EN, {
       dateKey: "2026-11-14",
       score: 0,
       world: 1,

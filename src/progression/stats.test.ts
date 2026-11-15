@@ -8,6 +8,9 @@ import {
   isFirstEverProfile,
   perfectRatePercent,
 } from "./stats";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const lifetime = (overrides: Partial<LifetimeStats> = {}): LifetimeStats => ({
   ...EMPTY_LIFETIME_STATS,
@@ -109,13 +112,13 @@ describe("currentDailyStreak", () => {
 
 describe("buildStatRows", () => {
   it("returns every stat once, in display order", () => {
-    const rows = buildStatRows(lifetime(), TODAY);
+    const rows = buildStatRows(EN, lifetime(), TODAY);
     expect(rows.map((row) => row.id)).toEqual([...STAT_IDS]);
     for (const row of rows) expect(row.label.length).toBeGreaterThan(0);
   });
 
   it("renders empty stats without NaN and with a placeholder rate", () => {
-    const rows = buildStatRows(lifetime(), TODAY);
+    const rows = buildStatRows(EN, lifetime(), TODAY);
     expect(Object.fromEntries(rows.map((row) => [row.id, row.value]))).toEqual({
       "runs-played": "0",
       "total-stacks": "0",
@@ -131,7 +134,7 @@ describe("buildStatRows", () => {
   });
 
   it("maps each lifetime field to its row", () => {
-    const rows = buildStatRows(
+    const rows = buildStatRows(EN, 
       lifetime({
         runsPlayed: 42,
         totalStacks: 1234,
@@ -161,6 +164,6 @@ describe("buildStatRows", () => {
     const input = Object.freeze(
       lifetime({ dailyDates: Object.freeze(["2026-11-14"]) as readonly string[] }),
     );
-    expect(() => buildStatRows(input, TODAY)).not.toThrow();
+    expect(() => buildStatRows(EN, input, TODAY)).not.toThrow();
   });
 });

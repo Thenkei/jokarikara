@@ -96,12 +96,6 @@ describe("WorldBuilder", () => {
     expect(config.mechanics.waveEffect).toBe(false); // untouched default
   });
 
-  it("sets the world name", () => {
-    const config = new WorldBuilder(DEFAULT_MECHANICS).name("Cosmos").build();
-
-    expect(config.name).toBe("Cosmos");
-  });
-
   it("merges visual profile properties", () => {
     const config = new WorldBuilder(DEFAULT_MECHANICS)
       .visualProfile({ hueCenter: 200, neonBias: 0.5 })

@@ -79,9 +79,6 @@ export interface BossConfig {
 
 export interface WorldConfig {
   mechanics: WorldMechanics;
-  name?: string;
-  /** One-line rule reminder shown when the world starts. */
-  tagline?: string;
   visualProfile?: Partial<WorldVisualProfile>;
 }
 

@@ -24,6 +24,7 @@ import {
 import { getWorldMechanics, ZEN_MIN_CLICK_RATIO } from "../constants/game";
 import type { GameMode } from "../types";
 import { forwardRef, useImperativeHandle } from "react";
+import { useI18n } from "../i18n/context";
 import {
   drawShape,
   drawPerfectGuide,
@@ -48,7 +49,7 @@ import {
 import { installGameTestBridge } from "../utils/testBridge";
 import { useResumeCountdown, type ResumeGoSource } from "../gameplay/useResumeCountdown";
 import { useWorldIntroHold } from "../gameplay/useWorldIntroHold";
-import { FIRST_VISIT_MAX_HOLD_MS, getFirstVisitHowTo } from "../gameplay/worldIntro";
+import { FIRST_VISIT_MAX_HOLD_MS, shouldTeachWorld } from "../gameplay/worldIntro";
 import { getWorldTheme, toMonoColor } from "../visual/theme";
 import { haptic } from "../utils/haptics";
 import {
@@ -269,6 +270,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     },
     ref,
   ) => {
+    const i18n = useI18n();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
     const stateRef = useRef<GameState | null>(null);
@@ -497,7 +499,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
     /** Hold on the intro when `world` is entered for the first time ever. */
     const teachWorldOnEntry = useCallback(
       (world: number) => {
-        if (getFirstVisitHowTo(world, taughtThroughRef.current) === null) return;
+        if (!shouldTeachWorld(world, taughtThroughRef.current)) return;
         taughtThroughRef.current = world;
         worldIntro.start(world);
       },
@@ -1226,7 +1228,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
       <canvas
         ref={canvasRef}
         role="img"
-        aria-label="Game board: tap, click or press Space to stack the growing shape"
+        aria-label={i18n.t("app.gameBoard")}
         onPointerDown={handlePointerDown}
         style={{ width: "100%", height: "100%", cursor: "pointer" }}
       />

@@ -10,6 +10,9 @@ import {
   getMissMarginHeadline,
   getMissMarginLabel,
 } from "./missMargin";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const NBSP = " ";
 
@@ -40,64 +43,64 @@ describe("margin buckets", () => {
 describe("untapped overflow wording (time)", () => {
   it("headline, mid-run label and hint", () => {
     const margin = { kind: "lateTime", seconds: 0.42 } as const;
-    expect(getMissMarginHeadline(margin)).toBe(`Late by 0.4${NBSP}s`);
-    expect(getMissMarginLabel(margin)).toBe(`LATE 0.4${NBSP}s`);
-    expect(getMissMarginHint(margin, false)).toBe(
+    expect(getMissMarginHeadline(EN, margin)).toBe(`Late by 0.4${NBSP}s`);
+    expect(getMissMarginLabel(EN, margin)).toBe(`LATE 0.4${NBSP}s`);
+    expect(getMissMarginHint(EN, margin, false)).toBe(
       `PERFECT opened 0.4${NBSP}s before the edge.`,
     );
-    expect(getMissMarginHint({ kind: "lateTime", seconds: 1.26 }, true)).toBe(
+    expect(getMissMarginHint(EN, { kind: "lateTime", seconds: 1.26 }, true)).toBe(
       `PERFECT opened 1.3${NBSP}s before the ring.`,
     );
-    expect(getMissAnnouncement(margin)).toBe(`Miss. Late by 0.4${NBSP}s`);
+    expect(getMissAnnouncement(EN, margin)).toBe(`Miss. Late by 0.4${NBSP}s`);
   });
 
   it("has no hint for size or fracture margins", () => {
-    expect(getMissMarginHint({ kind: "late", fraction: 0.04 }, false)).toBeNull();
-    expect(getMissMarginHint({ kind: "early", fraction: 0.04 }, true)).toBeNull();
-    expect(getMissMarginHint({ kind: "fracture", clearInSec: 0.3 }, false)).toBeNull();
+    expect(getMissMarginHint(EN, { kind: "late", fraction: 0.04 }, false)).toBeNull();
+    expect(getMissMarginHint(EN, { kind: "early", fraction: 0.04 }, true)).toBeNull();
+    expect(getMissMarginHint(EN, { kind: "fracture", clearInSec: 0.3 }, false)).toBeNull();
   });
 });
 
 describe("margin wording", () => {
   it("headlines say which way and by how much", () => {
-    expect(getMissMarginHeadline({ kind: "late", fraction: 0.04 })).toBe(
+    expect(getMissMarginHeadline(EN, { kind: "late", fraction: 0.04 })).toBe(
       `Too late by 4${NBSP}%`,
     );
-    expect(getMissMarginHeadline({ kind: "late", fraction: 0.006 })).toBe(
+    expect(getMissMarginHeadline(EN, { kind: "late", fraction: 0.006 })).toBe(
       "Too late by a hair",
     );
-    expect(getMissMarginHeadline({ kind: "early", fraction: 0.12 })).toBe(
+    expect(getMissMarginHeadline(EN, { kind: "early", fraction: 0.12 })).toBe(
       `Too early by 12${NBSP}%`,
     );
-    expect(getMissMarginHeadline({ kind: "early", fraction: 0.002 })).toBe(
+    expect(getMissMarginHeadline(EN, { kind: "early", fraction: 0.002 })).toBe(
       "Too early by a hair",
     );
-    expect(getMissMarginHeadline({ kind: "fracture", clearInSec: 0.26 })).toBe(
+    expect(getMissMarginHeadline(EN, { kind: "fracture", clearInSec: 0.26 })).toBe(
       `Sector clear 0.3${NBSP}s later`,
     );
   });
 
   it("short labels sign the size error", () => {
-    expect(getMissMarginLabel({ kind: "late", fraction: 0.04 })).toBe(`+4${NBSP}%`);
-    expect(getMissMarginLabel({ kind: "early", fraction: 0.04 })).toBe(`−4${NBSP}%`);
-    expect(getMissMarginLabel({ kind: "late", fraction: 0.009 })).toBe("BY A HAIR");
-    expect(getMissMarginLabel({ kind: "fracture", clearInSec: 1.04 })).toBe(
+    expect(getMissMarginLabel(EN, { kind: "late", fraction: 0.04 })).toBe(`+4${NBSP}%`);
+    expect(getMissMarginLabel(EN, { kind: "early", fraction: 0.04 })).toBe(`−4${NBSP}%`);
+    expect(getMissMarginLabel(EN, { kind: "late", fraction: 0.009 })).toBe("BY A HAIR");
+    expect(getMissMarginLabel(EN, { kind: "fracture", clearInSec: 1.04 })).toBe(
       `WAIT 1.0${NBSP}s`,
     );
   });
 
   it("serves the same cached text for the same bucket", () => {
-    const a = getMissMarginLabel({ kind: "late", fraction: 0.041 });
-    const b = getMissMarginLabel({ kind: "late", fraction: 0.039 });
+    const a = getMissMarginLabel(EN, { kind: "late", fraction: 0.041 });
+    const b = getMissMarginLabel(EN, { kind: "late", fraction: 0.039 });
     expect(a).toBe(b);
     // Labels and headlines never share a cache entry.
-    expect(getMissMarginHeadline({ kind: "late", fraction: 0.04 })).not.toBe(a);
+    expect(getMissMarginHeadline(EN, { kind: "late", fraction: 0.04 })).not.toBe(a);
   });
 
   it("announces a miss with its margin when known", () => {
-    expect(getMissAnnouncement({ kind: "late", fraction: 0.04 })).toBe(
+    expect(getMissAnnouncement(EN, { kind: "late", fraction: 0.04 })).toBe(
       `Miss. Too late by 4${NBSP}%`,
     );
-    expect(getMissAnnouncement(null)).toBe("Miss");
+    expect(getMissAnnouncement(EN, null)).toBe("Miss");
   });
 });

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import {
   ACHIEVEMENTS,
   ACHIEVEMENT_COUNT,
-  HIDDEN_ACHIEVEMENT_TEXT,
+  getAchievementText,
 } from "../progression/achievements";
+import { useI18n } from "../i18n/context";
 import { buildStatRows, isFirstEverProfile } from "../progression/stats";
 import type { AchievementRecord } from "../utils/storage";
 
@@ -14,6 +15,8 @@ interface AchievementsPanelProps {
 
 /** Menu sub-screen listing every achievement, locked ones greyed out. */
 export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const items = useMemo(
     () =>
       ACHIEVEMENTS.map((achievement) => {
@@ -23,11 +26,10 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
             ? achievement.progress({ run: null, lifetime: record.lifetime })
             : null;
         // A locked secret keeps its title and description to itself.
-        const text =
-          achievement.hidden && !unlocked ? HIDDEN_ACHIEVEMENT_TEXT : achievement;
+        const text = getAchievementText(i18n, achievement, unlocked);
         return { achievement, unlocked, progress, text };
       }),
-    [record],
+    [record, i18n],
   );
   const unlockedCount = items.filter((item) => item.unlocked).length;
   // Keyboard focus starts on BACK, but without scrolling to it: on a phone
@@ -43,8 +45,8 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
     () =>
       isFirstEverProfile(record.lifetime)
         ? null
-        : buildStatRows(record.lifetime, new Date()),
-    [record.lifetime],
+        : buildStatRows(i18n, record.lifetime, new Date()),
+    [record.lifetime, i18n],
   );
 
   return (
@@ -53,15 +55,15 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
       aria-labelledby="achievements-heading"
     >
       <h2 id="achievements-heading" className="achievements-heading">
-        ACHIEVEMENTS
+        {t("achievements.title")}
       </h2>
       <p className="achievements-count">
-        {unlockedCount} / {ACHIEVEMENT_COUNT} UNLOCKED
+        {t("achievements.count", { unlocked: unlockedCount, total: ACHIEVEMENT_COUNT })}
       </p>
       {statRows && (
         <section className="lifetime-stats" aria-labelledby="lifetime-stats-heading">
           <h3 id="lifetime-stats-heading" className="lifetime-stats-heading">
-            STATS
+            {t("achievements.stats")}
           </h3>
           <dl className="lifetime-stats-list">
             {statRows.map((row) => (
@@ -97,12 +99,15 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
                   {progress.current}/{progress.target}
                 </span>
                 <span className="visually-hidden">
-                  {progress.current} of {progress.target}
+                  {t("achievements.progressSpoken", {
+                    current: progress.current,
+                    target: progress.target,
+                  })}
                 </span>
               </>
             )}
             <span className="visually-hidden">
-              {unlocked ? "Unlocked" : "Locked"}
+              {t(unlocked ? "achievements.unlocked" : "achievements.locked")}
             </span>
           </li>
         ))}
@@ -113,7 +118,7 @@ export function AchievementsPanel({ record, onClose }: AchievementsPanelProps) {
         data-ui-sound="back"
         onClick={onClose}
       >
-        BACK
+        {t("achievements.back")}
       </button>
     </section>
   );

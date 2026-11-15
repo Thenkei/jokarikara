@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WorldAtlas } from "./WorldAtlas";
-import { getWorldConfig } from "../gameplay/selectors";
+import { getWorldName, getWorldTagline } from "../gameplay/worldText";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const renderAtlas = (bestWorld: number) => {
   const onPractice = vi.fn();
@@ -33,7 +36,7 @@ describe("WorldAtlas", () => {
     const wave = card(container, 4);
     expect(wave.className).toContain("revealed");
     expect(within(wave).getByText("Wave")).toBeTruthy();
-    expect(within(wave).getByText(getWorldConfig(4).tagline!)).toBeTruthy();
+    expect(within(wave).getByText(getWorldTagline(EN, 4))).toBeTruthy();
 
     const locked = card(container, 5);
     expect(locked.className).toContain("locked");
@@ -44,9 +47,8 @@ describe("WorldAtlas", () => {
       within(locked).getByRole("heading", { name: /WORLD 5\s*, locked/ }),
     ).toBeTruthy();
     for (let world = 5; world <= 10; world += 1) {
-      const { name, tagline } = getWorldConfig(world);
-      expect(container.textContent).not.toContain(name!);
-      expect(container.textContent).not.toContain(tagline!);
+      expect(container.textContent).not.toContain(getWorldName(EN, world));
+      expect(container.textContent).not.toContain(getWorldTagline(EN, world));
     }
   });
 

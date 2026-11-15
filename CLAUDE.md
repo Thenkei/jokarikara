@@ -52,7 +52,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/rendering/shapeRenderer.ts` - Pure drawing functions (no state mutation); glow uses `FAUX_GLOW` strokes, never `shadowBlur`
 - `src/rendering/effects.ts` - Pure, dt-based canvas juice (rings, particles, shake, flash); never touches gameplay state
 - `src/constants/game.ts` - Game balance constants, world mechanics, boss configurations, shape unlocks
-- `src/gameplay/config.ts` - Per-world mechanics and taglines; `builder.ts`, `fracture.ts`, `selectors.ts` support them
+- `src/gameplay/config.ts` - Per-world mechanics (names and taglines are catalog text); `builder.ts`, `fracture.ts`, `selectors.ts` support them
 - `src/gameplay/reverse.ts` - Reverse Stack (world 9): outward containment, arena limit, zoom-out camera
 - `src/gameplay/heartbeat.ts` - Heartbeat (world 10): beat-phase growth multiplier (mean 1) and visual pulse
 - `src/gameplay/guide.ts` - PERFECT ghost guide rules (Zen + first level; reverse-aware)
@@ -64,7 +64,7 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/modes/share.ts` - Share text for regular runs (mode, score, proportional emoji quality bar, game URL); reuses the Daily emoji legend
 - `src/modes/runInsights.ts` - Game over insights: why the run ended, stack quality breakdown
 - `src/modes/endFeedback.ts` - Run endings, pure: `selectEndFeedback(reason, mode, medal)` → cue (fail buzz / Time Attack `playTimeUp(world, medal)` / Zen finish chord), effect (`triggerFail` / calm `triggerTimeUp` ring + flash in the world colour), haptic and hold before `onGameOver` (fail 400 ms, time-up 1 s, finish 0; 0 under E2E); GameCanvas's `endRun` is its only caller. A Time Attack clock at 0 is always "timeout", even when a miss penalty drained it (that miss plays its own miss sound first). The TIME! moment reaches App via `onTimeUp` (banner, "Time! Score N[. Medal]" announcement, pause ignored during the hold); game over headline via `getGameOverHeadline`. E2E: `__GAME_AUDIO__.getEndSoundCalls()`
-- `src/modes/missMargin.ts` - Wording for how far a miss was off (`MissMargin`, computed by `getMissMargin` in `core/gameState.ts`): an untapped overflow is time since PERFECT opened (`perfectBandEnteredAt`, tracked in `updateActiveShape`; "Late by 0.4 s"), a tap that doesn't fit is a size % (solvers in `geometry.ts`/`reverse.ts`; < 1 % reads "by a hair"); game over headline + hint, mid-run MISS pop label (Zen/Time Attack), announcement; strings cached per bucket
+- `src/modes/missMargin.ts` - Wording for how far a miss was off (`MissMargin`, computed by `getMissMargin` in `core/gameState.ts`): an untapped overflow is time since PERFECT opened (`perfectBandEnteredAt`, tracked in `updateActiveShape`; "Late by 0.4 s"), a tap that doesn't fit is a size % (solvers in `geometry.ts`/`reverse.ts`; < 1 % reads "by a hair"); game over headline + hint, mid-run MISS pop label (Zen/Time Attack), announcement; strings cached per language and bucket
 - `src/modes/personalBest.ts` - "Chase your best": pure previous-best selection (mode top score; today's Daily best for a Daily; none for Zen/practice or a best of 0) and the one-shot crossing (strictly above); App keeps it in a ref, shows the HUD `BEST n` target, and on the crossing shows the banner, gold score pill, `playRecord` cue, `record` haptic and announcement once per run
 - `src/modes/medals.ts` - Time Attack medals (Bronze 1000 / Silver 1500 / Gold 2200, calibrated by simulating the real game functions): pure `getMedal`/`getNextMedal`, a one-shot run latch (App ref; HUD goal, lane pill, cue, `medal` haptic, announcement once per medal), `selectHudGoal` (one HUD goal chip: the nearer of `BEST n` and the next medal), game over medal, share label; best medal derived from the stored top score (no storage)
 - `src/utils/audioManager.ts` - Web Audio engine (procedural voices → compressor; mute = no allocation); `playUi` for menu sounds. Idle suspension: one timer suspends the context once the last voice + reverb tail + grace have passed and no music/run keeps it awake (pure rules in `src/audio/idle.ts`); every sound/music start resumes it first; off for offline contexts. E2E reads it via `__GAME_AUDIO__.getContextState()`
@@ -76,9 +76,9 @@ The game uses a functional, immutable state pattern without external state libra
 - `src/utils/haptics.ts` - Vibration helper (respects the haptics setting)
 - `src/utils/storage.ts` - localStorage: per-mode top-5 high scores, daily records, settings, achievements (all validated on read)
 - `src/progression/achievements.ts` - Achievement catalogue, named thresholds, pure `evaluate(run, lifetime)` and run/lifetime reducers; `useAchievements.ts` is the React glue (run state in refs, fed by `GameCanvas`'s `onStack`/`onMiss`, re-renders only on unlock)
-- `src/gameplay/atlas.ts` + `src/components/WorldAtlas.tsx` - World atlas (start screen `WORLDS n/10`, App's `startPanel` next to achievements; closing returns focus to the entry): per-world one-sentence how-to lines (keep in sync with the mechanics), worlds above `lifetime.bestWorld` locked as "???", PRACTICE goes through `startRun`'s Zen practice path (`practiceFrom`)
+- `src/gameplay/atlas.ts` + `src/components/WorldAtlas.tsx` - World atlas (start screen `WORLDS n/10`, App's `startPanel` next to achievements; closing returns focus to the entry): worlds above `lifetime.bestWorld` locked as "???", PRACTICE goes through `startRun`'s Zen practice path (`practiceFrom`). World names, taglines and one-sentence how-to lines live in the catalogs (`world.<n>.*`, read via `src/gameplay/worldText.ts`; keep them in sync with the mechanics)
 - `src/progression/stats.ts` - Pure `LifetimeStats` → ordered display rows (perfect rate, daily streak from an injected "today"), shown in the achievements panel
-- `src/components/SettingsSheet.tsx` - Settings dialog (labelled `role="switch"` rows) opened from the start screen gear and the pause menu; owns focus (first switch on open, Tab trap, Escape in document capture so it never reaches the pause handler, focus back to the opener); App makes the background `inert` and ignores game keys while it is open. E2E helpers in `tests/settingsHelpers.ts`
+- `src/components/SettingsSheet.tsx` - Settings dialog (labelled `role="switch"` rows, plus the Language segmented `radiogroup`: Auto / English / Français, roving tabindex) opened from the start screen gear and the pause menu; owns focus (first switch on open, Tab trap, Escape in document capture so it never reaches the pause handler, focus back to the opener); App makes the background `inert` and ignores game keys while it is open. E2E helpers in `tests/settingsHelpers.ts`
 - `src/components/StartBackdrop.tsx` - Animated start screen backdrop; layer data lives in `startBackdropLayers.ts` (non-component exports stay out of component modules for Fast Refresh); `flourish` plays a CSS-only burst on per-layer wrappers
 - `src/utils/secrets.ts` - Start screen easter eggs (keep out of user-facing docs): pure matchers for 7 quick title taps (backdrop flourish + `playChime`) and the ↑↑↓↓←→←→ key sequence (toggles the session-only Mono look: `getWorldTheme(..., mono)` + `toMonoColor` in the renderer, a CSS filter on DOM layers only, never on the canvas; danger signals stay red-orange: `theme.danger` on the canvas, and DOM `.danger-signal` / `.critical` elements are kept out of the filter). Both unlock the hidden `curious-mind` achievement (`hidden: true`, shown as "???", counted in the total, granted via `useAchievements().unlock`)
 - `src/components/GameOverScreen.tsx` - Presentational game over: score hero, run cards in a scrolling body, and an action bar (RETRY / share / menu) that never scrolls away; achievement toasts drop into a lane reserved above the hero (never over the title or the action bar)
@@ -86,12 +86,13 @@ The game uses a functional, immutable state pattern without external state libra
 ### localStorage keys
 Bump the version suffix on any incompatible schema change and migrate from the previous key (see `LEGACY_STORAGE_KEY`):
 - `shape-stack-high-scores-v3` (per-mode top 5; migrates from v2)
-- `shape-stack-settings` (`reducedFx`, `muted`, `music`, `haptics`, `timingCue`, ...)
+- `shape-stack-settings` (`reducedFx`, `muted`, `music`, `haptics`, `timingCue`, `language`, ...)
+- High score `date` is a local date key (`YYYY-MM-DD`), formatted per language when shown (`src/modes/scoreDate.ts`); older entries hold a display string, shown as is
 - `shape-stack-daily-v1`
 - `shape-stack-achievements-v1`
 
 ### World Mechanics (src/gameplay/config.ts)
-Each world (1-10) introduces cumulative effects (each has a `tagline` shown on entry):
+Each world (1-10) introduces cumulative effects (each has a catalog tagline, `world.<n>.tagline`, shown on entry):
 - World 2: Breathing (size oscillation)
 - World 3: Accelerating growth pattern + fracture windows
 - World 4: Wave (horizontal sway)
@@ -110,6 +111,14 @@ Effects only apply to stacked shapes, not the active shape, for fair gameplay.
 ### HUD layout (App.tsx + App.css)
 - Row 1 `.hud-top`: the score pill holds only the score and the vital readout (Time Attack timer / Zen lives); its `::before`/`::after` spacers reserve PAUSE's fixed-width corner (`--pause-width`, `--pause-reserve`), so the pill is centred while it fits and slides left, never under PAUSE.
 - Row 2 `.hud-meta` (always visible, below PAUSE, wraps): goal chip, W, L, DAILY. Row 3 `.hud-secondary`: auto-revealed STYLE/COMBO (Zen controls). New HUD chips go in row 2 or 3, not row 1. `tests/hud-layout.spec.ts` guards 320/375 px.
+
+### i18n (src/i18n)
+Every user-facing string goes through the catalogs: visible text, `aria-label`s, screen-reader announcements, share text. No dependency, English (`en.ts`) is the source of truth.
+- `en.ts` defines keys (`area.name`, grouped by screen); `fr.ts` is typed `Catalog`, so a missing or misshaped key fails `tsc`. `{name}` placeholders are typed from the English literal; plurals are `{ one, other }` (`t(key, { count })`, `Intl.PluralRules`, missing categories fall back to `other`).
+- Translator (`getTranslator(locale)`, cached): `t`, `template` (for `Rich`, which splices React nodes into a template), `number` / `date` (`Intl`, named per-locale date formats in `formats.ts`), `upper`. Params are written as plain digits (game readouts never get grouped); format prose numbers with `number()` first.
+- Pure modules take the `Translator` as an argument (never read the language from a global); components call `useI18n()` (`src/i18n/context.ts`); App owns the setting (`language`: "auto" | "en" | "fr", resolved by `resolveLocale` against `navigator.languages`, re-read on `languagechange`), provides the context and sets `<html lang>`.
+- Game terms stay English labels in every catalog (PERFECT / GREAT / GOOD / OK, COMBO, STYLE); language names are endonyms (`LANGUAGE_NAMES`), not translated. French: tutoiement, U+00A0 before `:` and `%`, U+202F before `!` `?` and units; write invisible spaces as `\u` escapes.
+- Tests: `src/i18n/i18n.test.ts` (keys, placeholders, not-English-by-accident with an allow-list, typography, `@ts-expect-error` type checks, formatting, detection), `src/i18n/french.test.ts` (pure modules in French), `tests/i18n.spec.ts` (`test.use({ locale: "fr-FR" })`: screens, override + reload, game over + share, 320 px layout, axe). Other specs run on Playwright's en-US and assert English. Mind length: French is ~20 % longer; check the HUD, the 17.5rem pause column and the game over action bar at 320 px.
 
 ### Loop invariants
 - Simulation is time-based: every per-frame change must scale with `dt` (clamped to `MAX_FRAME_DT`).
@@ -133,7 +142,7 @@ Measured with `npm run perf` and Chromium DevTools at 4× CPU throttle:
   - Drive the game through `window.__GAME_TEST__` (`src/utils/testBridge.ts`: pause, step, forceStack(ratio), setActiveSize, setTimeRemaining, tap, getState), only installed when `VITE_E2E=true`. Helpers in `tests/bridgeHelpers.ts`.
   - Import `test` from `tests/fixtures.ts`: it clears localStorage on each navigation, so seed state with an `addInitScript` registered after the fixture.
   - Prefer deterministic bridge control (pause + step) over wall-clock waits; the dev machine is often loaded and timings are noisy.
-- **Accessibility**: `tests/axe.spec.ts` scans every screen with axe-core (WCAG 2.1 A/AA, any impact fails) plus a color-contrast pass with the decorative backdrop/canvas hidden (axe can't see through image nodes); add a scan when you add a screen. Seed-dependent HUD chip tints are swept in `src/visual/hudChipContrast.test.ts` (parses App.css).
+- **Accessibility**: `tests/axe.spec.ts` scans every screen (scan helpers in `tests/axeHelpers.ts`, phone layout geometry in `tests/layoutHelpers.ts`) with axe-core (WCAG 2.1 A/AA, any impact fails) plus a color-contrast pass with the decorative backdrop/canvas hidden (axe can't see through image nodes); add a scan when you add a screen. Seed-dependent HUD chip tints are swept in `src/visual/hudChipContrast.test.ts` (parses App.css).
 - **Tiers**: by default Chromium runs every spec, other browsers/devices run only specs tagged `@cross-browser`. `E2E_FULL=1` runs the full matrix.
 - **Snapshots**: darwin baselines only; snapshot assertions are ignored on Linux CI. Update locally with `--update-snapshots` and review the diff images.
 

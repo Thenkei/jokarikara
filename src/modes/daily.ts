@@ -1,4 +1,5 @@
 import type { StackQuality } from "../types";
+import type { Translator } from "../i18n";
 import { STYLE_QUALITY_POINTS } from "../constants/game";
 
 /**
@@ -32,15 +33,15 @@ export const getDailySeed = (dateKey: string): number => {
   return hash >>> 0;
 };
 
-/** Human label for the date key, e.g. "Nov 14". Falls back to the key. */
-export const formatDailyLabel = (dateKey: string, locale?: string): string => {
+/**
+ * Human label for the date key in the active language, e.g. "Nov 14" /
+ * "14 novembre". Falls back to the key.
+ */
+export const formatDailyLabel = (i18n: Translator, dateKey: string): string => {
   const [y, m, d] = dateKey.split("-").map(Number);
   if (!y || !m || !d) return dateKey;
   try {
-    return new Date(y, m - 1, d).toLocaleDateString(locale, {
-      month: "short",
-      day: "numeric",
-    });
+    return i18n.date(new Date(y, m - 1, d), "dailyDay");
   } catch {
     return dateKey;
   }
@@ -80,15 +81,14 @@ export interface DailyShareInput {
   qualities: readonly StackQuality[];
 }
 
-/** Spoiler-free result text, Wordle-style: score + quality trail. */
-export const buildDailyShareText = ({
-  dateKey,
-  score,
-  world,
-  level,
-  stackCount,
-  qualities,
-}: DailyShareInput): string => {
+/**
+ * Spoiler-free result text, Wordle-style: score + quality trail. The date
+ * stays an ISO key in every language (one unambiguous form to compare).
+ */
+export const buildDailyShareText = (
+  { t }: Translator,
+  { dateKey, score, world, level, stackCount, qualities }: DailyShareInput,
+): string => {
   const trail = qualities
     .slice(0, SHARE_TRAIL_LENGTH)
     .map((q) => QUALITY_EMOJI[q])
@@ -98,8 +98,13 @@ export const buildDailyShareText = ({
       ? ` +${qualities.length - SHARE_TRAIL_LENGTH}`
       : "";
   const lines = [
-    `Shape Stack Daily ${dateKey}`,
-    `${score} pts · ${stackCount} stacks · W${world} L${level}`,
+    t("shareText.dailyTitle", { date: dateKey }),
+    t("shareText.dailyStats", {
+      score,
+      stacks: t("shareText.stacks", { count: stackCount }),
+      world,
+      level,
+    }),
   ];
   if (trail) lines.push(`${trail}${overflow}`);
   return lines.join("\n");

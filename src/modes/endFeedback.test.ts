@@ -6,6 +6,9 @@ import {
   selectEndFeedback,
 } from "./endFeedback";
 import { MEDALS, type Medal } from "./medals";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const MODES: readonly GameMode[] = ["CLASSIC", "ZEN", "TIME_ATTACK"];
 
@@ -87,11 +90,11 @@ describe("selectEndFeedback", () => {
 
 describe("getTimeUpAnnouncement", () => {
   it("states the score, and the medal when one was earned", () => {
-    expect(getTimeUpAnnouncement({ score: 820, medal: null })).toBe("Time! Score 820");
-    expect(getTimeUpAnnouncement({ score: 1240, medal: "BRONZE" })).toBe(
+    expect(getTimeUpAnnouncement(EN, { score: 820, medal: null })).toBe("Time! Score 820");
+    expect(getTimeUpAnnouncement(EN, { score: 1240, medal: "BRONZE" })).toBe(
       "Time! Score 1240. Bronze medal",
     );
-    expect(getTimeUpAnnouncement({ score: 2300, medal: "GOLD" })).toBe(
+    expect(getTimeUpAnnouncement(EN, { score: 2300, medal: "GOLD" })).toBe(
       "Time! Score 2300. Gold medal",
     );
   });
@@ -99,10 +102,10 @@ describe("getTimeUpAnnouncement", () => {
 
 describe("getGameOverHeadline", () => {
   it("only says GAME OVER for a lost run", () => {
-    expect(getGameOverHeadline("finished")).toBe("SESSION COMPLETE");
-    expect(getGameOverHeadline("timeout")).toBe("TIME!");
+    expect(getGameOverHeadline(EN, "finished")).toBe("SESSION COMPLETE");
+    expect(getGameOverHeadline(EN, "timeout")).toBe("TIME!");
     for (const reason of ["overflow", "badTap", "fracture", "lives", null, undefined] as const) {
-      expect(getGameOverHeadline(reason)).toBe("GAME OVER");
+      expect(getGameOverHeadline(EN, reason)).toBe("GAME OVER");
     }
   });
 });

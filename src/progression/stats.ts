@@ -1,10 +1,11 @@
 import { getLocalDateKey } from "../modes/daily";
 import type { LifetimeStats } from "./achievements";
+import type { Translator } from "../i18n";
 
 /**
  * Lifetime statistics: a pure projection of `LifetimeStats` into ordered,
- * display-ready rows. No React, no storage, no clock: "today" is injected so
- * the daily streak is deterministic under test.
+ * display-ready rows. No React, no storage, no clock: "today" and the
+ * translator are injected so the rows are deterministic under test.
  */
 
 export const STAT_IDS = [
@@ -30,14 +31,6 @@ export interface StatRow {
 
 /** Shown when a ratio has no denominator yet. */
 export const NO_VALUE = "—";
-
-/**
- * Fixed locale: the UI is English-only, and a fixed format keeps values
- * stable across devices and tests ("1,234", never "1 234").
- */
-const numberFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-
-const formatCount = (value: number): string => numberFormat.format(value);
 
 /** True for a profile that has never played: the stats section is hidden. */
 export const isFirstEverProfile = (lifetime: LifetimeStats): boolean =>
@@ -96,36 +89,24 @@ export const currentDailyStreak = (
 
 /** Ordered display rows for the stats section of the achievements panel. */
 export const buildStatRows = (
+  i18n: Translator,
   lifetime: LifetimeStats,
   today: Date,
 ): readonly StatRow[] => {
+  // Grouped per language ("1,234" / "1 234"), whole numbers only.
+  const count = (value: number) => i18n.number(value, { maximumFractionDigits: 0 });
   const rate = perfectRatePercent(lifetime.totalPerfects, lifetime.totalStacks);
-  return [
-    { id: "runs-played", label: "Runs played", value: formatCount(lifetime.runsPlayed) },
-    { id: "total-stacks", label: "Total stacks", value: formatCount(lifetime.totalStacks) },
-    { id: "perfect-rate", label: "Perfect rate", value: rate === null ? NO_VALUE : `${rate}%` },
-    { id: "best-combo", label: "Best combo", value: formatCount(lifetime.bestCombo) },
-    {
-      id: "best-perfect-run",
-      label: "Best perfect streak",
-      value: formatCount(lifetime.bestPerfectRun),
-    },
-    { id: "best-world", label: "Best world", value: formatCount(lifetime.bestWorld) },
-    { id: "best-zen-stacks", label: "Best Zen stack", value: formatCount(lifetime.bestZenStacks) },
-    {
-      id: "best-time-attack",
-      label: "Best Time Attack",
-      value: formatCount(lifetime.bestTimeAttackScore),
-    },
-    {
-      id: "daily-played",
-      label: "Daily challenges",
-      value: formatCount(lifetime.dailyDates.length),
-    },
-    {
-      id: "daily-streak",
-      label: "Daily streak",
-      value: formatCount(currentDailyStreak(lifetime.dailyDates, today)),
-    },
-  ];
+  const values: Readonly<Record<StatId, string>> = {
+    "runs-played": count(lifetime.runsPlayed),
+    "total-stacks": count(lifetime.totalStacks),
+    "perfect-rate": rate === null ? NO_VALUE : i18n.number(rate / 100, { style: "percent" }),
+    "best-combo": count(lifetime.bestCombo),
+    "best-perfect-run": count(lifetime.bestPerfectRun),
+    "best-world": count(lifetime.bestWorld),
+    "best-zen-stacks": count(lifetime.bestZenStacks),
+    "best-time-attack": count(lifetime.bestTimeAttackScore),
+    "daily-played": count(lifetime.dailyDates.length),
+    "daily-streak": count(currentDailyStreak(lifetime.dailyDates, today)),
+  };
+  return STAT_IDS.map((id) => ({ id, label: i18n.t(`stats.${id}`), value: values[id] }));
 };

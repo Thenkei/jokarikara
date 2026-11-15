@@ -5,6 +5,7 @@ import {
   countRevealedWorlds,
 } from "../gameplay/atlas";
 import { getWorldTheme } from "../visual/theme";
+import { useI18n } from "../i18n/context";
 
 interface WorldAtlasProps {
   /** Lifetime best world (`lifetime.bestWorld`): worlds above it stay locked. */
@@ -25,7 +26,9 @@ const ATLAS_THEME_SEED = 0;
  * show their number (no spoilers).
  */
 export function WorldAtlas({ bestWorld, reducedFx, onPractice, onClose }: WorldAtlasProps) {
-  const entries = useMemo(() => buildAtlasEntries(bestWorld), [bestWorld]);
+  const i18n = useI18n();
+  const { t } = i18n;
+  const entries = useMemo(() => buildAtlasEntries(i18n, bestWorld), [i18n, bestWorld]);
   const revealedCount = countRevealedWorlds(bestWorld);
   const accents = useMemo(
     () =>
@@ -48,12 +51,12 @@ export function WorldAtlas({ bestWorld, reducedFx, onPractice, onClose }: WorldA
   return (
     <section className="screen world-atlas-screen" aria-labelledby="world-atlas-heading">
       <h2 id="world-atlas-heading" className="achievements-heading">
-        WORLDS
+        {t("atlas.title")}
       </h2>
       <p className="achievements-count world-atlas-count">
-        {revealedCount} / {ATLAS_WORLD_COUNT} DISCOVERED
+        {t("atlas.count", { revealed: revealedCount, total: ATLAS_WORLD_COUNT })}
       </p>
-      <p className="world-atlas-intro">Each world adds a new twist to the ones before.</p>
+      <p className="world-atlas-intro">{t("atlas.intro")}</p>
       <ul className="world-atlas-list">
         {entries.map((entry, index) => {
           const { world } = entry;
@@ -69,13 +72,13 @@ export function WorldAtlas({ bestWorld, reducedFx, onPractice, onClose }: WorldA
                 </span>
                 <div className="world-card-body">
                   <h3 className="world-card-title">
-                    <span className="world-card-number">WORLD {world}</span>
+                    <span className="world-card-number">{t("atlas.world", { world })}</span>
                     <span className="world-card-name" aria-hidden="true">
-                      ???
+                      {t("atlas.lockedName")}
                     </span>
-                    <span className="visually-hidden">, locked</span>
+                    <span className="visually-hidden">{t("atlas.lockedSpoken")}</span>
                   </h3>
-                  <p className="world-card-hint">Reach world {world} to reveal</p>
+                  <p className="world-card-hint">{t("atlas.lockedHint", { world })}</p>
                 </div>
               </li>
             );
@@ -92,7 +95,7 @@ export function WorldAtlas({ bestWorld, reducedFx, onPractice, onClose }: WorldA
               </span>
               <div className="world-card-body">
                 <h3 className="world-card-title">
-                  <span className="world-card-number">WORLD {world}</span>{" "}
+                  <span className="world-card-number">{t("atlas.world", { world })}</span>{" "}
                   <span className="world-card-name">{entry.name}</span>
                 </h3>
                 <p className="world-card-tagline">{entry.tagline}</p>
@@ -103,9 +106,9 @@ export function WorldAtlas({ bestWorld, reducedFx, onPractice, onClose }: WorldA
                     className="world-card-practice"
                     data-ui-sound="confirm"
                     onClick={() => onPractice(world)}
-                    aria-label={`Practice world ${world}, ${entry.name}`}
+                    aria-label={t("atlas.practiceAria", { world, name: entry.name })}
                   >
-                    PRACTICE
+                    {t("atlas.practice")}
                   </button>
                 )}
               </div>
@@ -120,7 +123,7 @@ export function WorldAtlas({ bestWorld, reducedFx, onPractice, onClose }: WorldA
         data-ui-sound="back"
         onClick={onClose}
       >
-        BACK
+        {t("achievements.back")}
       </button>
     </section>
   );

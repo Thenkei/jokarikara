@@ -11,6 +11,9 @@ import {
   selectStreakLabel,
 } from "./dailyStreak";
 import { getLocalDateKey } from "./daily";
+import { getTranslator } from "../i18n";
+
+const EN = getTranslator("en");
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -94,7 +97,7 @@ describe("getNextLocalMidnight / msUntilNextDaily", () => {
         new Date(zone.springNextMidnight).toISOString(),
       );
       expect(msUntilNextDaily(now)).toBe(22 * HOUR + 30 * MINUTE);
-      expect(formatCountdown(msUntilNextDaily(now))).toBe("22h 30m");
+      expect(formatCountdown(EN, msUntilNextDaily(now))).toBe("22h 30m");
     });
 
     it("counts the real 25 h of a fall-back day", () => {
@@ -104,7 +107,7 @@ describe("getNextLocalMidnight / msUntilNextDaily", () => {
         new Date(zone.fallNextMidnight).toISOString(),
       );
       expect(msUntilNextDaily(now)).toBe(24 * HOUR + 30 * MINUTE);
-      expect(formatCountdown(msUntilNextDaily(now))).toBe("24h 30m");
+      expect(formatCountdown(EN, msUntilNextDaily(now))).toBe("24h 30m");
     });
 
     it("lands on the transition day itself, not an hour off", () => {
@@ -131,7 +134,7 @@ describe("formatCountdown", () => {
     [-5_000, "<1m"],
     [Number.NaN, "<1m"],
   ])("%d ms → %s", (ms, expected) => {
-    expect(formatCountdown(ms)).toBe(expected);
+    expect(formatCountdown(EN, ms)).toBe(expected);
   });
 
   it.each([
@@ -141,12 +144,12 @@ describe("formatCountdown", () => {
     [45 * MINUTE, "45 minutes"],
     [30_000, "less than a minute"],
   ])("spoken %d ms → %s", (ms, expected) => {
-    expect(formatCountdownSpoken(ms)).toBe(expected);
+    expect(formatCountdownSpoken(EN, ms)).toBe(expected);
   });
 
   it("describes the next Daily for an instant", () => {
     useTimeZone("Europe/Paris");
-    expect(describeNextDaily(new Date(2026, 10, 14, 23, 15))).toEqual({
+    expect(describeNextDaily(EN, new Date(2026, 10, 14, 23, 15))).toEqual({
       text: "45m",
       spoken: "45 minutes",
     });
@@ -155,12 +158,12 @@ describe("formatCountdown", () => {
 
 describe("selectStreakLabel", () => {
   it.each([0, 1, -3, 2.5, Number.NaN])("shows nothing for streak %d", (streak) => {
-    expect(selectStreakLabel(streak, true)).toBeNull();
-    expect(selectStreakLabel(streak, false)).toBeNull();
+    expect(selectStreakLabel(EN, streak, true)).toBeNull();
+    expect(selectStreakLabel(EN, streak, false)).toBeNull();
   });
 
   it("celebrates a streak that includes today", () => {
-    expect(selectStreakLabel(3, true)).toEqual({
+    expect(selectStreakLabel(EN, 3, true)).toEqual({
       state: "kept",
       days: 3,
       text: "3-DAY STREAK",
@@ -169,7 +172,7 @@ describe("selectStreakLabel", () => {
   });
 
   it("asks to keep a streak that today has not extended yet", () => {
-    expect(selectStreakLabel(3, false)).toEqual({
+    expect(selectStreakLabel(EN, 3, false)).toEqual({
       state: "at-risk",
       days: 3,
       text: "KEEP YOUR 3-DAY STREAK",
@@ -182,18 +185,18 @@ describe("getDailyStreakLabel", () => {
   const now = new Date(2026, 10, 15, 10, 0);
 
   it("is at risk when yesterday was played but today is not", () => {
-    expect(getDailyStreakLabel(["2026-11-13", "2026-11-14"], now)?.state).toBe("at-risk");
+    expect(getDailyStreakLabel(EN, ["2026-11-13", "2026-11-14"], now)?.state).toBe("at-risk");
   });
 
   it("is kept once today is played", () => {
     expect(
-      getDailyStreakLabel(["2026-11-13", "2026-11-14", "2026-11-15"], now),
+      getDailyStreakLabel(EN, ["2026-11-13", "2026-11-14", "2026-11-15"], now),
     ).toMatchObject({ state: "kept", days: 3 });
   });
 
   it("is gone when a day was missed", () => {
-    expect(getDailyStreakLabel(["2026-11-12", "2026-11-13"], now)).toBeNull();
-    expect(getDailyStreakLabel(["2026-11-15"], now)).toBeNull();
+    expect(getDailyStreakLabel(EN, ["2026-11-12", "2026-11-13"], now)).toBeNull();
+    expect(getDailyStreakLabel(EN, ["2026-11-15"], now)).toBeNull();
   });
 });
 
@@ -205,7 +208,7 @@ describe("describeDailyButton", () => {
   });
 
   it("invites a first play without a streak or countdown", () => {
-    const view = describeDailyButton({
+    const view = describeDailyButton({ i18n: EN, 
       now,
       record: { best: 0, attempts: 0 },
       dailyDates: [],
@@ -219,7 +222,7 @@ describe("describeDailyButton", () => {
   });
 
   it("warns about an at-risk streak in the accessible name", () => {
-    const view = describeDailyButton({
+    const view = describeDailyButton({ i18n: EN, 
       now,
       record: { best: 0, attempts: 0 },
       dailyDates: ["2026-11-12", "2026-11-13", "2026-11-14"],
@@ -231,7 +234,7 @@ describe("describeDailyButton", () => {
   });
 
   it("shows the result, the kept streak and the countdown once played", () => {
-    const view = describeDailyButton({
+    const view = describeDailyButton({ i18n: EN, 
       now,
       record: { best: 140, attempts: 2 },
       dailyDates: ["2026-11-14", "2026-11-15"],
@@ -246,7 +249,7 @@ describe("describeDailyButton", () => {
   });
 
   it("uses the singular for a single try", () => {
-    const view = describeDailyButton({
+    const view = describeDailyButton({ i18n: EN, 
       now,
       record: { best: 90, attempts: 1 },
       dailyDates: ["2026-11-15"],

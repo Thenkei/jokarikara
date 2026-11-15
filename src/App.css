@@ -2254,6 +2254,60 @@ button:focus-visible {
   opacity: 0.4;
 }
 
+/* Language: title + description, then a full-width segmented radio group
+   (three options never fit beside the text on a 320 px phone). */
+.settings-language {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem 0.95rem 0.85rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-color);
+}
+
+.settings-segmented {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.settings-segment {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 999px;
+  background: transparent;
+  color: #c9d1e0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.settings-segment:hover:not([aria-checked="true"]) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Darker than --accent-color: white label text needs 4.5:1 (5.2:1 here). */
+.settings-segment[aria-checked="true"] {
+  background: #2563eb;
+  color: #fff;
+}
+
+.settings-segment:focus-visible {
+  outline-offset: 2px;
+}
+
 .settings-done-btn {
   align-self: stretch;
   padding: 0.95rem 1rem;
@@ -2305,7 +2359,8 @@ button:focus-visible {
   .settings-gear-btn svg,
   .settings-switch,
   .settings-switch-track,
-  .settings-switch-thumb {
+  .settings-switch-thumb,
+  .settings-segment {
     transition: none;
   }
 

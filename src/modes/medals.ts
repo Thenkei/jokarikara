@@ -1,4 +1,5 @@
 import type { GameMode } from "../types";
+import type { Translator } from "../i18n";
 
 /**
  * Time Attack medals: Bronze / Silver / Gold goals for the final score.
@@ -29,11 +30,17 @@ export const MEDAL_THRESHOLDS: Readonly<Record<Medal, number>> = Object.freeze({
   GOLD: 2200,
 });
 
-export const MEDAL_LABELS: Readonly<Record<Medal, string>> = Object.freeze({
-  BRONZE: "Bronze",
-  SILVER: "Silver",
-  GOLD: "Gold",
-});
+/** The metal alone, e.g. "Gold" / "Or" (HUD goal, "Silver at 1500"). */
+export const getMedalName = (i18n: Translator, medal: Medal): string =>
+  i18n.t(`medal.name.${medal}`);
+
+/**
+ * The medal as a noun phrase, e.g. "Gold medal" / "Médaille d'or" (banners,
+ * announcements, share text). A phrase of its own, not "{metal} medal":
+ * French elides ("d'or") and puts the metal last.
+ */
+export const getMedalTitle = (i18n: Translator, medal: Medal): string =>
+  i18n.t(`medal.title.${medal}`);
 
 /**
  * Crossing cue strength: the combo fanfare tier played for each medal (a
@@ -96,7 +103,8 @@ export const getMedalResult = (score: number): MedalResult => ({
 });
 
 /** Share text label, word only (no emoji): "Gold medal". */
-export const getMedalShareLabel = (medal: Medal): string => `${MEDAL_LABELS[medal]} medal`;
+export const getMedalShareLabel = (i18n: Translator, medal: Medal): string =>
+  getMedalTitle(i18n, medal);
 
 // ---------------------------------------------------------------------------
 // In-run latch: one cue per medal, never per frame
@@ -164,9 +172,14 @@ export const selectHudGoal = (
 };
 
 /** Screen-reader text for a crossing (the banner itself is decorative). */
-export const getMedalAnnouncement = (medal: Medal): string => {
+export const getMedalAnnouncement = (i18n: Translator, medal: Medal): string => {
   const next = getMedalTarget(medal);
+  const title = getMedalTitle(i18n, medal);
   return next === null
-    ? `${MEDAL_LABELS[medal]} medal. Top medal earned`
-    : `${MEDAL_LABELS[medal]} medal. Next: ${MEDAL_LABELS[next.medal]} at ${next.threshold}`;
+    ? i18n.t("announce.medalTop", { medal: title })
+    : i18n.t("announce.medalNext", {
+        medal: title,
+        next: getMedalName(i18n, next.medal),
+        threshold: next.threshold,
+      });
 };
