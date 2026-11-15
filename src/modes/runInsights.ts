@@ -5,22 +5,36 @@ import {
   PERFECT_STACK_TIME_BONUS,
 } from "../constants/game";
 import { isReverseWorld } from "../gameplay/reverse";
-import { getMissMarginHeadline } from "./missMargin";
+import { getMissMarginHeadline, getMissMarginHint } from "./missMargin";
 
 /**
  * Game over explanations: what ended the run and one actionable tip. Pure so
  * copy and rules are testable without rendering.
  */
 export interface EndInsight {
-  /** How far the final miss was off, e.g. "Too late by 4 %" (when known). */
+  /** How far the final miss was off, e.g. "Late by 0.4 s" (when known). */
   margin?: string;
+  /** Reading aid for the margin, e.g. "PERFECT opened 0.4 s before the edge." */
+  marginHint?: string;
   title: string;
   tip: string;
 }
 
 /**
+ * "Too late: the shape crossed the edge." → "The shape crossed the edge.":
+ * once a margin headline says late/early, the sentence must not repeat it.
+ */
+const TIMING_PREFIX = /^Too (late|early): /;
+
+const withoutTimingPrefix = (title: string): string => {
+  const rest = title.replace(TIMING_PREFIX, "");
+  return rest === title ? title : rest.charAt(0).toUpperCase() + rest.slice(1);
+};
+
+/**
  * Insight for a run's end. `margin` (the final miss, see `getMissMargin`)
- * adds the magnitude headline; it is ignored for mode-level ends (clock,
+ * adds the magnitude headline (and hint) and drops the sentence's own
+ * "Too late:"/"Too early:" prefix; it is ignored for mode-level ends (clock,
  * lives), where the last miss is not what the card explains.
  */
 export const getEndInsight = (
@@ -33,7 +47,13 @@ export const getEndInsight = (
   if (reason !== "overflow" && reason !== "badTap" && reason !== "fracture") {
     return insight;
   }
-  return { margin: getMissMarginHeadline(margin), ...insight };
+  const hint = getMissMarginHint(margin, isReverseWorld(world));
+  return {
+    margin: getMissMarginHeadline(margin),
+    ...(hint ? { marginHint: hint } : {}),
+    title: withoutTimingPrefix(insight.title),
+    tip: insight.tip,
+  };
 };
 
 const getReasonInsight = (

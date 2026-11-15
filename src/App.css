@@ -2550,6 +2550,10 @@ button:focus-visible {
   color: var(--mono-danger-text);
 }
 
+.game-container[data-theme="mono"] .end-insight-hint {
+  color: #ffc9b3;
+}
+
 .game-container[data-theme="mono"] .end-insight-tip {
   color: #d6b3a3;
 }
@@ -2601,6 +2605,14 @@ button:focus-visible {
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   margin-bottom: 0.15rem;
+}
+
+.end-insight-hint {
+  color: #ffc9c9;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.35rem;
 }
 
 .end-insight-title {

@@ -47,6 +47,7 @@ import {
   REVERSE_SPAWN_RATIO,
 } from "../gameplay/reverse";
 import { getBeatPhase, getHeartbeatMultiplier } from "../gameplay/heartbeat";
+import { getPerfectBandEntrySize } from "../gameplay/guide";
 import { isTapBlockedByFracture } from "../gameplay/fracture";
 
 /** Regular worlds: a new shape starts at this fraction of its container. */
@@ -145,6 +146,7 @@ export const createInitialState = (
     elapsedTime: 0,
     lastMissReason: null,
     lastMissMargin: null,
+    perfectBandEnteredAt: null,
     styleScore: 0,
     streak: 0,
     bestStreak: 0,
@@ -216,6 +218,7 @@ export const spawnActiveShape = (
     currentSpeed,
     isBossLevel,
     activeOffset: { x: 0, y: 0 },
+    perfectBandEnteredAt: null,
   };
 };
 
@@ -349,7 +352,36 @@ export const updateActiveShape = (state: GameState, dt: number): GameState => {
     ...state,
     activeShape: updatedShapeWithPulse,
     activeOffset,
+    perfectBandEnteredAt: trackPerfectBandEntry(
+      state,
+      updatedShapeWithPulse.size,
+      dt,
+    ),
   };
+};
+
+/**
+ * Clock time the growing shape entered the PERFECT band, updated for a frame
+ * that grew it from `state.activeShape.size` to `newSize`. The loop advances
+ * the clock before growing, so the frame spans [elapsedTime − dt,
+ * elapsedTime]; the crossing is interpolated linearly inside it. A shape
+ * already past the band entry (spawned or forced there) counts from the frame
+ * start. Numbers only: no allocation in the per-frame path.
+ */
+const trackPerfectBandEntry = (
+  state: GameState,
+  newSize: number,
+  dt: number,
+): number | null => {
+  const known = state.perfectBandEnteredAt ?? null;
+  const last = state.shapes[state.shapes.length - 1];
+  if (known !== null || !last || !state.activeShape) return known;
+  const entry = getPerfectBandEntrySize(state.world, last.size);
+  if (newSize < entry) return null;
+  const frameStart = state.elapsedTime - dt;
+  const oldSize = state.activeShape.size;
+  if (oldSize >= entry || newSize <= oldSize) return frameStart;
+  return frameStart + (dt * (entry - oldSize)) / (newSize - oldSize);
 };
 
 /**
@@ -468,6 +500,7 @@ export const stackActiveShape = (
       shapes: finalShapes,
       activeShape: null,
       activeOffset: { x: 0, y: 0 },
+      perfectBandEnteredAt: null,
       world: newWorld,
       score: newScore,
       stackCount: newStackCount,
@@ -563,6 +596,17 @@ const lateMargin = (size: number, fit: number | null): MissMargin | null =>
   fit === null || fit <= 0 ? null : { kind: "late", fraction: (size - fit) / fit };
 
 /**
+ * Seconds of game clock between the growing shape entering the PERFECT band
+ * and `state` (the overflow frame). Null when it never entered the band, e.g.
+ * a rotated or drifting shape that could not fit up to PERFECT.
+ */
+export const getOverflowLateness = (state: GameState): MissMargin | null => {
+  const enteredAt = state.perfectBandEnteredAt ?? null;
+  if (enteredAt === null) return null;
+  return { kind: "lateTime", seconds: Math.max(0, state.elapsedTime - enteredAt) };
+};
+
+/**
  * How far a miss was off, from the state at the moment of the miss (before
  * it is handled). See {@link MissMargin} for the exact definitions. Pure and
  * event-only (a few dozen containment checks), never per frame. Null when the
@@ -581,9 +625,15 @@ export const getMissMargin = (
     return clearInSec === null ? null : { kind: "fracture", clearInSec };
   }
 
+  // Untapped overflow (container edge or arena ring): caught on the frame it
+  // crosses, so its size overshoot is always about one frame of growth. Tell
+  // how long PERFECT had been open instead (null if it never opened).
+  if (reason === "overflow") return getOverflowLateness(state);
+
   if (isReverseWorld(state.world)) {
-    // Crossing the ring is "late" whatever the trigger; otherwise a reverse
-    // tap that fails is one that did not wrap the previous shape yet.
+    // A reverse tap past the ring (only reachable when forced) is "late";
+    // otherwise a failed reverse tap is one that did not wrap the previous
+    // shape yet.
     if (!isWithinArena(state)) {
       return lateMargin(active.size, getLargestArenaSize(state));
     }
@@ -632,6 +682,7 @@ const handleMissInner = (state: GameState): GameState => {
       streak: 0,
       lastStackQuality: null,
       activeShape: resetActiveAfterMiss(state),
+      perfectBandEnteredAt: null,
       activeOffset: { x: 0, y: 0 },
     };
     return timeRemaining <= 0 ? setGameOver(nextState) : nextState;
@@ -646,6 +697,7 @@ const handleMissInner = (state: GameState): GameState => {
       ...state,
       zenLivesRemaining: nextLives,
       activeShape: resetActiveAfterMiss(state),
+      perfectBandEnteredAt: null,
       activeOffset: { x: 0, y: 0 },
     };
     if (nextLives <= 0) {
@@ -715,6 +767,7 @@ export const restartActiveShape = (
   return {
     ...nextState,
     activeShape: newActiveShape,
+    perfectBandEnteredAt: null,
     currentSpeed,
     activeOffset: { x: 0, y: 0 },
   };
@@ -758,6 +811,7 @@ export const undoLastStack = (state: GameState): GameState => {
     level: newLevel,
     targetZoom: newTargetZoom,
     activeShape: null, // Force spawn of new shape
+    perfectBandEnteredAt: null,
   };
 };
 

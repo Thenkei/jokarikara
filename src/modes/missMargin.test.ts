@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   HAIR_FRACTION,
   MAX_MARGIN_PERCENT,
-  getClearTenths,
+  MAX_TENTHS,
+  getMissMarginHint,
+  getTenths,
   getMarginPercent,
   getMissAnnouncement,
   getMissMarginHeadline,
@@ -25,10 +27,34 @@ describe("margin buckets", () => {
     expect(getMarginPercent(Number.NaN)).toBeNull();
   });
 
-  it("rounds fracture waits to tenths, never below 0.1 s", () => {
-    expect(getClearTenths(0.01)).toBe(1);
-    expect(getClearTenths(0.26)).toBe(3);
-    expect(getClearTenths(1.04)).toBe(10);
+  it("rounds durations to tenths, never below 0.1 s", () => {
+    expect(getTenths(0)).toBe(1);
+    expect(getTenths(0.01)).toBe(1);
+    expect(getTenths(0.26)).toBe(3);
+    expect(getTenths(1.04)).toBe(10);
+    expect(getTenths(500)).toBe(MAX_TENTHS);
+    expect(getTenths(Number.NaN)).toBe(1);
+  });
+});
+
+describe("untapped overflow wording (time)", () => {
+  it("headline, mid-run label and hint", () => {
+    const margin = { kind: "lateTime", seconds: 0.42 } as const;
+    expect(getMissMarginHeadline(margin)).toBe(`Late by 0.4${NBSP}s`);
+    expect(getMissMarginLabel(margin)).toBe(`LATE 0.4${NBSP}s`);
+    expect(getMissMarginHint(margin, false)).toBe(
+      `PERFECT opened 0.4${NBSP}s before the edge.`,
+    );
+    expect(getMissMarginHint({ kind: "lateTime", seconds: 1.26 }, true)).toBe(
+      `PERFECT opened 1.3${NBSP}s before the ring.`,
+    );
+    expect(getMissAnnouncement(margin)).toBe(`Miss. Late by 0.4${NBSP}s`);
+  });
+
+  it("has no hint for size or fracture margins", () => {
+    expect(getMissMarginHint({ kind: "late", fraction: 0.04 }, false)).toBeNull();
+    expect(getMissMarginHint({ kind: "early", fraction: 0.04 }, true)).toBeNull();
+    expect(getMissMarginHint({ kind: "fracture", clearInSec: 0.3 }, false)).toBeNull();
   });
 });
 

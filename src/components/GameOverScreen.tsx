@@ -254,6 +254,9 @@ export function GameOverScreen({
                 {endInsight.margin && (
                   <p className="end-insight-margin">{endInsight.margin}</p>
                 )}
+                {endInsight.marginHint && (
+                  <p className="end-insight-hint">{endInsight.marginHint}</p>
+                )}
                 <p className="end-insight-title">{endInsight.title}</p>
                 <p className="end-insight-tip">{endInsight.tip}</p>
               </div>

@@ -11,12 +11,18 @@ import { isTapBlockedByFracture } from "../gameplay/fracture";
 import {
   FRACTURE_CLEAR_HORIZON,
   FRACTURE_CLEAR_STEP,
+  advanceClock,
+  checkContainment,
   createInitialState,
   getFractureClearDelay,
   getMissMargin,
   handleMiss,
+  restartActiveShape,
   spawnActiveShape,
+  stackActiveShape,
+  updateActiveShape,
 } from "./gameState";
+import { STYLE_QUALITY_THRESHOLDS } from "../constants/game";
 
 const shape = (type: Shape["type"], size: number, rotation = 0): Shape => ({
   type,
@@ -102,20 +108,100 @@ describe("getLargestFittingSize", () => {
   });
 });
 
-describe("getMissMargin (regular worlds)", () => {
-  it("overflow: overshoot relative to the largest fitting size", () => {
-    const margin = getMissMargin(
-      regularState(shape("circle", 100), shape("circle", 110)),
-      "overflow",
-    );
-    expect(margin?.kind).toBe("late");
-    expect(margin && "fraction" in margin ? margin.fraction : NaN).toBeCloseTo(
-      110 / 101 - 1,
-      5,
-    );
+/** One loop frame, in the loop's order (clock first, then growth). */
+const frame = (state: GameState, dt: number) =>
+  updateActiveShape(advanceClock(state, dt), dt);
+
+const PERFECT = STYLE_QUALITY_THRESHOLDS.perfectMinRatio;
+/** PERFECT band entry for a 100-unit container. */
+const PERFECT_SIZE = 100 * PERFECT;
+
+describe("PERFECT band entry tracking", () => {
+  /** Container 100, circle growing at a fixed rate (frozen growth speed). */
+  const growing = (size: number): GameState => ({
+    ...regularState(shape("circle", 100), shape("circle", size)),
+    elapsedTime: 10,
+    perfectBandEnteredAt: null,
   });
 
-  it("tap with a corner out (square in pentagon): same definition", () => {
+  it("interpolates the crossing inside the frame", () => {
+    const before = growing(PERFECT * 100 - 1);
+    const after = frame(before, 0.1);
+    const grown = after.activeShape!.size - before.activeShape!.size;
+    expect(grown).toBeGreaterThan(1); // the frame crosses the band entry
+    // Entry is 1 unit into a `grown`-unit frame that started at t = 10.
+    expect(after.perfectBandEnteredAt).toBeCloseTo(10 + 0.1 * (1 / grown), 9);
+  });
+
+  it("stays null below the band and keeps the first entry afterwards", () => {
+    const below = frame(growing(50), 1 / 60);
+    expect(below.perfectBandEnteredAt).toBeNull();
+    const entered = { ...growing(98), perfectBandEnteredAt: 7.5 };
+    expect(frame(entered, 1 / 60).perfectBandEnteredAt).toBe(7.5);
+  });
+
+  it("counts a shape already past the entry from the frame start", () => {
+    expect(frame(growing(99), 0.02).perfectBandEnteredAt).toBeCloseTo(10, 9);
+  });
+
+  it("resets whenever a new shape starts growing", () => {
+    const entered = { ...growing(99), perfectBandEnteredAt: 3 };
+    expect(spawnActiveShape(entered).perfectBandEnteredAt).toBeNull();
+    expect(restartActiveShape(entered).perfectBandEnteredAt).toBeNull();
+    expect(stackActiveShape(entered).state.perfectBandEnteredAt).toBeNull();
+    const zen = handleMiss({ ...entered, mode: "ZEN", zenLivesRemaining: 5 }, "badTap");
+    expect(zen.perfectBandEnteredAt).toBeNull();
+  });
+});
+
+describe("getMissMargin (regular worlds)", () => {
+  it("untapped overflow: time since PERFECT opened, not a size", () => {
+    const margin = getMissMargin(
+      {
+        ...regularState(shape("circle", 100), shape("circle", 101.4)),
+        elapsedTime: 12.75,
+        perfectBandEnteredAt: 12.35,
+      },
+      "overflow",
+    );
+    expect(margin).toEqual({ kind: "lateTime", seconds: expect.closeTo(0.4, 9) });
+  });
+
+  it("untapped overflow matches a real run: PERFECT entry to the edge", () => {
+    // Grow frame by frame until containment fails, like the loop does.
+    let state: GameState = {
+      ...regularState(shape("circle", 100), shape("circle", 60)),
+      perfectBandEnteredAt: null,
+    };
+    let enteredAt: number | null = null;
+    for (let i = 0; i < 10_000 && checkContainment(state); i += 1) {
+      state = frame(state, 1 / 60);
+      if (enteredAt === null && state.activeShape!.size >= PERFECT_SIZE) {
+        enteredAt = state.elapsedTime;
+      }
+    }
+    const margin = getMissMargin(state, "overflow");
+    expect(margin?.kind).toBe("lateTime");
+    const seconds = margin?.kind === "lateTime" ? margin.seconds : NaN;
+    // Interpolated entry: within one frame before the first frame in band.
+    expect(seconds).toBeGreaterThanOrEqual(state.elapsedTime - enteredAt!);
+    expect(seconds).toBeLessThanOrEqual(state.elapsedTime - enteredAt! + 1 / 60);
+  });
+
+  it("untapped overflow that never reached PERFECT: reason only", () => {
+    // Square in pentagon cannot grow past ~58 % of the pentagon.
+    expect(
+      getMissMargin(
+        {
+          ...regularState(shape("pentagon", 200), shape("square", 117)),
+          perfectBandEnteredAt: null,
+        },
+        "overflow",
+      ),
+    ).toBeNull();
+  });
+
+  it("tap with a corner out (square in pentagon): size overshoot vs the fit", () => {
     const margin = getMissMargin(
       regularState(shape("pentagon", 200), shape("square", 130)),
       "badTap",
@@ -126,14 +212,20 @@ describe("getMissMargin (regular worlds)", () => {
     });
   });
 
+  it("tap with a corner out (circle in circle): overshoot vs the buffered fit", () => {
+    expect(
+      getMissMargin(regularState(shape("circle", 100), shape("circle", 110)), "badTap"),
+    ).toEqual({ kind: "late", fraction: expect.closeTo(110 / 101 - 1, 5) });
+  });
+
   it("is null when nothing was out (or no number makes sense)", () => {
     expect(
-      getMissMargin(regularState(shape("circle", 100), shape("circle", 90)), "overflow"),
+      getMissMargin(regularState(shape("circle", 100), shape("circle", 90)), "badTap"),
     ).toBeNull();
     expect(
       getMissMargin(
         regularState(shape("circle", 100), shape("circle", 90), { x: 70, y: 0 }),
-        "overflow",
+        "badTap",
       ),
     ).toBeNull();
     expect(
@@ -144,7 +236,7 @@ describe("getMissMargin (regular worlds)", () => {
   it("is captured by handleMiss before the shape resets", () => {
     const missed = handleMiss(
       { ...regularState(shape("circle", 100), shape("circle", 110)), mode: "ZEN", zenLivesRemaining: 5 },
-      "overflow",
+      "badTap",
     );
     expect(missed.activeShape?.size).toBeLessThan(10); // reset to spawn size
     expect(missed.lastMissMargin).toEqual({
@@ -172,14 +264,37 @@ describe("getMissMargin (Reverse Stack)", () => {
     expect(getMissMargin(state, "badTap")?.kind).toBe("early");
   });
 
-  it("crossing the arena: overshoot relative to the arena diameter", () => {
+  it("crossing the arena untapped: time since PERFECT (wrapping) opened", () => {
+    const state = reverseState(shape("circle", 100), shape("circle", 530), {
+      initialSize: 500,
+      zoom: 2,
+      elapsedTime: 20,
+      perfectBandEnteredAt: 18.8,
+    });
+    expect(getMissMargin(state, "overflow")).toEqual({
+      kind: "lateTime",
+      seconds: expect.closeTo(1.2, 9),
+    });
+  });
+
+  it("enters the Reverse band once the shape reaches the previous size", () => {
+    const state = reverseState(shape("circle", 100), shape("circle", 99.9), {
+      perfectBandEnteredAt: null,
+    });
+    expect(frame(state, 0.1).perfectBandEnteredAt).not.toBeNull();
+    expect(
+      frame({ ...state, activeShape: shape("circle", 80) }, 1 / 60).perfectBandEnteredAt,
+    ).toBeNull();
+  });
+
+  it("a tap past the arena: overshoot relative to the arena diameter", () => {
     const state = reverseState(shape("circle", 100), shape("circle", 530), {
       initialSize: 500,
       zoom: 2,
     });
     expect(getArenaRadius(state)).toBe(250);
     expect(getLargestArenaSize(state)).toBeCloseTo(500, 3);
-    expect(getMissMargin(state, "overflow")).toEqual({
+    expect(getMissMargin(state, "badTap")).toEqual({
       kind: "late",
       fraction: expect.closeTo(0.06, 5),
     });

@@ -18,10 +18,15 @@ export type MissReason =
  * offset as the shape that missed; fractions are relative to the *target*
  * size, never to the container, so "4 %" means the same thing on every level.
  *
- * - `late`: the shape was too big. `fraction = (size − fit) / fit`, where
- *   `fit` is the largest size that still satisfied the limit it broke: the
- *   container edge (regular worlds, overflow or a tap with a corner out) or
- *   the arena ring (Reverse Stack overflow).
+ * - `lateTime`: an untapped overflow (the shape crossed the container edge,
+ *   or the Reverse Stack arena, on its own). A size margin would always be
+ *   about one frame of growth, so this is time instead: `seconds` of game
+ *   clock between the shape entering the PERFECT band and the overflow, i.e.
+ *   how long the player waited too long. Absent when the shape never reached
+ *   the band (it could not fit up to PERFECT).
+ * - `late`: a tap that did not fit (a corner out: rotation, drift; or past
+ *   the arena). `fraction = (size − fit) / fit`, where `fit` is the largest
+ *   size that still satisfied the limit it broke.
  * - `early`: Reverse Stack tap before wrapping the previous shape.
  *   `fraction = (wrap − size) / wrap`, where `wrap` is the smallest size that
  *   fully contains the previous shape.
@@ -30,6 +35,7 @@ export type MissReason =
  *   Absent when it would have overflowed before clearing.
  */
 export type MissMargin =
+  | { kind: "lateTime"; seconds: number }
   | { kind: "late"; fraction: number }
   | { kind: "early"; fraction: number }
   | { kind: "fracture"; clearInSec: number };
@@ -79,6 +85,13 @@ export interface GameState {
   lastMissReason: MissReason | null;
   /** How far that miss was off (null when not computable). */
   lastMissMargin?: MissMargin | null;
+  /**
+   * Game clock (`elapsedTime`) at which the current growing shape entered the
+   * PERFECT band (see `getPerfectBandEntrySize`), interpolated within the
+   * frame; null until it does. Reset whenever a new shape starts growing.
+   * Lets an untapped overflow say how long the player waited too long.
+   */
+  perfectBandEnteredAt?: number | null;
   styleScore: number;
   streak: number;
   bestStreak: number;
