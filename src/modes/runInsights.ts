@@ -1,21 +1,42 @@
-import type { EndReason, StackQuality } from "../types";
+import type { EndReason, MissMargin, StackQuality } from "../types";
 import { qualitiesFromScoreHistory } from "./daily";
 import {
   GREAT_STACK_TIME_BONUS,
   PERFECT_STACK_TIME_BONUS,
 } from "../constants/game";
 import { isReverseWorld } from "../gameplay/reverse";
+import { getMissMarginHeadline } from "./missMargin";
 
 /**
  * Game over explanations: what ended the run and one actionable tip. Pure so
  * copy and rules are testable without rendering.
  */
 export interface EndInsight {
+  /** How far the final miss was off, e.g. "Too late by 4 %" (when known). */
+  margin?: string;
   title: string;
   tip: string;
 }
 
+/**
+ * Insight for a run's end. `margin` (the final miss, see `getMissMargin`)
+ * adds the magnitude headline; it is ignored for mode-level ends (clock,
+ * lives), where the last miss is not what the card explains.
+ */
 export const getEndInsight = (
+  reason: EndReason | null | undefined,
+  world: number,
+  margin?: MissMargin | null,
+): EndInsight | null => {
+  const insight = getReasonInsight(reason, world);
+  if (!insight || !margin) return insight;
+  if (reason !== "overflow" && reason !== "badTap" && reason !== "fracture") {
+    return insight;
+  }
+  return { margin: getMissMarginHeadline(margin), ...insight };
+};
+
+const getReasonInsight = (
   reason: EndReason | null | undefined,
   world: number,
 ): EndInsight | null => {

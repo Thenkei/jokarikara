@@ -55,6 +55,33 @@ describe("GameOverScreen", () => {
     expect(container.querySelector(".progression-score")).toBeNull();
   });
 
+  it("leads the insight card with the miss margin, keeping the danger styling", () => {
+    const { container } = renderScreen({
+      endInsight: {
+        margin: "Too late by 4 %",
+        title: "Too late: the shape crossed the edge.",
+        tip: "Tap a touch earlier.",
+      },
+    });
+    const card = container.querySelector(".end-insight");
+    expect(card?.classList.contains("danger-signal")).toBe(true);
+    expect(card?.getAttribute("role")).toBe("status");
+    const lines = Array.from(card?.querySelectorAll("p") ?? []).map((p) => p.className);
+    expect(lines).toEqual(["end-insight-margin", "end-insight-title", "end-insight-tip"]);
+    expect(card?.querySelector(".end-insight-margin")?.textContent).toBe(
+      "Too late by 4 %",
+    );
+    expect(card?.querySelector(".end-insight-title")?.textContent).toBe(
+      "Too late: the shape crossed the edge.",
+    );
+  });
+
+  it("shows no margin line when the miss had none", () => {
+    const { container } = renderScreen();
+    expect(container.querySelector(".end-insight-margin")).toBeNull();
+    expect(container.querySelector(".end-insight-title")?.textContent).toBe("Too late.");
+  });
+
   it("hides the combo stat in Zen", () => {
     const { container } = renderScreen({ mode: "ZEN" });
     expect(container.querySelector(".stat-combo")).toBeNull();

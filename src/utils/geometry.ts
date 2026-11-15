@@ -222,3 +222,53 @@ export const isContained = (child: Shape, parent: Shape): boolean => {
   const childVertices = getVertices(child);
   return childVertices.every((v) => isPointInShape(v, parent));
 };
+
+/** Bisection steps for size thresholds: 2^-24 of the bracket, far below a pixel. */
+const SIZE_SEARCH_ITERATIONS = 24;
+
+/**
+ * Boundary size between `fitsAt(okSize) === true` and `fitsAt(badSize) ===
+ * false`, found by bisection and returned on the fitting side. Works in both
+ * directions (okSize below or above badSize). Assumes a single crossing in
+ * the bracket, which holds when a shape is scaled about its own centre
+ * against a convex or centre-star-shaped limit (every shape in the game).
+ * Only meant for events (a miss), never for the per-frame path.
+ */
+export const findSizeThreshold = (
+  fitsAt: (size: number) => boolean,
+  okSize: number,
+  badSize: number,
+): number => {
+  let ok = okSize;
+  let bad = badSize;
+  for (let i = 0; i < SIZE_SEARCH_ITERATIONS; i += 1) {
+    const mid = (ok + bad) / 2;
+    if (fitsAt(mid)) ok = mid;
+    else bad = mid;
+  }
+  return ok;
+};
+
+/** Smallest size probed when looking for a fit (as a fraction of the shape). */
+const MIN_FIT_PROBE_RATIO = 1e-3;
+
+/**
+ * Largest size the child could have had, with the same type, rotation and
+ * centre offset, while every vertex stays inside `parent` (same rule and
+ * buffers as the containment check). Null when the child already fits, or
+ * when no size fits at all (its centre has drifted outside the parent).
+ */
+export const getLargestFittingSize = (
+  child: Shape,
+  parent: Shape,
+  offset: Point = { x: 0, y: 0 },
+): number | null => {
+  const fitsAt = (size: number) =>
+    getVertices({ ...child, size }).every((v) =>
+      isPointInShape({ x: v.x + offset.x, y: v.y + offset.y }, parent),
+    );
+  if (fitsAt(child.size)) return null;
+  const smallest = child.size * MIN_FIT_PROBE_RATIO;
+  if (!fitsAt(smallest)) return null;
+  return findSizeThreshold(fitsAt, smallest, child.size);
+};

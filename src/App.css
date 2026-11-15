@@ -2256,6 +2256,80 @@ button:focus-visible {
   }
 }
 
+/*
+ * Zen / Time Attack: MISS and how far it was off ("+4 %", "BY A HAIR"), where
+ * the quality label of a stack appears (a miss never shows one). A danger
+ * signal: it stays red-orange in Mono.
+ */
+.miss-pop {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  pointer-events: none;
+  color: #ff7b7b;
+  /* Dark under-shadow first: it sits over the stack's rim, like quality labels. */
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.75),
+    0 0 10px rgba(255, 90, 90, 0.45);
+  white-space: nowrap;
+  animation: missPop 1.2s ease-out forwards;
+}
+
+.miss-pop-title {
+  font-size: clamp(1.3rem, 7vw, 2rem);
+  font-weight: 820;
+  letter-spacing: 0.08em;
+}
+
+.miss-pop-margin {
+  font-size: clamp(0.95rem, 4.6vw, 1.2rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: #ffc2c2;
+}
+
+@keyframes missPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.86);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.03);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -54%) scale(1);
+  }
+}
+
+@keyframes missPopFade {
+  0%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .miss-pop {
+    animation: missPopFade 1.2s linear forwards;
+  }
+}
+
 /* ---------- First-run hint ---------- */
 .first-run-hint {
   position: absolute;
@@ -2471,7 +2545,8 @@ button:focus-visible {
   border-color: rgba(255, 110, 60, 0.3);
 }
 
-.game-container[data-theme="mono"] .end-insight-title {
+.game-container[data-theme="mono"] .end-insight-title,
+.game-container[data-theme="mono"] .end-insight-margin {
   color: var(--mono-danger-text);
 }
 
@@ -2482,6 +2557,17 @@ button:focus-visible {
 .game-container[data-theme="mono"] .time-penalty-pop {
   color: var(--mono-danger-text);
   text-shadow: 0 0 10px rgba(255, 90, 36, 0.5);
+}
+
+.game-container[data-theme="mono"] .miss-pop {
+  color: var(--mono-danger-text);
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.75),
+    0 0 10px rgba(255, 90, 36, 0.5);
+}
+
+.game-container[data-theme="mono"] .miss-pop-margin {
+  color: #ffc9b3;
 }
 
 /*
@@ -2506,6 +2592,15 @@ button:focus-visible {
 .gameover-card.end-insight {
   background: rgba(255, 120, 120, 0.06);
   border-color: rgba(255, 140, 140, 0.2);
+}
+
+.end-insight-margin {
+  color: #ff8f8f;
+  font-weight: 900;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.15rem;
 }
 
 .end-insight-title {

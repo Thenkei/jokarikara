@@ -12,6 +12,28 @@ export type MissReason =
   /** A tap while a fracture sector crossed the growing shape. */
   | "fracture";
 
+/**
+ * How far a miss was off, captured at the moment of the miss (pure core:
+ * `getMissMargin`). Sizes are compared with the same type, rotation and drift
+ * offset as the shape that missed; fractions are relative to the *target*
+ * size, never to the container, so "4 %" means the same thing on every level.
+ *
+ * - `late`: the shape was too big. `fraction = (size − fit) / fit`, where
+ *   `fit` is the largest size that still satisfied the limit it broke: the
+ *   container edge (regular worlds, overflow or a tap with a corner out) or
+ *   the arena ring (Reverse Stack overflow).
+ * - `early`: Reverse Stack tap before wrapping the previous shape.
+ *   `fraction = (wrap − size) / wrap`, where `wrap` is the smallest size that
+ *   fully contains the previous shape.
+ * - `fracture`: seconds until no red sector crossed the shape, simulating the
+ *   run forward from the tap (growth, rotation, drift and sectors all move).
+ *   Absent when it would have overflowed before clearing.
+ */
+export type MissMargin =
+  | { kind: "late"; fraction: number }
+  | { kind: "early"; fraction: number }
+  | { kind: "fracture"; clearInSec: number };
+
 /** Why a run ended (shown on the game over screen). */
 export type EndReason = MissReason | "timeout" | "lives";
 
@@ -55,6 +77,8 @@ export interface GameState {
   elapsedTime: number;
   /** Cause of the most recent miss (null until the first one). */
   lastMissReason: MissReason | null;
+  /** How far that miss was off (null when not computable). */
+  lastMissMargin?: MissMargin | null;
   styleScore: number;
   streak: number;
   bestStreak: number;
@@ -90,6 +114,8 @@ export interface RunStats {
   scoreHistory: readonly number[];
   /** Why the run ended; null if it was left without a game over. */
   endReason?: EndReason | null;
+  /** How far the miss that ended the run was off (only for a miss reason). */
+  endMargin?: MissMargin | null;
 }
 
 /**

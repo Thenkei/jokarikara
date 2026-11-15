@@ -16,6 +16,34 @@ describe("end insight", () => {
     expect(getEndInsight(undefined, 1)).toBeNull();
   });
 
+  it("leads with how far the final miss was off, keeping the explanation", () => {
+    const late = getEndInsight("overflow", 1, { kind: "late", fraction: 0.04 });
+    expect(late?.margin).toBe("Too late by 4 %");
+    expect(late?.title).toBe("Too late: the shape crossed the edge.");
+    expect(late?.tip).toContain("earlier");
+
+    expect(getEndInsight("overflow", 1, { kind: "late", fraction: 0.003 })?.margin).toBe(
+      "Too late by a hair",
+    );
+    expect(getEndInsight("badTap", 9, { kind: "early", fraction: 0.07 })?.margin).toBe(
+      "Too early by 7 %",
+    );
+    expect(
+      getEndInsight("fracture", 3, { kind: "fracture", clearInSec: 0.4 })?.margin,
+    ).toBe("Sector clear 0.4 s later");
+  });
+
+  it("has no margin headline without a margin or for mode-level ends", () => {
+    expect(getEndInsight("overflow", 1)?.margin).toBeUndefined();
+    expect(getEndInsight("fracture", 3, null)?.margin).toBeUndefined();
+    expect(
+      getEndInsight("lives", 1, { kind: "late", fraction: 0.04 })?.margin,
+    ).toBeUndefined();
+    expect(
+      getEndInsight("timeout", 1, { kind: "late", fraction: 0.04 })?.margin,
+    ).toBeUndefined();
+  });
+
   it("adapts the advice to Reverse Stack", () => {
     expect(getEndInsight("badTap", 9)?.tip).toContain("Reverse Stack");
     expect(getEndInsight("overflow", 9)?.title).toContain("ring");
