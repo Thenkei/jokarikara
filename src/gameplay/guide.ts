@@ -29,6 +29,16 @@ export interface PerfectGuide {
 }
 
 /**
+ * Size at which a growing shape on top of `lastSize` enters the PERFECT band:
+ * the container × the PERFECT ratio in regular worlds, the previous shape's
+ * size in Reverse Stack (wrapping it). Allocation-free, for the frame loop.
+ */
+export const getPerfectBandEntrySize = (world: number, lastSize: number): number =>
+  isReverseWorld(world)
+    ? lastSize
+    : lastSize * STYLE_QUALITY_THRESHOLDS.perfectMinRatio;
+
+/**
  * PERFECT target for the current active shape, regardless of whether the
  * ghost guide is shown. Shared by the ghost guide and the audio timing cue
  * so both always agree on where PERFECT is.
@@ -44,15 +54,16 @@ export const getPerfectTarget = (state: GameState): PerfectGuide | null => {
     // Outward: PERFECT means hugging the previous shape, i.e. a *maximum*
     // size of last / ratio once it is large enough to contain it.
     const perfectSize = last.size / ratio;
+    const bandEntrySize = getPerfectBandEntrySize(state.world, last.size);
     return {
       perfectSize,
-      inPerfectBand: size >= last.size && size <= perfectSize,
-      bandEntrySize: last.size,
+      inPerfectBand: size >= bandEntrySize && size <= perfectSize,
+      bandEntrySize,
       bandExitSize: perfectSize,
     };
   }
 
-  const perfectSize = last.size * ratio;
+  const perfectSize = getPerfectBandEntrySize(state.world, last.size);
   return {
     perfectSize,
     inPerfectBand: size >= perfectSize,

@@ -12,6 +12,34 @@ export type MissReason =
   /** A tap while a fracture sector crossed the growing shape. */
   | "fracture";
 
+/**
+ * How far a miss was off, captured at the moment of the miss (pure core:
+ * `getMissMargin`). Sizes are compared with the same type, rotation and drift
+ * offset as the shape that missed; fractions are relative to the *target*
+ * size, never to the container, so "4 %" means the same thing on every level.
+ *
+ * - `lateTime`: an untapped overflow (the shape crossed the container edge,
+ *   or the Reverse Stack arena, on its own). A size margin would always be
+ *   about one frame of growth, so this is time instead: `seconds` of game
+ *   clock between the shape entering the PERFECT band and the overflow, i.e.
+ *   how long the player waited too long. Absent when the shape never reached
+ *   the band (it could not fit up to PERFECT).
+ * - `late`: a tap that did not fit (a corner out: rotation, drift; or past
+ *   the arena). `fraction = (size − fit) / fit`, where `fit` is the largest
+ *   size that still satisfied the limit it broke.
+ * - `early`: Reverse Stack tap before wrapping the previous shape.
+ *   `fraction = (wrap − size) / wrap`, where `wrap` is the smallest size that
+ *   fully contains the previous shape.
+ * - `fracture`: seconds until no red sector crossed the shape, simulating the
+ *   run forward from the tap (growth, rotation, drift and sectors all move).
+ *   Absent when it would have overflowed before clearing.
+ */
+export type MissMargin =
+  | { kind: "lateTime"; seconds: number }
+  | { kind: "late"; fraction: number }
+  | { kind: "early"; fraction: number }
+  | { kind: "fracture"; clearInSec: number };
+
 /** Why a run ended (shown on the game over screen). */
 export type EndReason = MissReason | "timeout" | "lives";
 
@@ -55,6 +83,15 @@ export interface GameState {
   elapsedTime: number;
   /** Cause of the most recent miss (null until the first one). */
   lastMissReason: MissReason | null;
+  /** How far that miss was off (null when not computable). */
+  lastMissMargin?: MissMargin | null;
+  /**
+   * Game clock (`elapsedTime`) at which the current growing shape entered the
+   * PERFECT band (see `getPerfectBandEntrySize`), interpolated within the
+   * frame; null until it does. Reset whenever a new shape starts growing.
+   * Lets an untapped overflow say how long the player waited too long.
+   */
+  perfectBandEnteredAt?: number | null;
   styleScore: number;
   streak: number;
   bestStreak: number;
@@ -90,6 +127,8 @@ export interface RunStats {
   scoreHistory: readonly number[];
   /** Why the run ended; null if it was left without a game over. */
   endReason?: EndReason | null;
+  /** How far the miss that ended the run was off (only for a miss reason). */
+  endMargin?: MissMargin | null;
 }
 
 /**

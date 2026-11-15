@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent 
 import { audioManager as defaultAudioManager } from "../utils/audioManager";
 import type { IAudioService } from "../audio/types";
 import { getMusicIntensity, getMusicTension } from "../audio/soundtrack";
-import type { GameState, MissReason, RunStats, StackEvent, StackQuality, StyleUpdate } from "../types";
+import type { GameState, MissMargin, MissReason, RunStats, StackEvent, StackQuality, StyleUpdate } from "../types";
 import {
   createInitialState,
   spawnActiveShape,
@@ -114,8 +114,11 @@ interface GameCanvasProps {
   onZenLivesChange?: (lives: number | null) => void;
   /** After every successful stack (taps and the e2e bridge alike). */
   onStack?: (event: StackEvent) => void;
-  /** After a miss; `terminal` is true when it ended the run. */
-  onMiss?: (terminal: boolean) => void;
+  /**
+   * After a miss; `terminal` is true when it ended the run. `margin` says how
+   * far it was off (see `getMissMargin`), null when not computable.
+   */
+  onMiss?: (terminal: boolean, margin: MissMargin | null) => void;
   /**
    * Resume countdown (see `resumeWithCountdown`): the digit on screen (3, 2,
    * 1), once per digit, then null when play resumes. Not called on cancel
@@ -146,13 +149,21 @@ export interface GameCanvasHandle {
   tap: () => void;
 }
 
-const toRunStats = (state: GameState): RunStats => ({
-  stackCount: state.stackCount,
-  perfectCount: state.perfectCount,
-  bestStreak: state.bestStreak,
-  scoreHistory: state.scoreHistory,
-  endReason: getEndReason(state),
-});
+const toRunStats = (state: GameState): RunStats => {
+  const endReason = getEndReason(state);
+  return {
+    stackCount: state.stackCount,
+    perfectCount: state.perfectCount,
+    bestStreak: state.bestStreak,
+    scoreHistory: state.scoreHistory,
+    endReason,
+    // Only a run ended by the miss itself carries its margin (not clock/lives).
+    endMargin:
+      endReason !== null && endReason === state.lastMissReason
+        ? (state.lastMissMargin ?? null)
+        : null,
+  };
+};
 
 /** `wasBoss` must be read from the pre-stack state (spawn sets the flag). */
 const toStackEvent = (
@@ -396,7 +407,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
           : null,
       );
 
-      if (!wasGameOver) onMiss?.(stateRef.current.isGameOver);
+      if (!wasGameOver) {
+        onMiss?.(
+          stateRef.current.isGameOver,
+          stateRef.current.lastMissMargin ?? null,
+        );
+      }
 
       if (stateRef.current.isGameOver && !wasGameOver) {
         audioService.stopMusic();

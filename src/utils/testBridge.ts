@@ -31,6 +31,8 @@ export type GameTestBridgeState = {
   fractureActive?: boolean;
   fractureWillMissOnTap?: boolean;
   fractureSectorWidthDeg?: number;
+  /** How far the last miss was off (core value behind the UI wording). */
+  lastMissMargin: GameState["lastMissMargin"];
 };
 
 export type GameTestBridge = {
@@ -198,6 +200,7 @@ export const installGameTestBridge = ({
         fractureActive,
         fractureWillMissOnTap,
         fractureSectorWidthDeg,
+        lastMissMargin: state?.lastMissMargin ?? null,
       };
     },
     setActiveSize: (size: number) => {

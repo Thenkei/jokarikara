@@ -18,7 +18,11 @@ test.describe("Game over insights", () => {
     await bridge.step(0.016);
 
     await expect(page.locator(".gameover-screen")).toBeVisible();
-    await expect(page.locator(".end-insight-title")).toContainText("Too late");
+    // Untapped overflow: a time margin headline, then the reason sentence.
+    await expect(page.locator(".end-insight-margin")).toContainText("Late by");
+    await expect(page.locator(".end-insight-title")).toHaveText(
+      "The shape crossed the edge.",
+    );
     const legend = page.locator(".quality-breakdown-legend");
     await expect(legend).toContainText("PERFECT 1");
     await expect(legend).toContainText("GREAT 1");

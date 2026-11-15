@@ -55,6 +55,53 @@ describe("GameOverScreen", () => {
     expect(container.querySelector(".progression-score")).toBeNull();
   });
 
+  it("leads the insight card with the miss margin, keeping the danger styling", () => {
+    const NBSP = "\u00a0";
+    const { container } = renderScreen({
+      endInsight: {
+        margin: `Late by 0.4${NBSP}s`,
+        marginHint: `PERFECT opened 0.4${NBSP}s before the edge.`,
+        title: "The shape crossed the edge.",
+        tip: "Tap a touch earlier.",
+      },
+    });
+    const card = container.querySelector(".end-insight");
+    expect(card?.classList.contains("danger-signal")).toBe(true);
+    expect(card?.getAttribute("role")).toBe("status");
+    const lines = Array.from(card?.querySelectorAll("p") ?? []).map((p) => p.className);
+    expect(lines).toEqual([
+      "end-insight-margin",
+      "end-insight-hint",
+      "end-insight-title",
+      "end-insight-tip",
+    ]);
+    expect(card?.querySelector(".end-insight-margin")?.textContent).toBe(
+      `Late by 0.4${NBSP}s`,
+    );
+    expect(card?.querySelector(".end-insight-hint")?.textContent).toBe(
+      `PERFECT opened 0.4${NBSP}s before the edge.`,
+    );
+    expect(card?.querySelector(".end-insight-title")?.textContent).toBe(
+      "The shape crossed the edge.",
+    );
+  });
+
+  it("shows a size margin without a hint line", () => {
+    const { container } = renderScreen({
+      endInsight: { margin: "Too late by 4\u00a0%", title: "That tap didn't fit.", tip: "x" },
+    });
+    expect(container.querySelector(".end-insight-margin")?.textContent).toBe(
+      "Too late by 4\u00a0%",
+    );
+    expect(container.querySelector(".end-insight-hint")).toBeNull();
+  });
+
+  it("shows no margin line when the miss had none", () => {
+    const { container } = renderScreen();
+    expect(container.querySelector(".end-insight-margin")).toBeNull();
+    expect(container.querySelector(".end-insight-title")?.textContent).toBe("Too late.");
+  });
+
   it("hides the combo stat in Zen", () => {
     const { container } = renderScreen({ mode: "ZEN" });
     expect(container.querySelector(".stat-combo")).toBeNull();

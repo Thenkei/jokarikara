@@ -1,6 +1,6 @@
 import type { GameState } from "../types";
 import type { Shape } from "../utils/geometry";
-import { getVertices, isPointInShape } from "../utils/geometry";
+import { findSizeThreshold, getVertices, isPointInShape } from "../utils/geometry";
 import { getWorldMechanics } from "../constants/game";
 
 /**
@@ -43,17 +43,35 @@ export const createReverseSeed = (from: Shape, initialSize: number): Shape => ({
   opacity: 1,
 });
 
-/** True while every vertex of the growing shape stays inside the arena. */
-export const isWithinArena = (state: GameState): boolean => {
-  if (!state.activeShape) return true;
-  const radius = getArenaRadius(state);
-  const offset = state.activeOffset ?? { x: 0, y: 0 };
-  return getVertices(state.activeShape).every((v) => {
+const shapeWithinArena = (
+  shape: Shape,
+  offset: { x: number; y: number },
+  radius: number,
+): boolean =>
+  getVertices(shape).every((v) => {
     const x = v.x + offset.x;
     const y = v.y + offset.y;
     return x * x + y * y <= radius * radius;
   });
+
+/** True while every vertex of the growing shape stays inside the arena. */
+export const isWithinArena = (state: GameState): boolean => {
+  if (!state.activeShape) return true;
+  return shapeWithinArena(
+    state.activeShape,
+    state.activeOffset ?? { x: 0, y: 0 },
+    getArenaRadius(state),
+  );
 };
+
+const wrapsShape = (
+  outer: Shape,
+  offset: { x: number; y: number },
+  inner: Shape,
+): boolean =>
+  getVertices(inner).every((v) =>
+    isPointInShape({ x: v.x - offset.x, y: v.y - offset.y }, outer),
+  );
 
 /**
  * True when the growing shape (centred at its drift offset) fully contains
@@ -63,10 +81,47 @@ export const containsPrevious = (state: GameState): boolean => {
   const active = state.activeShape;
   const last = state.shapes[state.shapes.length - 1];
   if (!active || !last) return false;
+  return wrapsShape(active, state.activeOffset ?? { x: 0, y: 0 }, last);
+};
+
+/** Upper bracket doublings when searching for the wrapping size. */
+const WRAP_SEARCH_DOUBLINGS = 6;
+
+/**
+ * Smallest size the growing shape (same type, rotation, offset) needed to
+ * fully contain the previous shape: the target an early tap fell short of.
+ * Null when it already wraps it, or when no size up to 64x would.
+ */
+export const getReverseWrapSize = (state: GameState): number | null => {
+  const active = state.activeShape;
+  const last = state.shapes[state.shapes.length - 1];
+  if (!active || !last || active.size <= 0) return null;
   const offset = state.activeOffset ?? { x: 0, y: 0 };
-  return getVertices(last).every((v) =>
-    isPointInShape({ x: v.x - offset.x, y: v.y - offset.y }, active),
-  );
+  const wrapsAt = (size: number) => wrapsShape({ ...active, size }, offset, last);
+  if (wrapsAt(active.size)) return null;
+  let upper = Math.max(active.size, last.size) * 2;
+  for (let i = 0; i < WRAP_SEARCH_DOUBLINGS && !wrapsAt(upper); i += 1) {
+    upper *= 2;
+  }
+  if (!wrapsAt(upper)) return null;
+  return findSizeThreshold(wrapsAt, upper, active.size);
+};
+
+/**
+ * Largest size the growing shape (same type, rotation, offset) could have
+ * had while staying inside the arena: the limit an overflow crossed. Null
+ * when it is still inside, or when its centre has left the arena.
+ */
+export const getLargestArenaSize = (state: GameState): number | null => {
+  const active = state.activeShape;
+  if (!active) return null;
+  const offset = state.activeOffset ?? { x: 0, y: 0 };
+  const radius = getArenaRadius(state);
+  const fitsAt = (size: number) => shapeWithinArena({ ...active, size }, offset, radius);
+  if (fitsAt(active.size)) return null;
+  const smallest = active.size * 1e-3;
+  if (!fitsAt(smallest)) return null;
+  return findSizeThreshold(fitsAt, smallest, active.size);
 };
 
 /** Tap too early: the growing shape cannot contain the previous one yet. */

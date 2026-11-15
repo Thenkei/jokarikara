@@ -22,7 +22,7 @@ import {
   saveDailyResult,
 } from "./utils/storage";
 import type { HighScoresByMode } from "./utils/storage";
-import type { GameMode, RunStats, StyleUpdate, StackQuality } from "./types";
+import type { GameMode, MissMargin, RunStats, StyleUpdate, StackQuality } from "./types";
 import { getWorldPalette, getWorldTheme } from "./visual/theme";
 import { haptic, isHapticsSupported, setHapticsEnabled } from "./utils/haptics";
 import { StartBackdrop } from "./components/StartBackdrop";
@@ -33,6 +33,7 @@ import {
   RESUME_COUNTDOWN_STEP_MS,
 } from "./gameplay/resumeCountdown";
 import { getEndInsight, getQualityBreakdown } from "./modes/runInsights";
+import { getMissAnnouncement, getMissMarginLabel } from "./modes/missMargin";
 import { getWorldConfig } from "./gameplay/selectors";
 import {
   LEVELS_PER_WORLD,
@@ -316,6 +317,14 @@ function App() {
   const comboMilestoneStackRef = useRef(false);
   /** Bumped on each Time Attack miss to replay the "-Ns" pop. */
   const [penaltyPulseId, setPenaltyPulseId] = useState(0);
+  /**
+   * MISS pop for a miss that did not end the run (Zen, Time Attack), with how
+   * far it was off ("+4 %", "BY A HAIR"). Set once per miss event, never per
+   * frame; `id` replays the animation for identical consecutive labels.
+   */
+  const [missPop, setMissPop] = useState<{ label: string | null; id: number } | null>(
+    null,
+  );
   /** Start screen sub-panel shown instead of the menu (null = the menu). */
   const [startPanel, setStartPanel] = useState<StartPanel | null>(null);
   /**
@@ -362,14 +371,21 @@ function App() {
   const unlockedAchievementCount = countUnlocked(achievementRecord.unlocked);
 
   const handleRunMiss = useCallback(
-    (terminal: boolean) => {
+    (terminal: boolean, margin: MissMargin | null) => {
       recordAchievementMiss(terminal);
+      // A terminal miss is explained (with its margin) on the game over card.
+      if (terminal) return;
+      setMissPop((current) => ({
+        label: margin ? getMissMarginLabel(margin) : null,
+        id: (current?.id ?? 0) + 1,
+      }));
+      announce(getMissAnnouncement(margin));
       // A non-terminal Time Attack miss costs time: show the penalty.
-      if (!terminal && mode === "TIME_ATTACK" && TIME_ATTACK_MISS_PENALTY !== undefined) {
+      if (mode === "TIME_ATTACK" && TIME_ATTACK_MISS_PENALTY !== undefined) {
         setPenaltyPulseId((current) => current + 1);
       }
     },
-    [recordAchievementMiss, mode],
+    [recordAchievementMiss, mode, announce],
   );
   const bestWorldReached = achievementRecord.lifetime.bestWorld;
   const revealedWorldCount = countRevealedWorlds(bestWorldReached);
@@ -594,6 +610,7 @@ function App() {
     setLastQuality(null);
     setQualityPulseId(0);
     setPenaltyPulseId(0);
+    setMissPop(null);
     setComboBanner({ streak: 0, id: 0 });
     markProgress("reset", startWorld);
     setHasStackedThisRun(false);
@@ -689,9 +706,11 @@ function App() {
       clearSecondaryHudTimeout();
       setShowSecondaryHud(false);
       setGameState("GAMEOVER");
-      const reason = getEndInsight(stats.endReason, finalWorld)?.title;
+      const insight = getEndInsight(stats.endReason, finalWorld, stats.endMargin);
       announce(
-        ["Game over", reason, `Score ${finalScore}`].filter(Boolean).join(". "),
+        ["Game over", insight?.margin, insight?.title, `Score ${finalScore}`]
+          .filter(Boolean)
+          .join(". "),
       );
     },
     [
@@ -1104,7 +1123,9 @@ function App() {
       ? getMedalResult(score)
       : null;
 
-  const endInsight = lastRun ? getEndInsight(lastRun.stats.endReason, world) : null;
+  const endInsight = lastRun
+    ? getEndInsight(lastRun.stats.endReason, world, lastRun.stats.endMargin)
+    : null;
   const breakdown = getQualityBreakdown(lastRun?.stats.scoreHistory ?? []);
   /** Stacks made this run (a practice run starts with earlier worlds "done"). */
   const runStackCount = Math.max(
@@ -1532,6 +1553,21 @@ function App() {
                 −{TIME_ATTACK_MISS_PENALTY}s
               </div>
             )}
+
+          {missPop && (
+            // Decorative: the live region announces the miss and its margin.
+            <div
+              key={`miss-${missPop.id}`}
+              className="miss-pop danger-signal"
+              data-testid="miss-pop"
+              aria-hidden="true"
+            >
+              <span className="miss-pop-title">MISS</span>
+              {missPop.label && (
+                <span className="miss-pop-margin">{missPop.label}</span>
+              )}
+            </div>
+          )}
 
           {comboBanner.streak > 0 && mode !== "ZEN" && (
             <div
