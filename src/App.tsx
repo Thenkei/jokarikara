@@ -114,6 +114,7 @@ import "./App.css";
 import { isE2eMode } from "./utils/e2e";
 import { GAME_OVER_INPUT_GUARD_MS } from "./modes/gameOverGuard";
 import { renderShareCardFile } from "./share/shareCard";
+import { promptInstall, useCanInstall } from "./pwa/installPrompt";
 
 
 const createRunSeed = (): number => {
@@ -700,6 +701,9 @@ function App() {
     const timer = window.setTimeout(warm, AUDIO_PREWARM_FALLBACK_MS);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // Chromium's install offer, captured in main.tsx before React mounted.
+  const canInstall = useCanInstall();
 
   const restartRun = () => startRun({ mode, daily: dailyKey !== null });
 
@@ -1313,6 +1317,8 @@ function App() {
             onStartDaily={() => startRun({ mode: "CLASSIC", daily: true })}
             onOpenPanel={setStartPanel}
             onOpenSettings={() => setShowSettings(true)}
+            canInstall={canInstall}
+            onInstall={() => void promptInstall()}
           />
         )}
 

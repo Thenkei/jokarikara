@@ -35,6 +35,8 @@ export const en = {
   "start.achievementsAria": "Achievements: {unlocked} of {total} unlocked",
   "start.worlds": "WORLDS {revealed}/{total}",
   "start.worldsAria": "Worlds: {revealed} of {total} discovered",
+  "start.install": "INSTALL",
+  "start.installAria": "Install Shape Stack as an app, playable offline",
   "start.monoOn": "Mono look on",
   "start.monoOff": "Mono look off",
 
